@@ -1,10 +1,9 @@
 import sqlite3
-
-DB_NAME = "bot_data.db"
+import config
 
 def init_db():
     """Створює таблицю для станів, якщо вона ще не існує."""
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(config.DB_NAME)
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_states (
@@ -17,7 +16,7 @@ def init_db():
 
 def get_user_state(phone_number):
     """Отримує поточний стан користувача з бази."""
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(config.DB_NAME)
     cursor = conn.cursor()
     cursor.execute("SELECT current_state FROM user_states WHERE phone_number = ?", (phone_number,))
     result = cursor.fetchone()
@@ -26,7 +25,7 @@ def get_user_state(phone_number):
 
 def set_user_state(phone_number, state):
     """Зберігає або оновлює стан користувача."""
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(config.DB_NAME)
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO user_states (phone_number, current_state)
