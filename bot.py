@@ -1,25 +1,18 @@
-import socket
 import json
-import os
-import sys
 from messageparser import parse_signal_data
 from database import init_db
 import config
+from connection.connection_client import get_client
 
 def main():
-    if not os.path.exists(config.SOCKET_PATH):
-        print(f"❌ Помилка: Сокет {config.SOCKET_PATH} не знайдено.")
-        print("Спочатку запустіть демон: signal-cli -u ВашНомер daemon --socket /tmp/signal-bot.sock")
-        sys.exit(1)
 
     # Ініціалізуємо базу даних перед стартом
     init_db()
 
     # Створюємо підключення до Unix сокета
-    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 
     try:
-        client.connect(config.SOCKET_PATH)
+        client = get_client(config.TCP_HOST, config.TCP_PORT)
         print("✅ Бот підключився до Signal і слухає ефір...")
 
         # Читаємо потік даних порядково (JSON-RPC надсилає кожен пакет в один рядок)

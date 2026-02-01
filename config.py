@@ -5,7 +5,9 @@ BASE_DIR = os.path.expanduser("~/work/signalBot")
 DATA_DIR = os.path.join(BASE_DIR, "signal-data")
 
 # Шлях до сокета
-SOCKET_PATH = "/tmp/signal-bot.sock"
+SOCKET_PATH = "/tmp/signal-bot.sock" # для мак
+TCP_HOST = '127.0.0.1'
+TCP_PORT = 1234
 
 # Налаштування структури папок
 FOLDER_YEAR_FORMAT = "%Y"         # Наприклад: 2026
@@ -21,5 +23,5 @@ SIGNAL_ATTACHMENTS_DIR = os.path.expanduser("~/.local/share/signal-cli/attachmen
 DB_NAME = os.path.join(BASE_DIR, "bot_data.db")
 
 DESERTER_XLSX = DATA_DIR + "/" + "А0224 СЗЧ 2022-2025.xlsx"
-PROCESS_DOC = True
-PROCESS_XLS = True
+PROCESS_DOC = False
+PROCESS_XLS = False
