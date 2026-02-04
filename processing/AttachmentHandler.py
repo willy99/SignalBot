@@ -36,12 +36,14 @@ class AttachmentHandler:
         if os.path.exists(source_file):
             shutil.copy2(source_file, destination_file)
 
+            data_for_excel = None
+
             if config.PROCESS_DOC:
-                doc_processor = DocProcessor(destination_file)
-                doc_processor.process_doc()
-            if config.PROCESS_XLS:
-                word_data = {'піб': 'КОЗАЧУК Вячеслав Вікторович', 'статус': 'СЗЧ'}
-                self.workflow.excelProcessor.insert_record(word_data)
+                doc_processor = DocProcessor(self.workflow, destination_file)
+                data_for_excel = doc_processor.process()
+
+            if config.PROCESS_XLS and data_for_excel is not None:
+                self.workflow.excelProcessor.insert_record(data_for_excel)
                 self.workflow.excelProcessor.save()
             print(f"📁 Файл впорядковано: {destination_file}")
 

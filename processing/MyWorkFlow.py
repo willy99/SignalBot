@@ -3,6 +3,7 @@ from processing.ExcelProcessor import ExcelProcessor
 from processing.AttachmentHandler import AttachmentHandler
 from connection.MyDataBase import MyDataBase
 from processing.Stat import Stat
+import traceback
 
 class MyWorkFlow:
 
@@ -32,7 +33,7 @@ class MyWorkFlow:
             params = data.get("params", {})
             envelope = params.get("envelope", {})
 
-            print(str(data))
+            # print(str(data))
             # 1. Обробка вхідного повідомлення від когось іншого
             if "dataMessage" in envelope:
                 self.stats.messagesProcessed += 1
@@ -90,6 +91,10 @@ class MyWorkFlow:
                         return f"📤 ВИ НАПИСАЛИ до {dest}: {text}"
 
         except Exception as e:
+            stack_trace = traceback.format_exc()
+
+            print("--- FULL STACK TRACE ---")
+            print(stack_trace)
             return f"❌ Помилка парсингу: {e}"
 
         return None
@@ -100,11 +105,13 @@ class MyWorkFlow:
         text = text.lower().strip()
 
         print(f"DEBUG: User={user_id}, State={current_state}, Text='{text}'")
+        main_menu = "Ви у Головному меню:\n1. Техпідтримка\n2. Статистика\n3. Вихід"
+        menu_prompt = "Напишіть 'меню' для початку роботи."
 
         # Глобальна команда для скидання або входу
-        if text == "меню" or text == "start":
+        if text == "меню" or text == "start" or text == "menu":
             self.db.set_user_state(user_id, "MAIN_MENU")
-            return "Ви у Головному меню:\n1. Техпідтримка\n2. Статистика\n3. Вихід"
+            return main_menu
 
         # Логіка для стану MAIN_MENU
         if current_state == "MAIN_MENU":
@@ -112,22 +119,34 @@ class MyWorkFlow:
                 self.db.set_user_state(user_id, "SUPPORT")
                 return "Опишіть вашу проблему або натисніть 0 для повернення."
             elif text == "2":
-                # Стан не змінюємо, просто даємо інфу
-                return self.stats.get_report()
+                self.db.set_user_state(user_id, "STAT")
+                result = self.stats.get_report()
+                result += ":\n1. Повна статистика по файлам\n0. Вихід"
+                return result
             elif text == "3" or text == "вихід":
                 self.db.set_user_state(user_id, "START")
-                return "До зустрічі! Напишіть 'меню', щоб почати знову."
+                return menu_prompt
             elif text == "0":
-                return "Ви вже у Головному меню. Виберіть пункт 1, 2 або 3."
+                return main_menu
 
         # Логіка для стану SUPPORT
         elif current_state == "SUPPORT":
             if text == "0":
                 self.db.set_user_state(user_id, "MAIN_MENU")
-                return "Повертаємось... Ви у Головному меню:\n1. Техпідтримка\n2. Статистика\n3. Вихід"
+                return main_menu
             else:
                 # Тут можна додати збереження проблеми в БД
                 return f"✅ Ваш запит '{text}' прийнято. Наші фахівці зв'яжуться з вами.\n\nНатисніть 0 для виходу в меню."
 
+        elif current_state == "STAT":
+            if text == "0":
+                self.db.set_user_state(user_id, "MAIN_MENU")
+                return main_menu
+            if text == "1":
+                # Тут можна додати збереження проблеми в БД
+                return self.stats.get_full_report()
+            else:
+                return "Фігня-цифра"
+
         # Якщо стан невідомий або START
-        return "Напишіть 'меню' для початку роботи."
+        return menu_prompt

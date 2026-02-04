@@ -5,14 +5,24 @@ class Stat:
         self.attachmentWordProcessed = 0
         self.attachmentPDFProcessed = 0
         self.errors = 0
+        self.doc_names = []
+        self.error_doc_names = {}
 
     def get_report(self):
         return (
-            "📊 *Статистика роботи бота*\n"
+            "📊 * Статистика роботи бота *\n"
             "━━━━━━━━━━━━━━━\n"
             f"📩 Оброблено повідомлень: {self.messagesProcessed}\n"
             f"📝 Документів Word (DOCX): {self.attachmentWordProcessed}\n"
             f"📄 Файлів PDF: {self.attachmentPDFProcessed}\n"
             f"❌ Помилок під час обробки: {self.errors}\n"
+            "━━━━━━━━━━━━━━━\n"
+        )
+
+    def get_full_report(self):
+        return (
+            "📊 * Оброблені документи  *\n"
+            "━━━━━━━━━━━━━━━\n"
+            f"📩 Список документів: {self.doc_names}\n"
             "━━━━━━━━━━━━━━━\n"
         )
