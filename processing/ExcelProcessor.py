@@ -22,6 +22,7 @@ class ExcelProcessor:
             if not os.path.exists(self.file_path):
                 raise FileNotFoundError(f"Файл {self.file_path} не знайдено")
 
+            print(f'>> INIT EXCEL PROCESSOR...')
             # keep_vba=True для вашого .xlsm файлу
             self.workbook = openpyxl.load_workbook(self.file_path, keep_vba=True)
             self.sheet = self.workbook[DESERTER_TAB_NAME]
@@ -101,4 +102,4 @@ class ExcelProcessor:
 
     def save(self):
         self.workbook.save(self.file_path)
-        print("Файл успішно збережено")
+        print("--- ✔️EXCEL - додано інформація")

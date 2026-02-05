@@ -8,6 +8,13 @@ class Stat:
         self.doc_names = []
         self.error_doc_names = {}
 
+    def add_error(self, doc_path, error):
+        doc_errors = self.error_doc_names.get(doc_path)
+        if not doc_errors:
+            doc_errors = []
+        doc_errors.append(error)
+        self.error_doc_names[doc_path] = doc_errors
+
     def get_report(self):
         return (
             "📊 * Статистика роботи бота *\n"
@@ -24,5 +31,7 @@ class Stat:
             "📊 * Оброблені документи  *\n"
             "━━━━━━━━━━━━━━━\n"
             f"📩 Список документів: {self.doc_names}\n"
+            "━━━━━━━━━━━━━━━\n"
+            f"📩 Список помилок: {str(self.error_doc_names)}\n"
             "━━━━━━━━━━━━━━━\n"
         )

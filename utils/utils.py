@@ -1,10 +1,9 @@
 import datetime
 from datetime import datetime, timedelta
 import config
+import os
 
 def clean_text(text):
-    # .split() без аргументів розбиває рядок по будь-якій кількості
-    # пробілів, табуляцій та переносів, а " ".join зшиває їх назад одним пробілом.
     if text is None: return None
     return " ".join(text.split())
 
@@ -51,10 +50,6 @@ def format_to_excel_date(date_val):
         formatted = formatted[1:]
 
     return formatted
-
-
-import os
-
 
 def get_file_name(file_path):
     """

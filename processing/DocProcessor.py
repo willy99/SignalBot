@@ -1,10 +1,7 @@
-from docx import Document
-import textract
-import fitz
 from pathlib import Path
-
+from .parsers.ParserFactory import ParserFactory
 import config
-from utils.utils import clean_text, format_to_excel_date, get_file_name
+from utils.utils import format_to_excel_date, get_file_name, clean_text
 import dics.deserter_xls_dic as col
 from dics.deserter_xls_dic import *
 from datetime import datetime
@@ -12,7 +9,6 @@ import re
 
 class DocProcessor:
 
-    NA = ''
     PIECE_HEADER = 'header'
     PIECE_1 = 'piece 1'
     PIECE_2 = 'piece 2'
@@ -25,56 +21,54 @@ class DocProcessor:
         self.response = {
             'insertionDate' :None,
         }
+        self.extension = Path(self.file_path).suffix
+        self.engine = ParserFactory.get_parser(file_path)
 
     def process(self):
-        extension = Path(self.file_path).suffix
-        print("Пошук тексту..." + extension)
-
-        if extension.lower() == '.doc':
-            text_pieces = self.get_doc_pieces()
-            result = self.process_fields(text_pieces)
-            self.workflow.stats.attachmentWordProcessed += 1
-            self.workflow.stats.doc_names.append(self.file_path)
-            return result
-        elif extension.lower() == '.docx':
-            text_pieces = self.get_docx_pieces()
-            result = self.process_fields(text_pieces)
-            self.workflow.stats.attachmentWordProcessed += 1
-            self.workflow.stats.doc_names.append(self.file_path)
-            return result
-        elif extension.lower() == '.pdf':
-            self.workflow.stats.attachmentPDFProcessed += 1
-            return None
-        print("...Пошук закінчено")
-
-
-    def get_doc_pieces(self):
+        print(f"--- Обробка тексту... {self.extension}")
         doc_pieces = {}
-        doc_pieces[self.PIECE_HEADER] = clean_text(self.find_paragraph_doc(TEXT_ANCHOR_HEADER))
-        doc_pieces[self.PIECE_1] = clean_text(self.extract_text_between_doc(TEXT_ANCHOR_PIECE_1_START_V1, TEXT_ANCHOR_PIECE_1_END_V1))
-        doc_pieces[self.PIECE_3] = clean_text(self.extract_text_between_doc(TEXT_ANCHOR_PIECE_3_START_V1, TEXT_ANCHOR_PIECE_3_END_V1)) or clean_text(
-            self.extract_text_between_doc(TEXT_ANCHOR_PIECE_3_START_V2, TEXT_ANCHOR_PIECE_3_END_V1)) or clean_text(
-            self.extract_text_between_doc(TEXT_ANCHOR_PIECE_3_START_V3, TEXT_ANCHOR_PIECE_3_END_V1))
-        doc_pieces[self.PIECE_4] = clean_text(self.extract_text_between_doc(TEXT_ANCHOR_PIECE_4_START_V1, TEXT_ANCHOR_PIECE_4_END_V1))
-        return doc_pieces
 
-    def get_docx_pieces(self):
-        doc_pieces = {}
-        doc_pieces[self.PIECE_HEADER] = clean_text(self.find_paragraph_docx(TEXT_ANCHOR_HEADER))
-        doc_pieces[self.PIECE_1] = clean_text(self.extract_text_between_docx(TEXT_ANCHOR_PIECE_1_START_V1, TEXT_ANCHOR_PIECE_1_END_V1))
-        doc_pieces[self.PIECE_3] = clean_text(self.extract_text_between_docx(TEXT_ANCHOR_PIECE_3_START_V1, TEXT_ANCHOR_PIECE_3_END_V1)) or clean_text(
-            self.extract_text_between_docx(TEXT_ANCHOR_PIECE_3_START_V2, TEXT_ANCHOR_PIECE_3_END_V1)) or clean_text(
-            self.extract_text_between_docx(TEXT_ANCHOR_PIECE_3_START_V3, TEXT_ANCHOR_PIECE_3_END_V1))
-        doc_pieces[self.PIECE_4] = clean_text(self.extract_text_between_docx(TEXT_ANCHOR_PIECE_4_START_V1, TEXT_ANCHOR_PIECE_4_END_V1))
-        return doc_pieces
+        # Отримуємо основні блоки
+        doc_pieces[self.PIECE_HEADER] = self.engine.extract_text_between(PATTERN_PIECE_HEADER_START, PATTERN_PIECE_HEADER_END, True)
+        doc_pieces[self.PIECE_1] = self.engine.extract_text_between(PATTERN_PIECE_1_START, PATTERN_PIECE_1_END, True)
+        doc_pieces[self.PIECE_4] = self.engine.extract_text_between(PATTERN_PIECE_4_START, PATTERN_PIECE_4_END, True)
+
+        print('>>>header :' + str(doc_pieces[self.PIECE_HEADER]))
+        print('>>>1 :' + str(doc_pieces[self.PIECE_1]))
+        print('>>>4 :' + str(doc_pieces[self.PIECE_4]))
+
+        raw_piece_3 = self.engine.extract_text_between(PATTERN_PIECE_3_START, PATTERN_PIECE_3_END, True) or ""
+        # Нарізаємо на окремих людей
+        persons = self.cut_into_person(raw_piece_3)
+        all_final_records = []
+        for person_text in persons:
+            # Робимо копію структури для конкретної людини
+            individual_pieces = doc_pieces.copy()
+            individual_pieces[self.PIECE_3] = person_text
+
+            # Обробляємо поля (ПІБ, РНОКПП тощо)
+            processed_data = self.process_fields(individual_pieces)
+
+            # extend додає елементи списку до загального списку, а не сам список
+            if isinstance(processed_data, list):
+                all_final_records.extend(processed_data)
+            else:
+                all_final_records.append(processed_data)
+
+        self.workflow.stats.attachmentWordProcessed += 1
+        self.workflow.stats.doc_names.append(self.file_path)
+
+        print(f"--- ✔️ Обробка закінчено. Знайдено осіб: {len(all_final_records)}")
+        return all_final_records
 
     def process_fields(self, text_pieces):
+        self.validatePieces(text_pieces)
 
         result = []
 
         fields = {
             col.COLUMN_INSERT_DATE: format_to_excel_date(datetime.now()),
-            col.COLUMN_MIL_UNIT: "А0224",  # Значення за замовчуванням
+            col.COLUMN_MIL_UNIT: DEFAULT_MIL_UNIT,
         }
 
         text = text_pieces[self.PIECE_HEADER]
@@ -85,9 +79,9 @@ class DocProcessor:
         if text is not None:
             # Приклад наповнення результатів після аналізу тексту
             fields[col.COLUMN_DESERTION_DATE] = self._extract_desertion_date(text)
-            fields[col.COLUMN_DESERTION_REGION] = self._extract_desertion_region(text)
+            fields[col.COLUMN_DESERTION_REGION] = self._extract_desertion_region(clean_text(text))
             fields[col.COLUMN_DESERT_CONDITIONS] = self._extract_desert_conditions(text)
-            fields[col.COLUMN_DESERTION_PLACE] = self._extract_desertion_place(text, get_file_name(self.file_path))
+            fields[col.COLUMN_DESERTION_PLACE] = self._extract_desertion_place(clean_text(text), get_file_name(self.file_path))
             fields[col.COLUMN_RETURN_DATE] = self._extract_return_date(text)
 
         text = text_pieces[self.PIECE_3]
@@ -95,13 +89,13 @@ class DocProcessor:
             # Приклад наповнення результатів після аналізу тексту
             fields[col.COLUMN_NAME] = self._extract_name(text)
             fields[col.COLUMN_ID_NUMBER] = self._extract_id_number(text)
-            fields[col.COLUMN_TZK] = self._extract_rtzk(text)
+            fields[col.COLUMN_TZK] = self._extract_rtzk(clean_text(text))
             fields[col.COLUMN_PHONE] = self._extract_phone(text)
             fields[col.COLUMN_BIRTHDAY] = self._extract_birthday(text)
             fields[col.COLUMN_TITLE] = self._extract_title(text)
             fields[col.COLUMN_SERVICE_TYPE] = self._extract_service_type(text)
-            fields[col.COLUMN_ADDRESS] = self._extract_address(text)
-            fields[col.COLUMN_BIO] = self._extract_bio(text, fields[col.COLUMN_NAME])
+            fields[col.COLUMN_ADDRESS] = self._extract_address(clean_text(text))
+            fields[col.COLUMN_BIO] = self._extract_bio(clean_text(text), fields[col.COLUMN_NAME])
             fields[col.COLUMN_ENLISTMENT_DATE] = self._extract_conscription_date(text)
             fields[col.COLUMN_SUBUNIT] = self._extract_military_subunit(text, get_file_name(self.file_path))
 
@@ -112,19 +106,61 @@ class DocProcessor:
         result.append(fields)
         return result
 
+
+    def validatePieces(self, doc_pieces):
+        if doc_pieces[self.PIECE_HEADER] is None:
+            raise ValueError(f"❌ Частина з довідкою не витягнуто")
+        if doc_pieces[self.PIECE_1] is None:
+            raise ValueError(f"❌ Частина 1 не витягнуто!")
+        if doc_pieces[self.PIECE_3] is None:
+            raise ValueError(f"❌ Частина 3 не витягнуто!")
+        if doc_pieces[self.PIECE_4] is None:
+            raise ValueError(f"❌ Частина 4 не витягнуто!")
+
+
+    def cut_into_person(self, doc_piece_3):
+        """
+        Розрізає блок тексту на окремих осіб за паттерном ПІБ (КАПСОМ).
+        Повертає масив рядків, де кожен рядок — це дані однієї особи.
+        """
+        # print('>>> search persons in:' + doc_piece_3)
+        if not doc_piece_3:
+            return []
+
+        # Знаходимо всі ПІБ, що стоять на початку рядків
+        matches = list(re.finditer(STRICT_NAME_PATTERN, doc_piece_3, re.MULTILINE))
+
+        if not matches:
+            # Якщо жодного ПІБ капсом не знайдено, повертаємо весь текст як одну особу
+            return [doc_piece_3.strip()]
+
+        persons = []
+        for i in range(len(matches)):
+            start_idx = matches[i].start()
+            end_idx = matches[i + 1].start() if i + 1 < len(matches) else len(doc_piece_3)
+
+            person_data = doc_piece_3[start_idx:end_idx].strip()
+
+            if len(person_data) > 20:
+                persons.append(person_data)
+                print('... 🏃‍♂️ПЕРСОНА: ' + self._extract_name(person_data))
+
+        return persons
+
+
     def _extract_mil_unit(self, text):
         pattern = r'\b[А-ЯA-Z]\d{4}\b'
         match = re.search(pattern, text)
         if match:
             return match.group(0).upper()
-        return self.NA
+        return NA
 
     def _extract_bio(self, text, full_name):
         """
         Повертає частину тексту, починаючи з ПІБ.
         Оскільки текст вичищений, використовуємо прямий пошук.
         """
-        if not full_name or full_name == self.NA:
+        if not full_name or full_name == NA:
             return text
 
         # Знаходимо позицію, де починається ПІБ
@@ -138,12 +174,11 @@ class DocProcessor:
 
     def _extract_name(self, text):
         # беремо саме ПЕРШИЙ знайдений ПІБ у тексті
-        pattern = r'\b([А-ЩЬЮЯҐЄІЇ]{3,})\s+([А-ЯҐЄІЇ][а-яґєії\']{2,})\s+([А-ЯҐЄІЇ][а-яґєії\']{2,})\b'
 
-        match = re.search(pattern, text)
+        match = re.search(NAME_PATTERN, text)
         if match:
             return f"{match.group(1)} {match.group(2)} {match.group(3)}"
-        return self.NA
+        return NA
 
     def _extract_title(self, text):
         """
@@ -156,7 +191,7 @@ class DocProcessor:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
             return match.group(0).lower()
-        return self.NA
+        return NA
 
     def _extract_service_type(self, text):
         mapping = {
@@ -166,24 +201,35 @@ class DocProcessor:
         for pattern, result in mapping.items():
             if re.search(pattern, text, re.IGNORECASE):
                 return result
-        return self.NA
+        return NA
 
     def _extract_id_number(self, text):
-        """
-        Шукає 10 цифр підряд поруч із ключовими словами РНОКПП або ІПН.
-        Враховує можливі переплутані літери (напр. РНОК ПП, І.П.Н).
-        """
-        # Шукаємо ключові слова, після яких йде 10 цифр
-        # [РІ][НП][ОН][К][П]? - спроба охопити помилки в РНОКПП/ІПН
-        pattern = r'(?:РНОКПП|ІПН|І\.П\.Н\.|РНОК\s*ПП|РНОК\s*ПП)[\s.:]*(\d{10})\b'
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            return match.group(1)
+        # 1. Шукаємо ключове слово та результат після нього
+        # Додаємо перевірку на текст "не надано", "відсутній" тощо
+        marker_pattern = r'(?i)(?:РНОКПП|ІПН|І\.П\.Н\.|РНОК\s*ПП)'
 
-        # Якщо поруч немає ключових слів, шукаємо просто 10 цифр,
-        # але перевіряємо, щоб це не був номер телефону
-        standalone_digits = re.findall(r'\b\d{10}\b', text)
-        return standalone_digits[0] if standalone_digits else self.NA
+        # Шукаємо позицію маркера
+        marker_match = re.search(marker_pattern, text)
+
+        if marker_match:
+            # Беремо шматок тексту після маркера (приблизно 30 символів)
+            after_marker = text[marker_match.end():marker_match.end() + 30]
+
+            # Якщо відразу після маркера бачимо слова про відсутність — повертаємо NA
+            if re.search(r'(?i)(відсутн|не надано|немає|відомості)', after_marker):
+                return NA
+
+            # Якщо слова про відсутність немає, шукаємо 10 цифр
+            digits_match = re.search(r'(\d{10})\b', after_marker)
+            if digits_match:
+                return digits_match.group(1)
+
+        # 2. Резервний пошук (тільки якщо маркера взагалі немає в тексті)
+        # Шукаємо 10 цифр, які НЕ починаються на '0' (номери телефонів)
+        # [1-9] гарантує, що ми не візьмемо мобільний номер 068... чи 093...
+        standalone_digits = re.findall(r'\b([1-9]\d{9})\b', text)
+
+        return standalone_digits[0] if standalone_digits else NA
 
     def _extract_phone(self, text):
         """
@@ -201,7 +247,7 @@ class DocProcessor:
             # Приводимо до формату 0XXXXXXXXX (останні 10 цифр)
             if len(digits) >= 10:
                 return digits[-10:]
-        return self.NA
+        return NA
 
     def _extract_conscription_date(self, text):
         """
@@ -214,7 +260,7 @@ class DocProcessor:
         # 1. Знаходимо РНОКПП/ІПН, щоб знати, де зупинити пошук
         id_match = re.search(r'(?:РНОКПП|ІПН)', text, re.IGNORECASE)
         if not id_match:
-            return self.NA
+            return NA
 
         pos_id = id_match.start()
         # Беремо зону пошуку ПЕРЕД РНОКПП (близько 150 символів)
@@ -228,73 +274,96 @@ class DocProcessor:
             found_date = dates[-1]
             return format_to_excel_date(found_date)
 
-        return self.NA
+        return NA
 
     def _extract_birthday(self, text):
         """
-        Витягує дату перед словами "року народження".
+        Витягує дату народження з підтримкою різних форматів пробілів та скорочень.
         """
-        # Шукаємо формат ДД.ММ.РРРР перед "року народження"
-        pattern = r'(\d{2}\.\d{2}\.\d{4})[\s]*(року народження|р.н.)'
+        # 1. Використовуємо \s+ (один або більше пробілів будь-якого типу)
+        # 2. Додаємо підтримку можливого слова "від" (іноді пишуть "06.02.1975 р. від народження")
+        pattern = r'(\d{2}\.\d{2}\.\d{4})\s*(?:року\s+народження|р\.н\.|народження)'
+
+        # Використовуємо re.search з ігноруванням регістру
         match = re.search(pattern, text, re.IGNORECASE)
+
         if match:
-            return format_to_excel_date(match.group(1))
-        return self.NA
+            date_str = match.group(1).strip()
+            return format_to_excel_date(date_str)
+
+        # Резервний пошук: якщо "року народження" немає, але є формат дати поруч із ПІБ
+        # (допомагає, якщо заголовок блоку вже відрізав ключові слова)
+        backup_pattern = r'\b(\d{2}\.\d{2}\.\d{4})\b'
+        # Шукаємо всі дати і беремо першу, яка зазвичай є датою народження у цьому блоці
+        all_dates = re.findall(backup_pattern, text)
+        if all_dates:
+            return format_to_excel_date(all_dates[0])
+
+        return NA
 
     def _extract_address(self, text):
-        """
-        Беремо текст після 'Адреса проживання' і шукаємо в ньому
-        найдовшу послідовність, що закінчується номером будинку/квартири.
-        """
-        # 1. Знаходимо ОСТАННЄ входження ключової фрази
+        # 1. Знаходимо маркер
+        print('text = ' + text)
         marker = "Адреса проживання"
-        starts = [m.start() for m in re.finditer(re.escape(marker), text, re.IGNORECASE)]
-        if not starts:
-            return self.NA
+        match_marker = re.search(re.escape(marker), text, re.IGNORECASE)
+        if not match_marker:
+            return NA
 
-        # Працюємо з текстом після маркера
-        search_area = text[starts[-1]:]
-        # Видаляємо сам заголовок
-        search_area = re.sub(r'^Адреса проживання(?: військовослужбовця)?\s*:?\s*', '', search_area,
-                             flags=re.IGNORECASE)
+        # Беремо все ПІСЛЯ маркера
+        address_part = text[match_marker.end():].strip()
 
-        # 2. ПАТТЕРН: Беремо все, поки не зустрінемо номер будинку
-        # (цифри, можливо з дробом або літерою), і опціонально квартиру.
-        # [^.!?\n]{5,} - мінімум 5 будь-яких символів (вулиця, місто)
-        # \d{1,4}(?:[/-]\d+)?\s*[А-Яа-я]? - номер будинку
-        pattern = r'([^.!?\n]{5,}.*?\d{1,4}(?:[/-]\d+)?\s*[А-Яа-я]?(?:\s*,?\s*кв\.?\s*\d+)?)'
+        # Видаляємо "військовослужбовця" та двокрапку
+        address_part = re.sub(r'^(?:\s*військовослужбовця)?\s*:?\s*', '', address_part, flags=re.IGNORECASE)
+        print('>>>> address part: ' + address_part)
 
-        match = re.search(pattern, search_area, re.DOTALL)
+        # 2. ПАТТЕРН: беремо все до першого ";" або "\n"
+        # [^;\n]+ — шукає будь-які символи, окрім крапки з комою та переносу рядка
+        pattern = r'^((?:(?!Близькі родичі|;|\n).)+)'
+
+        match = re.search(pattern, address_part, re.IGNORECASE | re.DOTALL)
 
         if match:
             address = match.group(1).strip()
-
-            # Видаляємо "хвости", які могли прилипнути (наприклад, початок наступного пункту)
-            # Якщо в адресі раптом з'явився текст "4. Хто проводив" - обрізаємо
-            address = re.split(r'\s\d+\s*[А-Я]', address)[0]
-
-            # Фінальна чистка пробілів
+            # Фінальна чистка від зайвих пробілів та крапок у кінці
             return " ".join(address.split()).strip(':;,. ')
 
-        return self.NA
+        return NA
 
     def _extract_rtzk(self, text):
-        pattern = r'(?i)([А-ЯҐЄІЇ][^.,!?]*?(?:РТЦК|ТЦК|МТЦК)(?:\s*(?:та|&)?\s*СП)?(?:\s+м\.\s+[А-Яа-я\']+|\s+[А-Яа-я\']+\s+обл\.?)?)'
+        # 1. Покращений паттерн: додаємо підтримку складних назв міст
+        pattern = r'(?i)((?:[А-ЯҐЄІЇ][^.,!?\s]*\s+){1,5}?(?:РТЦК|ТЦК|МТЦК)(?:\s*(?:та|&)?\s*СП)?(?:\s+м\.\s+[А-ЯІЇЄа-яіїє\-\']+(?:\s+[А-ЯІЇЄа-яіїє\-\']+)*|\s+[А-ЯІЇЄа-яіїє\']+\s+обл\.?)?)'
 
         match = re.search(pattern, text)
         if match:
             res = match.group(1).strip()
 
-            res = re.sub(
-                r'(?i)^(Призваний|Призвана|Яким)\s+(на військову службу\s+)?(за призовом\s+)?(під час мобілізації\s+)?',
-                '', res)
+            # 2. Очищення. ПЕРШИМ ділом видаляємо дату, але ОБЕРЕЖНО
+            # Видаляємо тільки саму дату, не чіпаючи текст ПЕРЕД нею
+            res = re.sub(r'\s*,?\s*\d{2}\.\d{2}\.\d{2,4}.*$', '', res)
 
-            res = re.sub(r'\d{2}\.\d{2}\.\d{4}.*$', '', res)
+            trash_patterns = [
+                r'(?i)призваний\s+',
+                r'(?i)призвана\s+',
+                r'(?i)яким\s+',
+                r'(?i)на\s+військову\s+службу\s+',
+                r'(?i)за\s+призовом\s+',
+                r'(?i)під\s+час\s+мобілізації\s+',
+                r'(?i)з\s+\d{2}\.\d{2}\.\d{2,4}',
+            ]
 
+            for p in trash_patterns:
+                res = re.sub(p, '', res)
+
+            # 3. Фінальна чистка
+            # join(split()) прибере зайві пробіли, якщо дата була всередині
             final_res = " ".join(res.split()).strip(':;,. ')
-            return final_res if final_res else self.NA
 
-        return self.NA
+            # Видаляємо залишки фраз, якщо вони стали на початку після чистки
+            final_res = re.sub(r'(?i)^(на військову службу|призваний)\s+', '', final_res)
+
+            return final_res if final_res else NA
+
+        return NA
 
     def _extract_desertion_date(self, text):
         """
@@ -313,7 +382,7 @@ class DocProcessor:
         if fallback:
             return format_to_excel_date(fallback.group(1))
 
-        return self.NA
+        return NA
 
     def _extract_desert_conditions(self, text):
         """
@@ -323,9 +392,9 @@ class DocProcessor:
         paragraphs = [p.strip() for p in re.split(r'[\r\n]{2,}', text) if p.strip()]
 
         # Ключові слова для перевірки/контролю
-        check_markers = ["під час перевірки", "під час шикування", "перевірці наявності", "не повернувся"]
+        check_markers = ["під час перевірки", "під час шикування", "перевірці наявності", "не повернувся", "не прибуття"]
         # Ключові слова для факту відсутності
-        absence_markers = ["відсутн", "виявлено відсутність", "не було в наявності", "не повернувся"]
+        absence_markers = ["відсутн", "виявлено відсутність", "не було в наявності", "не повернувся", "не прибуття"]
 
         for para in paragraphs:
             clean_para = " ".join(para.split()).lower()
@@ -338,7 +407,7 @@ class DocProcessor:
                 # Повертаємо абзац одним рядком без внутрішніх розривів
                 return " ".join(para.split())
 
-        return self.NA
+        return NA
 
     def _extract_return_date(self, text):
         """
@@ -347,7 +416,7 @@ class DocProcessor:
         """
         # 1. Перевіряємо наявність ключової фрази
         if "був присутній" not in text.lower():
-            return self.NA
+            return ''
 
         # 2. Якщо фраза є, шукаємо дату ДД.ММ.РРРР, яка стоїть ПЕРЕД "року був присутній"
         # Або просто дату в цьому ж реченні
@@ -363,7 +432,7 @@ class DocProcessor:
         if fallback_with_presence:
             return format_to_excel_date(fallback_with_presence.group(1))
 
-        return self.NA
+        return ''
 
     def _extract_desertion_region(self, text):
         """
@@ -391,13 +460,13 @@ class DocProcessor:
         if backup_match:
             return " ".join(backup_match.group(1).split())
 
-        return self.NA
+        return NA
 
     def _calculate_service_days(self, conscription_date_str, desertion_date_str):
         """
             Рахує дні та перевіряє їх на логіку.
             """
-        if conscription_date_str == self.NA or desertion_date_str == self.NA:
+        if conscription_date_str == NA or desertion_date_str == NA:
             return 0
 
         try:
@@ -458,7 +527,7 @@ class DocProcessor:
                     res = abbreviation
                 found_subunits.append(res)
 
-        return found_subunits[-1] if found_subunits else self.NA
+        return found_subunits[-1] if found_subunits else NA
 
     def _extract_desertion_place(self, text, file_name=None):
         short_values = list(set(DESERTION_PLACE_MAPPING.values()))
@@ -472,130 +541,4 @@ class DocProcessor:
             if re.search(pattern, text, re.IGNORECASE):
                 return short_name
 
-        return self.NA
-
-
-    ########################### - DOC - ###############################
-    def find_paragraph_doc(self, search_text, get_next=False):
-        # textract витягує текст з .doc через antiword
-        byte_content = textract.process(self.file_path)
-        text = byte_content.decode('utf-8')
-
-        paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
-
-        for i, para in enumerate(paragraphs):
-            para = clean_text(para).lower()
-            if search_text.lower() in para:
-                if get_next and i + 1 < len(paragraphs):
-                    return clean_text(paragraphs[i + 1])
-                else:
-                    return clean_text(paragraphs[i])
-        return None
-
-    def extract_text_between_doc(self, start_search, end_search):
-        # 1. Отримуємо весь текст одним шматком
-        byte_content = textract.process(self.file_path)
-        # Замінюємо декілька пробілів/переносів на один пробіл для стабільності пошуку
-        full_text = " ".join(byte_content.decode('utf-8').split())
-
-        # 2. Готуємо пошукові фрази (теж очищаємо від зайвих пробілів)
-        start_phrase = " ".join(start_search.split())
-        end_phrase = " ".join(end_search.split())
-
-        # 3. Шукаємо позицію кінця стартової фрази (rfind знайде ОСТАННЄ входження, тобто після інструкції)
-        start_pos = full_text.lower().rfind(start_phrase.lower())
-
-        if start_pos == -1:
-            return None
-
-        # Початок контенту — одразу після стартової фрази
-        content_start = start_pos + len(start_phrase)
-
-        # 4. Шукаємо позицію кінцевої фрази (починаючи від content_start)
-        end_pos = full_text.lower().find(end_phrase.lower(), content_start)
-
-        # 5. Вирізаємо результат
-        if end_pos != -1:
-            result = full_text[content_start:end_pos].strip()
-        else:
-            result = full_text[content_start:].strip()
-
-        return result if result else None
-
-
-    ########################### - DOCX - ###############################
-    def find_paragraph_docx(self, search_text, get_next=False):
-        """
-        Аналог для .docx файлів. Шукає параграф за текстом
-        і повертає його або наступний за ним.
-        """
-        doc = Document(self.file_path)
-        # Створюємо список параграфів, які не є порожніми
-        paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
-
-        for i, para_text in enumerate(paragraphs):
-            # Використовуємо clean_text для нормалізації пошуку (як у вашому прикладі)
-            para_clean = clean_text(para_text).lower()
-
-            if search_text.lower() in para_clean:
-                if get_next and i + 1 < len(paragraphs):
-                    return clean_text(paragraphs[i + 1])
-                else:
-                    return clean_text(paragraphs[i])
-
-        return None
-
-    def extract_text_between_docx(self, start_search, end_search):
-        """
-        Аналог для .docx. Збирає весь текст документа в один рядок
-        і вирізає контент між двома фразами.
-        """
-        # 1. Завантажуємо документ
-        doc = Document(self.file_path)
-
-        # 2. Збираємо весь текст, нормалізуючи пробіли (як у методі для .doc)
-        # Це дозволяє ігнорувати розриви сторінок та параграфів під час пошуку
-        full_text = " ".join([p.text for p in doc.paragraphs]).strip()
-        full_text = " ".join(full_text.split())
-
-        # 3. Готуємо пошукові фрази
-        start_phrase = " ".join(start_search.split())
-        end_phrase = " ".join(end_search.split())
-
-        # 4. Шукаємо останнє входження стартової фрази (rfind)
-        start_pos = full_text.lower().rfind(start_phrase.lower())
-
-        if start_pos == -1:
-            return None
-
-        # Початок контенту — одразу після знайденої фрази
-        content_start = start_pos + len(start_phrase)
-
-        # 5. Шукаємо позицію кінцевої фрази
-        end_pos = full_text.lower().find(end_phrase.lower(), content_start)
-
-        # 6. Вирізаємо та чистимо результат
-        if end_pos != -1:
-            result = full_text[content_start:end_pos].strip()
-        else:
-            result = full_text[content_start:].strip()
-
-        return result if result else None
-    ########################### - PDF - ###############################
-    def find_next_paragraph_pdf(self, search_text):
-        print('>>> pdf')
-        doc = fitz.open(self.file_path)
-
-        for page in doc:
-            # Отримуємо блоки тексту. Кожен блок зазвичай є абзацом.
-            blocks = page.get_text("blocks")
-            for i, b in enumerate(blocks):
-                block_text = b[4]  # 4-й елемент кортежу — це сам текст
-                print('>>> block : ' + clean_text(block_text))
-                if search_text.lower() in clean_text(block_text.lower()):
-                    if i + 1 < len(blocks):
-                        return clean_text(blocks[i + 1][4])
-                    return "Знайдено в останньому блоці сторінки."
-
-        return "Текст не знайдено."
-
+        return NA

@@ -53,12 +53,22 @@ class MyWorkFlow:
                 # process attachments
                 file_saved = False
                 if len(attachments) > 0:
+                    print('--------------------------🔓 BEGIN ------------------------------------------ ')
                     for att in attachments:
                         att_id = att.get("id")
                         filename = att.get("filename")
 
                         print(f"📎 Отримано файл: {filename} (ID: {att_id})")
                         file_saved = self.attachmentHandler.handle_attachment(att_id, filename)
+                        self.client.send_reaction(
+                            group_id,
+                            recipient,
+                            "➕" if file_saved else "⚠️",
+                            source_uuid,
+                            timestamp
+                        )
+                    print('--------------------------🔓 END -------------------------------------------- ')
+
 
                 elif message_text:
                     response = ''
@@ -72,14 +82,6 @@ class MyWorkFlow:
                         self.client.send_message(source, response)
 
                     # return f"📥 ВХІДНЕ від {source}: {message_text}"
-                if file_saved:
-                    self.client.send_reaction(
-                        group_id,
-                        recipient,
-                        "➕",
-                        source_uuid,
-                        timestamp
-                    )
             # 2. Обробка синхронізації (ви написали з телефону комусь)
             elif "syncMessage" in envelope:
                 sync_msg = envelope["syncMessage"]
@@ -100,7 +102,6 @@ class MyWorkFlow:
         return None
 
     def getResponseAndMove(self, user_id, text):
-        # Отримуємо чистий стан
         current_state = self.db.get_user_state(user_id)
         text = text.lower().strip()
 
@@ -108,12 +109,10 @@ class MyWorkFlow:
         main_menu = "Ви у Головному меню:\n1. Техпідтримка\n2. Статистика\n3. Вихід"
         menu_prompt = "Напишіть 'меню' для початку роботи."
 
-        # Глобальна команда для скидання або входу
         if text == "меню" or text == "start" or text == "menu":
             self.db.set_user_state(user_id, "MAIN_MENU")
             return main_menu
 
-        # Логіка для стану MAIN_MENU
         if current_state == "MAIN_MENU":
             if text == "1":
                 self.db.set_user_state(user_id, "SUPPORT")
@@ -129,13 +128,11 @@ class MyWorkFlow:
             elif text == "0":
                 return main_menu
 
-        # Логіка для стану SUPPORT
         elif current_state == "SUPPORT":
             if text == "0":
                 self.db.set_user_state(user_id, "MAIN_MENU")
                 return main_menu
             else:
-                # Тут можна додати збереження проблеми в БД
                 return f"✅ Ваш запит '{text}' прийнято. Наші фахівці зв'яжуться з вами.\n\nНатисніть 0 для виходу в меню."
 
         elif current_state == "STAT":
@@ -143,7 +140,6 @@ class MyWorkFlow:
                 self.db.set_user_state(user_id, "MAIN_MENU")
                 return main_menu
             if text == "1":
-                # Тут можна додати збереження проблеми в БД
                 return self.stats.get_full_report()
             else:
                 return "Фігня-цифра"
