@@ -43,10 +43,10 @@ class AttachmentHandler:
             if config.PROCESS_DOC:
                 doc_processor = DocProcessor(self.workflow, destination_file)
                 data_for_excel = doc_processor.process()
-                file_parsed = self.check_for_errors(destination_file, data_for_excel)
+                file_parsed = doc_processor.check_for_errors(data_for_excel)
 
             if config.PROCESS_XLS and data_for_excel is not None:
-                self.workflow.excelProcessor.insert_record(data_for_excel)
+                self.workflow.excelProcessor.upsert_record(data_for_excel)
                 self.workflow.excelProcessor.save()
             print(f"📁 Файл впорядковано: {destination_file}")
 
@@ -81,17 +81,3 @@ class AttachmentHandler:
             with open(full_path, 'rb') as f:
                 return f.read()
         return None
-
-    def check_for_errors(self, file_path, data_for_excel):
-        result = True
-        if not data_for_excel:
-            return
-
-        for data_dict in data_for_excel:
-            for col_name, value in data_dict.items():
-                if value == NA:
-                    error = 'COLUMN ' + col_name + ' is ' + NA
-                    print('------ ⚠️ ' + error)
-                    self.workflow.stats.add_error(file_path, error)
-                    result = False
-        return result

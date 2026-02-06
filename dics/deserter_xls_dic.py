@@ -1,39 +1,43 @@
+from typing import Final
+
 # EXCEL FILE COLUMNS FOR DESERTERS (А0224 СЗЧ.XLSX)
-NA = 'N/A'
-DEFAULT_MIL_UNIT = 'А0224'
+NA : Final = '' # порожня ячейка, інформація не додана або не змогли витягнути
+DEFAULT_MIL_UNIT : Final = 'А0224'
 
-COLUMN_INCREMEMTAL = '№'
-COLUMN_INSERT_DATE = 'Дата внесення'
-COLUMN_DESERTION_DATE = 'Дата СЗЧ'
-COLUMN_RAPORT_DATE = 'Дата Рапорт'
-COLUMN_MIL_UNIT = 'Військова частина'
-COLUMN_SERVICE_TYPE = 'Від служби'
-COLUMN_TITLE = 'Військове звання'
-COLUMN_NAME = 'ПІБ'
-COLUMN_DESERTION_PLACE = 'Звідки СЗЧ'
-COLUMN_SUBUNIT = 'Підрозділ'
-COLUMN_SUBUNIT2 = 'Підрозділ2'
-COLUMN_DESERTION_REGION = 'Звідки СЗЧ н.п. обл'
-COLUMN_BIRTHDAY = 'Дата народження'
-COLUMN_ID_NUMBER = 'РНОКПП'
-COLUMN_ENLISTMENT_DATE = 'Дата призову на військову службу'
-COLUMN_DESERT_CONDITIONS = 'Дата, час обставини та причини самовільного залишення військової частини або місця служби'
-COLUMN_BIO = 'Біографічні дані, дата призову та яким РТЦК та СП Призваний'
-COLUMN_TZK = 'РТЦК'
-COLUMN_ADDRESS = 'Адреса проживання'
-COLUMN_PHONE = '№ телефону'
-COLUMN_EXECUTOR = 'Виконавець'
-COLUMN_SERVICE_DAYS = 'термін служби до СЗЧ'
-COLUMN_RETURN_DATE = 'Дата повернення до в/частини'
+# Відповідність назв колонок в екселі
+COLUMN_INCREMEMTAL : Final = '№'
+COLUMN_INSERT_DATE : Final = 'Дата внесення'
+COLUMN_DESERTION_DATE : Final = 'Дата СЗЧ'
+COLUMN_RAPORT_DATE : Final = 'Дата Рапорт'
+COLUMN_MIL_UNIT : Final = 'Військова частина'
+COLUMN_SERVICE_TYPE : Final = 'Від служби'
+COLUMN_TITLE : Final = 'Військове звання'
+COLUMN_NAME : Final = 'ПІБ'
+COLUMN_DESERTION_PLACE : Final = 'Звідки СЗЧ'
+COLUMN_SUBUNIT : Final = 'Підрозділ'
+COLUMN_SUBUNIT2 : Final = 'Підрозділ2'
+COLUMN_DESERTION_REGION : Final = 'Звідки СЗЧ н.п. обл'
+COLUMN_BIRTHDAY : Final = 'Дата народження'
+COLUMN_ID_NUMBER : Final = 'РНОКПП'
+COLUMN_ENLISTMENT_DATE : Final = 'Дата призову на військову службу'
+COLUMN_DESERT_CONDITIONS : Final = 'Дата, час обставини та причини самовільного залишення військової частини або місця служби'
+COLUMN_BIO : Final = 'Біографічні дані, дата призову та яким РТЦК та СП Призваний'
+COLUMN_TZK : Final = 'РТЦК'
+COLUMN_ADDRESS : Final = 'Адреса проживання'
+COLUMN_PHONE : Final = '№ телефону'
+COLUMN_EXECUTOR : Final = 'Виконавець'
+COLUMN_SERVICE_DAYS : Final = 'термін служби до СЗЧ'
+COLUMN_RETURN_DATE : Final = 'Дата повернення до в/частини'
 
-TITLES = [
+# ранги
+TITLES : Final = [
             'солдат', 'старший солдат', 'молодший сержант', 'сержант',
             'старший сержант', 'головний сержант', 'штаб-сержант',
             'молодший лейтенант', 'лейтенант', 'старший лейтенант', 'капітан',
             'майор', 'підполковник', 'полковник', 'офіцер'
         ]
-
-SUBUNIT_MAPPING = {
+# маппінг підрозділів
+SUBUNIT_MAPPING : Final = {
     # Пріоритет: спочатку довші назви, потім коротші
     r'(?i)(\d+)?\s*десант(?:но)?[- ]?штурмов(?:ого|ий)\s*батальйон(?:у|) ': r'\1 дшб',
     r'(?i)аеромобільн(?:ого|ий)\s*батальйон(?:у|)': 'АЕМБ',
@@ -65,7 +69,8 @@ SUBUNIT_MAPPING = {
     r'\МР\b': 'МР',
 }
 
-DESERTION_PLACE_MAPPING = {
+# мапінг звідки тіканув
+DESERTION_PLACE_MAPPING : Final = {
     r'(?i)район[у\s]+виконання\s+(?:бойового\s+)?(завдан[(ня|нь)\s]*)(за\s+призначенням)?': 'РВБЗ',
     r'(?i)після\s+проходження\s+військово-лікарської\s+комісії': 'відрядження',
     r'(?i)курсанта\s+.*?навчальної\s+роти': 'НЦ',
@@ -75,17 +80,19 @@ DESERTION_PLACE_MAPPING = {
     r'(?i)(?:повернув(?:ся|ось|нення)|неприбуття|не\s+прибув)\s+з\s+відпустки': 'Відпустки',
 }
 
-NAME_PATTERN = r'\b([А-ЩЬЮЯҐЄІЇ]{3,})\s+([А-ЯҐЄІЇ][а-яґєії\']{2,})\s+([А-ЯҐЄІЇ][а-яґєії\']{2,})\b'
-STRICT_NAME_PATTERN = r'^\b([А-ЩЬЮЯҐЄІЇ]{3,})\s+([А-ЯҐЄІЇ][а-яґєії\']{2,})\s+([А-ЯҐЄІЇ][а-яґєії\']{2,})\b'
+#### регулярки для конкретних полів ###
+NAME_PATTERN : Final = r'\b(([А-ЩЬЮЯҐЄІЇʼ-]{3,}\s?){1,2})\s+([А-ЯҐЄІЇ][а-яґєії\']{2,})\s+(([А-ЯҐЄІЇ][а-яґєії\-\']{2,}\s?){1,2})\b'
+STRICT_NAME_PATTERN : Final = r'^\b(([А-ЩЬЮЯҐЄІЇʼ-]{3,}\s?){1,2})\s+([А-ЯҐЄІЇ][а-яґєії\']{2,})\s+(([А-ЯҐЄІЇ][а-яґєії\-\']{2,}\s?){1,2})\b'
 
-PATTERN_PIECE_HEADER_START = 'ДОПОВІДЬ'
-PATTERN_PIECE_HEADER_END = r'1\.\s+Дата\s+і\s+час\s+скоєння'
+#### регулярки для шматків тексту ####
+PATTERN_PIECE_HEADER_START : Final = 'ДОПОВІДЬ'
+PATTERN_PIECE_HEADER_END : Final = r'1\.\s+Дата\s+і\s+час\s+скоєння'
 
-PATTERN_PIECE_1_START = r'матеріальна\s+та\s+моральна\s+шкода\)\.'
-PATTERN_PIECE_1_END = r'2\.\s+Коли,\s+яким\s+органом'
+PATTERN_PIECE_1_START : Final = r'матеріальна\s+та\s+моральна\s+шкода\)\.'
+PATTERN_PIECE_1_END : Final = r'2\.\s+Коли,\s+яким\s+органом'
 
-PATTERN_PIECE_3_START = r'(?:Стислі демографічні дані|Адреса проживання.*?Близькі родичі|Близькі родичі.*?Адреса проживання|призваний на військову службу, освіта, сімейний стан)'
-PATTERN_PIECE_3_END = r'\b4[\.\s\)]+(?:Хто проводить|Службове розслідування)'
+PATTERN_PIECE_3_START : Final = r'(?:Стислі демографічні дані|Адреса проживання.*?Близькі родичі|Близькі родичі.*?Адреса проживання|призваний на військову службу, освіта, сімейний стан)'
+PATTERN_PIECE_3_END : Final = r'\b4[\.\s\)]+(?:Хто проводить|Службове розслідування)'
 
-PATTERN_PIECE_4_START = r'Хто проводить службове розслідування, строки його проведення\.'
-PATTERN_PIECE_4_END = r'5[\.\s\)]+Військове звання'
+PATTERN_PIECE_4_START : Final = r'Хто проводить службове розслідування, строки його проведення\.'
+PATTERN_PIECE_4_END : Final = r'5[\.\s\)]+Військове звання'

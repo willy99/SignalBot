@@ -1,3 +1,5 @@
+import os
+
 class Stat:
 
     def __init__(self):
@@ -27,11 +29,34 @@ class Stat:
         )
 
     def get_full_report(self):
+        # 1. Формуємо блок оброблених документів
+        # Витягуємо тільки імена файлів за допомогою os.path.basename
+        processed_files = "\n".join([f"✅ {os.path.basename(f)}" for f in self.doc_names])
+
+        if not processed_files:
+            processed_files = "Список порожній"
+
+        # 2. Формуємо блок помилок
+        errors_list = []
+        for file_path, errors in self.error_doc_names.items():
+            file_name = os.path.basename(file_path)
+            errors_list.append(f"❌ {file_name}:")
+            # Якщо помилки — це список, додаємо кожну з відступом
+            if isinstance(errors, list):
+                for err in errors:
+                    errors_list.append(f"   • {err}")
+            else:
+                errors_list.append(f"   • {errors}")
+
+        errors_block = "\n".join(errors_list) if errors_list else "✔️"
+
         return (
-            "📊 * Оброблені документи  *\n"
+            "📊 *ЗВІТ ОБРОБКИ ДОКУМЕНТІВ*\n"
             "━━━━━━━━━━━━━━━\n"
-            f"📩 Список документів: {self.doc_names}\n"
+            "* 📝 Оброблені файли:*\n"
+            f"{processed_files}\n"
             "━━━━━━━━━━━━━━━\n"
-            f"📩 Список помилок: {str(self.error_doc_names)}\n"
-            "━━━━━━━━━━━━━━━\n"
+            "*Помилки обробки:*\n"
+            f"{errors_block}\n"
+            "━━━━━━━━━━━━━━━"
         )

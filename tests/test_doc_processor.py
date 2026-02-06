@@ -1,5 +1,4 @@
 import pytest
-import os
 from pathlib import Path
 from processing.DocProcessor import DocProcessor
 from dics.deserter_xls_dic import *
@@ -39,40 +38,29 @@ def test_process_doc_fedorov_simple(processor_factory):
 
     fields = result[0]
 
-    # 1. Загальні дані та ідентифікація
     assert fields[COLUMN_NAME] == "ФЕДОРОВ Олександр Вікторович"
     assert fields[COLUMN_TITLE] == "солдат"
     assert fields[COLUMN_ID_NUMBER] == "1234567890"
     assert fields[COLUMN_BIRTHDAY] == "12/26/89"  # m/d/yy
-
-    # 2. Військова служба та підрозділ
     assert fields[COLUMN_SUBUNIT] == "ББпС"
     assert fields[COLUMN_SERVICE_TYPE] == "призовом"
     assert fields[COLUMN_MIL_UNIT] == "А0224"
     assert fields[COLUMN_TZK] == "Олександрійським РТЦК та СП"
     assert fields[COLUMN_ENLISTMENT_DATE] == "11/22/25"
     assert fields[COLUMN_SERVICE_DAYS] == 64
-
-    # 3. Обставини СЗЧ
     assert fields[COLUMN_DESERTION_DATE] == "1/25/26"
     assert fields[COLUMN_DESERTION_PLACE] == "РВБЗ"
     assert fields[COLUMN_DESERTION_REGION] == "Шахтарське Дніпропетровської області"
     assert "ФЕДОРОВ Олександр Вікторович" in fields[COLUMN_DESERT_CONDITIONS]
     assert "самовільно залишив" in fields[COLUMN_DESERT_CONDITIONS]
-
-    # 4. Контакти та адреса
     assert fields[COLUMN_PHONE] == "0687775544"
     assert fields[COLUMN_ADDRESS] == "Кіровоградська область, Олександрійський район, м. Олександрія, вул. Дружби 22, кв. 23"
-
-    # 5. Специфічні умови (немає "був присутній" - дата порожня)
-    assert fields[COLUMN_RETURN_DATE] == ""
-
-    # 6. Виконавець
+    assert fields[COLUMN_RETURN_DATE] is None
     assert fields[COLUMN_EXECUTOR] == "МОГУТОВ Ігор Миколайович"
 
 
 def test_process_doc_maly_simple(processor_factory):
-    # Тестуємо реальний кейс Федорова (СЗЧ)
+    # Тестуємо реальний кейс (СЗЧ)
     filename = "2_01.01.2026 СЗЧ з РВБЗ 2 сабатр САДН  МАЛИЙ Д.В.doc"
     processor = processor_factory(filename)
     result = processor.process()
@@ -82,38 +70,25 @@ def test_process_doc_maly_simple(processor_factory):
     assert len(result) > 0
     fields = result[0]
 
-    # 1. Загальні дані та ідентифікація
     assert fields[COLUMN_NAME] == "МАЛИЙ Дмитро Вадимович"
     assert fields[COLUMN_TITLE] == "солдат"
     assert fields[COLUMN_ID_NUMBER] == "3611112233"
     # Зверни увагу: у результаті '12/28/0' (ймовірно, через помилку форматування року 2000)
     # Якщо очікуємо 2000 рік, перевір функцію format_to_excel_date
     assert fields[COLUMN_BIRTHDAY] == "12/28/0"
-
-    # 2. Військова служба та підрозділ
     assert fields[COLUMN_SUBUNIT] == "САДН"
     assert fields[COLUMN_SERVICE_TYPE] == "контрактом"
     assert fields[COLUMN_MIL_UNIT] == "А0224"
-    assert fields[COLUMN_TZK] == "Покровсько-Тернівським РТЦК та СП"
+    assert fields[COLUMN_TZK] == "Покровсько-Тернівським РТЦК та СП, м. Кривий Ріг"
     assert fields[COLUMN_ENLISTMENT_DATE] == "11/23/20"
     assert fields[COLUMN_SERVICE_DAYS] == 1865
-
-    # 3. Обставини СЗЧ
     assert fields[COLUMN_DESERTION_DATE] == "1/1/26"
     assert fields[COLUMN_DESERTION_PLACE] == "РВБЗ"
     assert fields[COLUMN_DESERTION_REGION] == "Тернівка Дніпропетровської області"
     assert "МАЛИЙ Дмитро Вадимович" in fields[COLUMN_DESERT_CONDITIONS]
-    # assert "самовільно залишив" in fields[COLUMN_DESERT_CONDITIONS]
-
-    # 4. Контакти та адреса
     assert fields[COLUMN_PHONE] == "0969111111"
-    # Перевіряємо початок адреси (у результаті вона може бути обрізана або нормалізована)
     assert fields[COLUMN_ADDRESS] == "Дніпропетровська обл., м. Кривий Ріг, вул. Ф. Караманиця, буд. 11А, кв 12"
-
-    # 5. Специфічні умови
-    assert fields[COLUMN_RETURN_DATE] == ""
-
-    # 6. Виконавець
+    assert fields[COLUMN_RETURN_DATE] is None
     assert fields[COLUMN_EXECUTOR] == "БОЙКО Віктор Олександрович"
 
 # tests error - missing one of the part in the document
@@ -121,12 +96,8 @@ def test_process_doc_maly_error_missing_4(processor_factory):
     # Тестуємо реальний кейс, де заздалегідь знаємо, що PIECE_4 буде None
     filename = "3_01.01.2026 СЗЧ з РВБЗ 2 сабатр САДН  МАЛИЙ Д.В _ error.doc"
     processor = processor_factory(filename)
-
-    # Очікуємо, що під час виклику process виникне ValueError
     with pytest.raises(ValueError) as excinfo:
         processor.process()
-
-    # Перевіряємо, чи саме те повідомлення ми отримали
     assert "❌ Частина 4 не витягнуто!" in str(excinfo.value)
 
 # tests two persons in one document
@@ -135,8 +106,6 @@ def test_process_doc_two_persons(processor_factory):
     filename = "4_31.01.2026 СЗЧ з РВЗ Івончак Д.В., Неголюк В.В. 7 дшр 2 дшб.doc"
     processor = processor_factory(filename)
     result = processor.process()
-
-    # 1. Загальна перевірка структури
     assert isinstance(result, list)
     assert len(result) == 2  # Очікуємо двох осіб
 
@@ -159,8 +128,6 @@ def test_process_doc_two_persons(processor_factory):
     person2 = result[1]
     assert person2['ПІБ'] == 'НЕГОЛЮК Володимир Васильович'
     assert person2['Військове звання'] == 'солдат'
-    # Зверніть увагу: у вашому результаті РНОКПП підтягнувся номер телефону дружини (0689991121)
-    # через відсутність власного РНОКПП у тексті. Це варто перевірити в логіці парсера.
     assert person2['РНОКПП'] == NA
     assert person2['Дата народження'] == '10/29/81'
     assert person2['№ телефону'] == '0987773388'
@@ -181,38 +148,100 @@ def test_process_doc_two_persons(processor_factory):
 
 
 def test_process_doc_tzk_is_full(processor_factory):
+    # перевірка, що тцк розпарсився правильно та повно. матьйїхйоп
     filename = "5_05.02.2026 СЗЧ з РВБЗ (Кортун В.М.) рбс 3 дшб_tzk.doc"
     processor = processor_factory(filename)
     result = processor.process()
 
-    # 1. Загальна перевірка структури
     assert isinstance(result, list)
     assert len(result) == 1
 
     person = result[0]
     assert person['РТЦК'] == 'Крижопільським РТЦК та СП м. Крижопіль'
 
-
-'''def test_extract_military_subunit_from_filename(processor_factory):
-    # Перевірка логіки витягування підрозділу з назви файлу з підкресленнями
-    filename = "04.02.2026_СЗЧ_3_АЕМР_АЕМБ_ЄФРЕМОВ.docx"
+def test_process_docx_simple(processor_factory):
+    # тестування парсінгу docx
+    filename = "6_02.01.2026 СЗЧ відсутність на військовій службі без поважних причин (Шевчук В.Є.) 9 дшр 3 дшб.docx"
     processor = processor_factory(filename)
+    result = processor.process()
 
-    # Викликаємо метод напряму для тесту
-    res = processor._extract_military_subunit("якийсь текст", file_name=filename)
-    assert "3 АЕМР" in res
+    print(result)
+
+    assert isinstance(result, list)
+    assert len(result) == 1
+
+    person = result[0]
+    assert person['ПІБ'] == 'ШЕВЧУК Віктор Євгенович'
+    assert person['Військове звання'] == 'солдат'
+    assert person['РНОКПП'] == '2232933224'
+    assert person['Дата народження'] == '3/23/68'  # m/d/yy
+    assert person['Військова частина'] == 'А0224'
+    assert person['Підрозділ'] == '3 дшб'
+    assert person['Від служби'] == 'призовом'
+    assert person['РТЦК'] == 'Шепетівським РТЦК та СП м. Шепетівка'
+    assert person['Дата призову на військову службу'] == '2/24/22'
+    assert person['термін служби до СЗЧ'] == 1408
+    assert person['Дата СЗЧ'] == '1/2/26'
+    assert person['Звідки СЗЧ н.п. обл'] == 'Вознесенське, Миколаївської області'
+    assert "ШЕВЧУК Віктор Євгенович" in person[
+        'Дата, час обставини та причини самовільного залишення військової частини або місця служби']
+    assert "73 доби" in person[
+        'Дата, час обставини та причини самовільного залишення військової частини або місця служби']
+    assert person['№ телефону'] == '0671118227'
+    assert person['Адреса проживання'] == "Хмельницька область, Ізяславський район, с. Теліжинці, вул. Центральна, буд. 48"
+    assert person['Виконавець'] == 'САМУЛІК Роман Богданович'
 
 
-def test_calculate_service_days(processor_factory):
+#################### загальне модульне тестування регекспів ##############################
+
+def test_name_extraction(processor_factory):
     processor = processor_factory("any.docx")
-    # 20.07.2025 до 04.02.2026
-    # Формат у вас m/d/yy (згідно з вашим format_to_excel_date)
-    days = processor._calculate_service_days("7/20/25", "2/4/26")
-    assert days > 190
+    text = "ДВОЄЗЕРСЬКИЙ Олег Вікторович, старший солдат, військовослужбовець військової служби за призовом, "
+    res = processor._extract_name(text)
+    assert "ДВОЄЗЕРСЬКИЙ Олег Вікторович" in res
 
+    text = "САЛТИКОВ-ЩЕДРІН Олег Вікторович, старший солдат, військовослужбовець військової служби за призовом, "
+    res = processor._extract_name(text)
+    assert "САЛТИКОВ-ЩЕДРІН Олег Вікторович" in res
+
+    text = "САЛТИКОВ-ЩЕДРІН Олег Вікторович-Огли, старший солдат, військовослужбовець військової служби за призовом, "
+    res = processor._extract_name(text)
+    assert "САЛТИКОВ-ЩЕДРІН Олег Вікторович-Огли" in res
+
+    text = "САЛТИКОВ-ЩЕДРІН Олег Вікторович-Огли-Піздик, старший солдат, військовослужбовець військової служби за призовом, "
+    res = processor._extract_name(text)
+    assert "САЛТИКОВ-ЩЕДРІН Олег Вікторович-Огли" in res
+
+    text = "Салтіков Олег Вікторович, старший солдат, військовослужбовець військової служби за призовом, "
+    res = processor._extract_name(text)
+    assert "" in res
+
+    text = "Текст попереду ПРОТОН Олег Вікторович, старший солдат, військовослужбовець військової служби за призовом, "
+    res = processor._extract_name(text)
+    assert "ПРОТОН Олег Вікторович" in res
+
+    text = "Текст попереду ПРОТОН Олег Вікторович-Огли і пробели далі, старший солдат, військовослужбовець військової служби за призовом, "
+    res = processor._extract_name(text)
+    assert "ПРОТОН Олег Вікторович-Огли" in res
 
 def test_rtzk_extraction(processor_factory):
     processor = processor_factory("any.docx")
     text = "Призваний Слов'янським ТЦК 10.09.2025. РНОКПП 1234567890"
     res = processor._extract_rtzk(text)
-    assert "Слов'янським ТЦК" in res'''
+    assert "Слов'янським ТЦК" in res
+
+    text = "Призваний Пересипським РТЦК та СП , м. Одеса, 23.12.2024,. РНОКПП 3"
+    res = processor._extract_rtzk(text)
+    assert res == "Пересипським РТЦК та СП , м. Одеса"
+
+    text = "призваний Кропивницьким РТЦК та СП, м. Кропивницький, Кіровоградська обл., 19.06.2025 року. РНОКПП 32"
+    res = processor._extract_rtzk(text)
+    assert res == "Кропивницьким РТЦК та СП, м. Кропивницький, Кіровоградська обл"
+
+    text = "88 р.н.; призваний Галицько-Франківським ОРТЦК та СП 01.11.2025; адреса проживання: Льв"
+    res = processor._extract_rtzk(text)
+    assert res == "Галицько-Франківським ОРТЦК та СП"
+
+    text = "неодружений. Призваний Салтівським РТЦК та СП м. Харків, 27.07"
+    res = processor._extract_rtzk(text)
+    assert res == "Салтівським РТЦК та СП м. Харків"
