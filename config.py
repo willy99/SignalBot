@@ -1,10 +1,14 @@
 import os
 from typing import Final
+from dotenv import load_dotenv
+
+load_dotenv()
+
+NET_SERVER_IP = os.getenv("NET_SERVER_IP", "127.0.0.1")
+NET_USERNAME = os.getenv("NET_USERNAME")
+NET_PASSWORD = os.getenv("NET_PASSWORD")
 
 # Шляхи до папок
-NET_SERVER_IP = "192.168.110.64"
-NET_USERNAME = "Admin"
-NET_PASSWORD = "Flvbycrbq@2"
 EXCEL_DIR = 'exchange\\projekt407'
 DOC_DIR : Final = "exchange\\ДД"
 
