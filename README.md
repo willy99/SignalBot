@@ -22,7 +22,13 @@ cd ~ && /Applications/Signal.app/Contents/MacOS/Signal --user-data-dir="$HOME/Li
 ```jsx
 jenv local 21
 signal-cli -u +380938513200 daemon --socket /tmp/signal-bot.sock
+or
+signal-cli -u +380938513200 daemon --tcp 127.0.0.1:1234 
+
 ```
+
+Network configuration is in the env file.
+Pls take a look at .env_example
 
 Link device with following instructions: https://gemini.google.com/app/60bae3eb3c68ebd9
 

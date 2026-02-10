@@ -370,17 +370,24 @@ class DocProcessor:
 
         # ЕТАП 1: Перевірка назви файлу (тепер з IGNORECASE)
         if file_name:
+            # Сортуємо від найдовших до найкоротших, щоб спочатку ловити специфічні назви
             sorted_shorts = sorted(short_values, key=len, reverse=True)
 
-            short_val: str
             for short_val in sorted_shorts:
+                # Паттерн шукає без урахування регістру (re.IGNORECASE)
                 pattern = rf'(?:^|[\s_])(\d*[\s_]*)?{re.escape(short_val)}(?=[\s_]|$)'
-
                 match = re.search(pattern, file_name, re.IGNORECASE)
 
                 if match:
-                    res = match.group(0).strip()
-                    return re.sub(rf'(\d+)\s*({re.escape(short_val)})', r'\1 \2', res, flags=re.IGNORECASE).replace('_','')
+                    # Отримуємо цифри перед назвою (наприклад, "3" з "3 САДН")
+                    # match.group(1) містить цифри та пробіли/підкреслення перед назвою
+                    prefix = match.group(1) or ""
+                    digits = re.sub(r'\D', '', prefix)  # Залишаємо тільки цифри
+
+                    # Формуємо результат: цифри + пробіл + значення з мапінгу (short_val)
+                    if digits:
+                        return f"{digits} {short_val}"
+                    return short_val
 
         # ЕТАП 2: Пошук у тексті через мапінг (якщо в файлі не знайдено)
         found_subunits = []
