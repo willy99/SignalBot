@@ -7,6 +7,7 @@ from dics.deserter_xls_dic import *
 from datetime import datetime
 import re
 from typing import Final
+from processing.parsers.MLParser import MLParser
 
 class DocProcessor:
 
@@ -16,14 +17,17 @@ class DocProcessor:
     __PIECE_3 : Final  = 'piece 3'
     __PIECE_4 : Final  = 'piece 4'
 
-    def __init__(self, workflow, file_path):
+    def __init__(self, workflow, file_path, original_filename, insertion_date=datetime.now()):
         self.file_path = file_path
+        self.original_filename = original_filename
         self.workflow = workflow
+        self.insertion_date = insertion_date
         self.response = {
             'insertionDate' :None,
         }
         self.extension = Path(self.file_path).suffix
         self.engine = ParserFactory.get_parser(file_path)
+        self.ml_parser = MLParser(model_path=config.ML_MODEL_PATH)
 
     def process(self):
         print(f"--- Обробка тексту... {self.extension}")
@@ -34,11 +38,13 @@ class DocProcessor:
         doc_pieces[self.__PIECE_1] = self.engine.extract_text_between(PATTERN_PIECE_1_START, PATTERN_PIECE_1_END, True)
         doc_pieces[self.__PIECE_4] = self.engine.extract_text_between(PATTERN_PIECE_4_START, PATTERN_PIECE_4_END, True)
 
-        #print('>>>header :' + str(doc_pieces[self.PIECE_HEADER]))
-        #print('>>>1 :' + str(doc_pieces[self.PIECE_1]))
-        #print('>>>4 :' + str(doc_pieces[self.PIECE_4]))
-
         raw_piece_3 = self.engine.extract_text_between(PATTERN_PIECE_3_START, PATTERN_PIECE_3_END, True) or ""
+
+        print('>>>header :' + str(doc_pieces[self.__PIECE_HEADER]))
+        print('>>>1 :' + str(doc_pieces[self.__PIECE_1]))
+        print('>>>2 :' + str(raw_piece_3))
+        print('>>>4 :' + str(doc_pieces[self.__PIECE_4]))
+
         persons = self.cut_into_person(raw_piece_3)
         all_final_records = []
         for person_text in persons:
@@ -53,7 +59,7 @@ class DocProcessor:
                 all_final_records.append(processed_data)
 
         self.workflow.stats.attachmentWordProcessed += 1
-        self.workflow.stats.doc_names.append(self.file_path)
+        self.workflow.stats.doc_names.append(self.original_filename)
 
         print(f"--- ✔️ Обробка закінчено. Знайдено осіб: {len(all_final_records)}")
         return all_final_records
@@ -64,7 +70,7 @@ class DocProcessor:
         result = []
 
         fields = {
-            col.COLUMN_INSERT_DATE: format_to_excel_date(datetime.now()),
+            col.COLUMN_INSERT_DATE: format_to_excel_date(self.insertion_date),
             col.COLUMN_MIL_UNIT: DEFAULT_MIL_UNIT,
         }
 
@@ -73,34 +79,48 @@ class DocProcessor:
             fields[col.COLUMN_MIL_UNIT] = self._extract_mil_unit(text)
 
         text = text_pieces[self.__PIECE_1]
+
         if text is not None:
             fields[col.COLUMN_DESERTION_DATE] = self._extract_desertion_date(text)
             fields[col.COLUMN_DESERTION_REGION] = self._extract_desertion_region(clean_text(text))
             fields[col.COLUMN_DESERT_CONDITIONS] = self._extract_desert_conditions(text)
-            fields[col.COLUMN_DESERTION_PLACE] = self._extract_desertion_place(clean_text(text), get_file_name(self.file_path))
+            fields[col.COLUMN_DESERTION_PLACE] = self._extract_desertion_place(clean_text(text), get_file_name(self.original_filename))
             fields[col.COLUMN_RETURN_DATE] = self._extract_return_date(text)
+            print('>>> return date ' + str(fields[col.COLUMN_RETURN_DATE]))
 
         text = text_pieces[self.__PIECE_3]
+        ml_extracted = self.ml_parser.parse_text(text)
         if text is not None:
-            fields[col.COLUMN_NAME] = self._extract_name(text)
-            fields[col.COLUMN_ID_NUMBER] = self._extract_id_number(text)
+            fields[col.COLUMN_NAME] = self.get_best_match(ml_extracted.get(col.COLUMN_NAME), self._extract_name(text))
+            fields[col.COLUMN_ID_NUMBER] = self.get_best_match(ml_extracted.get(col.COLUMN_ID_NUMBER), self._extract_id_number(text))
             fields[col.COLUMN_TZK] = self._extract_rtzk(clean_text(text))
-            fields[col.COLUMN_PHONE] = self._extract_phone(text)
-            fields[col.COLUMN_BIRTHDAY] = self._extract_birthday(text)
-            fields[col.COLUMN_TITLE] = self._extract_title(text)
-            fields[col.COLUMN_SERVICE_TYPE] = self._extract_service_type(text)
-            fields[col.COLUMN_ADDRESS] = self._extract_address(clean_text(text))
-            fields[col.COLUMN_BIO] = self._extract_bio(clean_text(text), fields[col.COLUMN_NAME])
-            fields[col.COLUMN_ENLISTMENT_DATE] = self._extract_conscription_date(text)
-            fields[col.COLUMN_SUBUNIT] = self._extract_military_subunit(text, get_file_name(self.file_path))
+            fields[col.COLUMN_PHONE] = self.get_best_match(ml_extracted.get(col.COLUMN_PHONE), self._extract_phone(text))
+            fields[col.COLUMN_BIRTHDAY] = self.get_best_match(ml_extracted.get(col.COLUMN_BIRTHDAY), self._extract_birthday(text))
+            fields[col.COLUMN_TITLE] = self.get_best_match(ml_extracted.get(col.COLUMN_TITLE), self._extract_title(text))
+            fields[col.COLUMN_SERVICE_TYPE] = self.get_best_match(ml_extracted.get(col.COLUMN_SERVICE_TYPE), self._extract_service_type(text))
+            fields[col.COLUMN_ADDRESS] = self.get_best_match(ml_extracted.get(col.COLUMN_ADDRESS), self._extract_address(clean_text(text)))
+            fields[col.COLUMN_BIO] = self.get_best_match(ml_extracted.get(col.COLUMN_BIO), self._extract_bio(clean_text(text), fields[col.COLUMN_NAME]))
+            fields[col.COLUMN_ENLISTMENT_DATE] = self.get_best_match(ml_extracted.get(col.COLUMN_ENLISTMENT_DATE), self._extract_conscription_date(text))
+            fields[col.COLUMN_SUBUNIT] = self.get_best_match(ml_extracted.get(col.COLUMN_SUBUNIT), self._extract_military_subunit(text, get_file_name(self.original_filename)))
 
         fields[col.COLUMN_SERVICE_DAYS] = self._calculate_service_days(fields[col.COLUMN_ENLISTMENT_DATE], fields[col.COLUMN_DESERTION_DATE])
 
         text = text_pieces[self.__PIECE_4]
         fields[col.COLUMN_EXECUTOR] = self._extract_name(text)
-        result.append(fields)
+
+        #validate the case
+        if self.validateRecord(fields):
+            result.append(fields)
+        else:
+            print("... ▶️ НЕ ДОДАЄМО, не кейз СЗЧ!")
+
         return result
 
+
+    def validateRecord(self, record):
+        if record[COLUMN_DESERT_CONDITIONS] == NA and record[COLUMN_RETURN_DATE] is None:
+            return False
+        return True
 
     def validatePieces(self, doc_pieces):
         if doc_pieces[self.__PIECE_HEADER] is None:
@@ -117,7 +137,7 @@ class DocProcessor:
         if not doc_piece_3:
             return []
 
-        matches = list(re.finditer(STRICT_NAME_PATTERN, doc_piece_3, re.MULTILINE))
+        matches = list(re.finditer(PATTERN_STRICT_NAME, doc_piece_3, re.MULTILINE))
 
         if not matches:
             return [doc_piece_3.strip()]
@@ -135,15 +155,15 @@ class DocProcessor:
 
         return persons
 
-
-    def _extract_mil_unit(self, text):
-        pattern = r'\b[А-ЯA-Z]\d{4}\b'
-        match = re.search(pattern, text)
+    @staticmethod
+    def _extract_mil_unit(text):
+        match = re.search(PATTERN_MIL_UNIT, text)
         if match:
             return match.group(0).upper()
         return NA
 
-    def _extract_bio(self, text, full_name):
+    @staticmethod
+    def _extract_bio(text, full_name):
         if not full_name or full_name == NA:
             return text
         start_index = text.find(full_name)
@@ -152,49 +172,44 @@ class DocProcessor:
 
         return text
 
-    def _extract_name(self, text):
-        match = re.search(NAME_PATTERN, text)
+    @staticmethod
+    def _extract_name(text):
+        match = re.search(PATTERN_NAME, text)
         if match:
             return f"{match.group(1)} {match.group(3)} {match.group(4)}".strip()
         return NA
 
-    def _extract_title(self, text):
-        pattern = r'\b(' + '|'.join(TITLES) + r')\b'
-
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            return match.group(0).lower()
+    @staticmethod
+    def _extract_title(text):
+        # Проходимо по мапінгу (важливо: довгі назви мають бути вище коротких)
+        for pattern, canonical_name in PATTERN_TITLE_MAPPING.items():
+            if re.search(pattern, text, re.IGNORECASE):
+                return canonical_name
         return NA
 
-    def _extract_service_type(self, text):
-        mapping = {
-            r'приз[ио]вом|мобілізаці': "призовом",
-            r'контрактом': "контрактом"
-        }
-        for pattern, result in mapping.items():
+    @staticmethod
+    def _extract_service_type(text):
+        for pattern, result in PATTERN_SERVICE_TYPE_MAPPING.items():
             if re.search(pattern, text, re.IGNORECASE):
                 return result
-        return NA
+        return "призовом" # default
 
-    def _extract_id_number(self, text):
-        marker_pattern = r'(?i)(?:РНОКПП|ІПН|І\.П\.Н\.|РНОК\s*ПП)'
-
-        marker_match = re.search(marker_pattern, text)
-
+    @staticmethod
+    def _extract_id_number(text):
+        marker_match = re.search(PATTERN_ID_MARKER, text)
         if marker_match:
             after_marker = text[marker_match.end():marker_match.end() + 30]
-            if re.search(r'(?i)(відсутн|не надано|немає|відомості)', after_marker):
+            if re.search(PATTERN_ID_ABSENCE, after_marker):
                 return NA
-            digits_match = re.search(r'(\d{10})\b', after_marker)
+            digits_match = re.search(PATTERN_ID_DIGITS, after_marker)
             if digits_match:
                 return digits_match.group(1)
-        standalone_digits = re.findall(r'\b([1-9]\d{9})\b', text)
-
+        standalone_digits = re.findall(PATTERN_ID_STANDALONE, text)
         return standalone_digits[0] if standalone_digits else NA
 
-    def _extract_phone(self, text):
-        pattern = r'(?i)(?:номер|(?:ефон(у)?)|тел\.)[\s\w.:+]*?(\+?\s?3?8?[\s(-]*0\d{2}[\s)-]*\d{3}[\s-]*\d{2}[\s-]*\d{2})\b'
-        match = re.search(pattern, text, re.IGNORECASE)
+    @staticmethod
+    def _extract_phone(text):
+        match = re.search(PATTERN_PHONE, text, re.IGNORECASE)
 
         if match:
             raw_phone = match.group(2)
@@ -203,149 +218,126 @@ class DocProcessor:
                 return digits[-10:]
         return NA
 
-    def _extract_conscription_date(self, text):
-        """
-        Витягує дату призову. Підтримує формати: 01.01.2025 та 01.01.25.
-        """
-        # Патерн для дати: ДД.ММ.РРРР або ДД.ММ.РР
-        # \d{2} - день, \d{2} - місяць, (\d{4}|\d{2}) - рік (4 або 2 цифри)
-        date_pattern = r'(\d{2}\.\d{2}\.(?:\d{4}|\d{2}))'
-
-        # 1. Знаходимо РНОКПП/ІПН, щоб знати, де зупинити пошук
-        id_match = re.search(r'(?:РНОКПП|ІПН)', text, re.IGNORECASE)
+    @staticmethod
+    def _extract_conscription_date(text):
+        id_match = re.search(PATTERN_ID_MARKER, text, re.IGNORECASE)
         if not id_match:
             return NA
 
         pos_id = id_match.start()
-        # Беремо зону пошуку ПЕРЕД РНОКПП (близько 150 символів)
         lookback_area = text[max(0, pos_id - 150):pos_id]
 
         # 2. Шукаємо всі дати в цій зоні
-        dates = re.findall(date_pattern, lookback_area)
+        dates = re.findall(PATTERN_DATE, lookback_area)
 
         if dates:
-            # Беремо останню дату (найближчу до РНОКПП)
             found_date = dates[-1]
             return format_to_excel_date(found_date)
 
         return NA
 
-    def _extract_birthday(self, text):
-        pattern = r'(\d{2}\.\d{2}\.\d{4})\s*(?:року\s+народження|р\.н\.|народження)'
-        match = re.search(pattern, text, re.IGNORECASE)
+    @staticmethod
+    def _extract_birthday(text):
+        match = re.search(PATTERN_BIRTHDAY, text, re.IGNORECASE)
 
         if match:
             date_str = match.group(1).strip()
             return format_to_excel_date(date_str)
 
-        backup_pattern = r'\b(\d{2}\.\d{2}\.\d{4})\b'
+        backup_pattern = PATTERN_BIRTHDAY_FALLBACK
         all_dates = re.findall(backup_pattern, text)
         if all_dates:
             return format_to_excel_date(all_dates[0])
 
         return NA
 
-    def _extract_address(self, text):
-        marker = "Адреса проживання"
-        match_marker = re.search(re.escape(marker), text, re.IGNORECASE)
+    @staticmethod
+    def _extract_address(text):
+        match_marker = re.search(PATTERN_ADDRESS_MARKER, text, re.IGNORECASE)
         if not match_marker:
             return NA
 
         address_part = text[match_marker.end():].strip()
-        address_part = re.sub(r'^(?:\s*військовослужбовця)?\s*:?\s*', '', address_part, flags=re.IGNORECASE)
-        pattern = r'^((?:(?!Близькі родичі|;|\n).)+)'
-        match = re.search(pattern, address_part, re.IGNORECASE | re.DOTALL)
+        address_part = re.sub(PATTERN_ADDRESS_CLEANUP_PREFIX, '', address_part, flags=re.IGNORECASE)
+        match = re.search(PATTERN_ADDRESS_CONTENT, address_part, re.IGNORECASE | re.DOTALL)
         if match:
             address = match.group(1).strip()
-            return " ".join(address.split()).strip(':;,. ')
+            return " ".join(address.split()).strip(PATTERN_CLEANUP_POINTS)
 
         return NA
 
-    def _extract_rtzk(self, text):
-        pattern = r'(?i)((?:[А-ЯҐЄІЇ-][^.,!?\s]*\s+){1,5}?(?:О?РТЦК|ТЦК|МТЦК)(?:\s*(?:та|&)?\s*СП)?(?:\s?,?\s+м\.\s+[А-ЯІЇЄа-яіїє\-\']+,?(?:\s+[А-ЯІЇЄа-яіїє\-\']+)*|\s+[А-ЯІЇЄа-яіїє\']+\s+обл\.?)?)'
-
-        match = re.search(pattern, text)
+    @staticmethod
+    def _extract_rtzk(text):
+        match = re.search(PATTERN_RTZK, text)
         if match:
             res = match.group(1).strip()
-            res = re.sub(r'\s*,?\s*\d{2}\.\d{2}\.\d{2,4}.*$', '', res)
+            res = re.sub(PATTERN_RTZK_DATE_CLEANUP, '', res)
 
-            trash_patterns = [
-                r'(?i)призваний\s+',
-                r'(?i)призвана\s+',
-                r'(?i)яким\s+',
-                r'(?i)на\s+військову\s+службу\s+',
-                r'(?i)за\s+призовом\s+',
-                r'(?i)під\s+час\s+мобілізації\s+',
-                r'(?i)з\s+\d{2}\.\d{2}\.\d{2,4}',
-            ]
-
-            for p in trash_patterns:
+            for p in PATTERN_RTZK_TRASH:
                 res = re.sub(p, '', res)
-            final_res = " ".join(res.split()).strip(':;,. ')
-            final_res = re.sub(r'(?i)^(на військову службу|призваний)\s+', '', final_res)
+            final_res = " ".join(res.split()).strip(PATTERN_CLEANUP_POINTS)
+            final_res = re.sub(PATTERN_RTZK_CALLED, '', final_res)
 
             return final_res if final_res else NA
 
         return NA
 
-    def _extract_desertion_date(self, text):
-        pattern = r'(\d{2}\.\d{2}\.\d{4})(?=\s+року\s+(?:під час перевірки|був відсутній|самовільно залишив))'
-        match = re.search(pattern, text, re.IGNORECASE)
+    @staticmethod
+    def _extract_desertion_date(text):
+        match = re.search(PATTERN_DESERTION_DATE, text, re.IGNORECASE)
 
         if match:
             return format_to_excel_date(match.group(1))
-        fallback = re.search(r'(\d{2}\.\d{2}\.\d{4})', text)
+        fallback = re.search(PATTERN_DATE, text)
         if fallback:
             return format_to_excel_date(fallback.group(1))
 
         return NA
 
-    def _extract_desert_conditions(self, text):
-        paragraphs = [p.strip() for p in re.split(r'[\r\n]{2,}', text) if p.strip()]
-        check_markers = ["під час перевірки", "під час шикування", "перевірці наявності"]
-        absence_markers = ["відсутн", "виявлено відсутність", "не було в наявності", "не повернувся", "не прибуття", "неповернення"]
+    @staticmethod
+    def _extract_desert_conditions(text):
+        paragraphs = [p.strip() for p in re.split(PATTERN_PARAGRAPH_SPLIT, text) if p.strip()]
 
         for para in paragraphs:
             clean_para = " ".join(para.split()).lower()
-            has_check = any(marker in clean_para for marker in check_markers)
-            has_absence = any(marker in clean_para for marker in absence_markers)
+            has_check = any(marker in clean_para for marker in PATTERN_DESERT_CHECK_MARKERS)
+            has_absence = any(marker in clean_para for marker in PATTERN_DESERT_ABSENCE_MARKERS)
 
             if has_check or has_absence:
                 return " ".join(para.split())
 
         return NA
 
-    def _extract_return_date(self, text):
-        if "був присутній" not in text.lower():
+    @staticmethod
+    def _extract_return_date(text):
+        clean_txt = re.sub(r'\s+', ' ', text).lower()
+        if not any(marker in clean_txt for marker in PATTERN_RETURN_MARKERS):
             return None
-        pattern = r'(\d{2}\.\d{2}\.\d{4})(?=\s+року\s+був\s+присутній)'
-        match = re.search(pattern, text, re.IGNORECASE)
-
+        match = re.search(PATTERN_RETURN_DATE, text, re.IGNORECASE)
         if match:
             return format_to_excel_date(match.group(1))
 
-        fallback_with_presence = re.search(r'(\d{2}\.\d{2}\.\d{4})', text)
+        fallback_with_presence = re.search(PATTERN_DATE, text)
         if fallback_with_presence:
             return format_to_excel_date(fallback_with_presence.group(1))
 
         return None
 
-    def _extract_desertion_region(self, text):
-        pattern = r'(?i)(?:н\.п\.|с\.|м\.|село|місто|селище|смт)\s+([А-ЯҐЄІЇ][^.;]*?(?:області|обл\.))'
-
-        match = re.search(pattern, text, re.DOTALL)
+    @staticmethod
+    def _extract_desertion_region(text):
+        match = re.search(PATTERN_DESERTION_REGION_MAIN, text, re.DOTALL)
         if match:
             full_address = " ".join(match.group(1).split())
             return full_address.strip().rstrip('.')
 
-        backup_pattern = r'(?i)([А-Я][а-яіЇє]*?\s+район[у|а]\s+[А-Я][а-яіЇє]*?\s+області)'
-        backup_match = re.search(backup_pattern, text)
+        backup_match = re.search(PATTERN_DESERTION_REGION_BACKUP, text)
         if backup_match:
             return " ".join(backup_match.group(1).split())
 
         return NA
 
-    def _calculate_service_days(self, conscription_date_str, desertion_date_str):
+    @staticmethod
+    def _calculate_service_days(conscription_date_str, desertion_date_str):
         if conscription_date_str == NA or desertion_date_str == NA:
             return 0
         try:
@@ -368,9 +360,10 @@ class DocProcessor:
             print(f"Помилка розрахунку днів: {e}")
             return 0
 
-    def _extract_military_subunit(self, text, file_name=None):
+    @staticmethod
+    def _extract_military_subunit(text, file_name=None):
         short_values = set()
-        for val in SUBUNIT_MAPPING.values():
+        for val in PATTERN_SUBUNIT_MAPPING.values():
             clean_val = val.replace(r'\1', '').strip()
             if clean_val:
                 short_values.add(clean_val)
@@ -379,6 +372,7 @@ class DocProcessor:
         if file_name:
             sorted_shorts = sorted(short_values, key=len, reverse=True)
 
+            short_val: str
             for short_val in sorted_shorts:
                 pattern = rf'(?:^|[\s_])(\d*[\s_]*)?{re.escape(short_val)}(?=[\s_]|$)'
 
@@ -390,7 +384,7 @@ class DocProcessor:
 
         # ЕТАП 2: Пошук у тексті через мапінг (якщо в файлі не знайдено)
         found_subunits = []
-        for pattern, abbreviation in SUBUNIT_MAPPING.items():
+        for pattern, abbreviation in PATTERN_SUBUNIT_MAPPING.items():
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 if r'\1' in abbreviation:
@@ -402,18 +396,16 @@ class DocProcessor:
 
         return found_subunits[-1] if found_subunits else NA
 
-    def _extract_desertion_place(self, text, file_name=None):
-        short_values = list(set(DESERTION_PLACE_MAPPING.values()))
-
+    @staticmethod
+    def _extract_desertion_place(text, file_name=None):
         if file_name:
-            for val in short_values:
-                if re.search(rf'\b{re.escape(val)}\b', file_name, re.IGNORECASE):
-                    return val
+            for pattern, mapping_value in PATTERN_DESERTION_PLACE_MAPPING.items():
+                if re.search(mapping_value, file_name, re.IGNORECASE):
+                    return mapping_value
 
-        for pattern, short_name in DESERTION_PLACE_MAPPING.items():
+        for pattern, short_name in PATTERN_DESERTION_PLACE_MAPPING.items():
             if re.search(pattern, text, re.IGNORECASE):
                 return short_name
-
         return NA
 
     def check_for_errors(self, data_for_excel):
@@ -426,6 +418,12 @@ class DocProcessor:
                 if value == NA:
                     error = 'КОЛОНКА ' + col_name + ' ПОРОЖНЯ!'
                     print('------ ⚠️ ' + error)
-                    self.workflow.stats.add_error(self.file_path, error)
+                    self.workflow.stats.add_error(self.original_filename, error)
                     result = False
         return result
+
+
+    def get_best_match(self, ml_val, regex_val):
+        ml_str = str(ml_val or "").strip()
+        regex_str = str(regex_val or "").strip()
+        return ml_str if len(ml_str) >= len(regex_str) else regex_str

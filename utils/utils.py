@@ -1,7 +1,9 @@
 import datetime
-from datetime import datetime, timedelta
+from datetime import timedelta
 import config
 import os
+from typing import Any
+from dics.deserter_xls_dic import NA
 
 def clean_text(text):
     if text is None: return None
@@ -23,33 +25,41 @@ def get_effective_date():
 from datetime import datetime
 
 
-def format_to_excel_date(date_val):
+def format_to_excel_date(date_val: Any) -> str:
     """
-    Приймає datetime або str (ДД.ММ.РРРР або ДД.ММ.РР)
-    Повертає рядок у форматі m/d/yy (напр. 8/29/84)
+    Приймає datetime або str.
+    Повертає рядок у форматі, визначеному в EXCEL_DATE_FORMAT (напр. 08.02.2026).
     """
-    if not date_val or date_val == "N/A":
+    if not date_val or date_val == NA:
         return ""
 
+    # 1. Якщо це вже об'єкт datetime
+    if isinstance(date_val, datetime):
+        return date_val.strftime(config.EXCEL_DATE_FORMAT)
+
+    # 2. Якщо це рядок
     if isinstance(date_val, str):
         try:
-            date_val = date_val.strip().strip('.')
-            parts = date_val.split('.')
-            if len(parts) != 3:
-                return date_val
+            clean_val = date_val.strip().strip('.')
+            parts = clean_val.split('.')
 
-            # Визначаємо формат року: %Y для 2025, %y для 25
-            year_fmt = "%Y" if len(parts[2]) == 4 else "%y"
-            date_val = datetime.strptime(date_val, f"%d.%m.{year_fmt}")
-        except ValueError:
+            if len(parts) != 3:
+                return date_val  # Повертаємо як є, якщо формат дивний
+
+            # Визначаємо формат року: %Y для 2026, %y для 26
+            year_part = parts[2]
+            year_fmt = "%Y" if len(year_part) == 4 else "%y"
+
+            # Парсимо в об'єкт datetime
+            dt_obj = datetime.strptime(clean_val, f"%d.%m.{year_fmt}")
+
+            # Повертаємо у вашому цільовому форматі з константи
+            return dt_obj.strftime(config.EXCEL_DATE_FORMAT)
+
+        except (ValueError, IndexError):
             return date_val
 
-    # Твоя оригінальна логіка форматування
-    formatted = date_val.strftime("%m/%d/%y").replace("/0", "/")
-    if formatted.startswith("0"):
-        formatted = formatted[1:]
-
-    return formatted
+    return str(date_val)
 
 def get_file_name(file_path):
     """
@@ -62,3 +72,22 @@ def get_file_name(file_path):
     name_without_ext = os.path.splitext(base_name)[0]
 
     return name_without_ext
+
+def format_ukr_date(date_val):
+    if not date_val or str(date_val).lower() in ["none", "nan", ""]:
+        return ""
+
+    # 1. Відсікаємо час, якщо він є
+    date_str = str(date_val).split(' ')[0].strip()
+
+    # 2. Пробуємо кожен формат із нашого списку
+    for fmt in config.EXCEL_DATE_FORMATS_REPORT:
+        try:
+            dt = datetime.strptime(date_str, fmt)
+            # Як тільки знайшли збіг — повертаємо у вашому улюбленому форматі
+            return dt.strftime(config.EXCEL_DATE_FORMAT)
+        except ValueError:
+            continue
+
+    # 3. Якщо жоден формат не підійшов — повертаємо як було (щоб не втратити дані)
+    return date_str

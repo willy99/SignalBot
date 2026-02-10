@@ -1,6 +1,7 @@
 import sqlite3
 import config
 
+
 class MyDataBase:
     def __init__(self):
         self.db_name = config.DB_NAME

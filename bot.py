@@ -5,8 +5,8 @@ from processing.MyWorkFlow import MyWorkFlow
 
 def main():
     workflow = MyWorkFlow()
-    if config.PROCESS_XLS:
-        workflow.initExcelProcessor(config.DESERTER_XLSX) # one-time init
+    # if config.PROCESS_XLS:
+    workflow.initExcelProcessor(config.DESERTER_XLSX_FILE_PATH) # one-time init
 
     try:
         workflow.client.host = config.TCP_HOST

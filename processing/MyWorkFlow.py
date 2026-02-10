@@ -3,7 +3,11 @@ from processing.ExcelProcessor import ExcelProcessor
 from processing.AttachmentHandler import AttachmentHandler
 from connection.MyDataBase import MyDataBase
 from processing.Stat import Stat
+from processing.BatchProcessor import BatchProcessor
 import traceback
+
+from report.ExcelReport import ExcelReporter
+
 
 class MyWorkFlow:
 
@@ -17,15 +21,18 @@ class MyWorkFlow:
     def __init__(self):
         self.excelProcessor = None
         self.wordProcessor = None
+        self.reporter = None
         self.attachmentHandler = AttachmentHandler(self)
         self.client = SignalClient()
         self.db = MyDataBase()
         self.stats = Stat()  # Створюємо об'єкт статистики
+        self.batchProcessor = None
+        self.excelFilePath = None
 
-    def initExcelProcessor(self, file_path):
-        self.excelProcessor = ExcelProcessor(file_path)
-
-
+    def initExcelProcessor(self, excelFilePath):
+        self.excelProcessor = ExcelProcessor(excelFilePath)
+        self.reporter = ExcelReporter(self.excelProcessor)
+        self.excelFilePath = excelFilePath
 
     def parseSignalData(self, data):
         """Витягує текст повідомлення та номер відправника з JSON-RPC пакету."""
@@ -106,7 +113,7 @@ class MyWorkFlow:
         text = text.lower().strip()
 
         print(f"DEBUG: User={user_id}, State={current_state}, Text='{text}'")
-        main_menu = "Ви у Головному меню:\n1. Техпідтримка\n2. Статистика\n3. Вихід"
+        main_menu = "Ви у Головному меню:\n1. Batch обробка\n2. Статистика\n3. Вихід"
         menu_prompt = "Напишіть 'меню' для початку роботи."
 
         if text == "меню" or text == "start" or text == "menu":
@@ -114,26 +121,21 @@ class MyWorkFlow:
             return main_menu
 
         if current_state == "MAIN_MENU":
-            if text == "1":
-                self.db.set_user_state(user_id, "SUPPORT")
-                return "Опишіть вашу проблему або натисніть 0 для повернення."
+            if text == "1" or text == "batch":
+                self.batchProcessor = BatchProcessor(self, self.excelFilePath)
+                self.batchProcessor.start_processing(0)
+                self.batchProcessor = None
+                return "Піджигаємо!"
             elif text == "2":
                 self.db.set_user_state(user_id, "STAT")
                 result = self.stats.get_report()
-                result += ":\n1. Повна статистика по файлам\n0. Вихід"
+                result += ":\n1. Статистика по файлам\n2. Звіт по СЗЧ - today\n3. Звіт по СЗЧ - monthly\n4. Призвіща\n0. Вихід"
                 return result
-            elif text == "3" or text == "вихід":
+            elif text == "4" or text == "вихід":
                 self.db.set_user_state(user_id, "START")
                 return menu_prompt
             elif text == "0":
                 return main_menu
-
-        elif current_state == "SUPPORT":
-            if text == "0":
-                self.db.set_user_state(user_id, "MAIN_MENU")
-                return main_menu
-            else:
-                return f"✅ Ваш запит '{text}' прийнято. Наші фахівці зв'яжуться з вами.\n\nНатисніть 0 для виходу в меню."
 
         elif current_state == "STAT":
             if text == "0":
@@ -141,6 +143,12 @@ class MyWorkFlow:
                 return main_menu
             if text == "1":
                 return self.stats.get_full_report()
+            if text == "2":
+                return self.reporter.get_summary_report()
+            if text == "3":
+                return self.reporter.get_montly_report()
+            if text == "4":
+                return self.reporter.get_all_names_report()
             else:
                 return "Фігня-цифра"
 
