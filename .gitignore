@@ -1,0 +1,7 @@
+# Ігнорувати конкретну папку з даними
+signal-data/
+
+.env
+__pycache__/
+.DS_Store
+/ml/output_model/
