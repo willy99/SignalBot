@@ -29,7 +29,7 @@ FOLDER_DAY_FORMAT : Final = "%d.%m.%Y"    # Наприклад: 2026.01.28
 DAY_ROLLOVER_HOUR : Final = 16
 
 DESERTER_TAB_NAME : Final = "А0224"
-PROCESS_DOC : Final = True # copy file from signal to folder
+PROCESS_DOC : Final = True   # copy doc file from signal to date-folder
 PROCESS_XLS : Final = True # immediate process doc to excel. if false, batch can be applied later on
 
 EXCEL_DATE_FORMAT : Final = "%d.%m.%Y"

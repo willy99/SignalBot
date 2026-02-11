@@ -40,10 +40,14 @@ class DocProcessor:
 
         raw_piece_3 = self.engine.extract_text_between(PATTERN_PIECE_3_START, PATTERN_PIECE_3_END, True) or ""
 
-        print('>>>header :' + str(doc_pieces[self.__PIECE_HEADER]))
-        print('>>>1 :' + str(doc_pieces[self.__PIECE_1]))
-        print('>>>2 :' + str(raw_piece_3))
-        print('>>>4 :' + str(doc_pieces[self.__PIECE_4]))
+        if doc_pieces[self.__PIECE_HEADER] is None:
+            print('>>> ⚠️header :' + str(doc_pieces[self.__PIECE_HEADER]))
+        if doc_pieces[self.__PIECE_1] is None:
+            print('>>> ⚠️ 1 :' + str(doc_pieces[self.__PIECE_1]))
+        if raw_piece_3 is None:
+            print('>>> ⚠️ 2 :' + str(raw_piece_3))
+        if doc_pieces[self.__PIECE_4] is None:
+            print('>>> ⚠️ 4 :' + str(doc_pieces[self.__PIECE_4]))
 
         persons = self.cut_into_person(raw_piece_3)
         all_final_records = []
@@ -86,7 +90,7 @@ class DocProcessor:
             fields[col.COLUMN_DESERT_CONDITIONS] = self._extract_desert_conditions(text)
             fields[col.COLUMN_DESERTION_PLACE] = self._extract_desertion_place(clean_text(text), get_file_name(self.original_filename))
             fields[col.COLUMN_RETURN_DATE] = self._extract_return_date(text)
-            print('>>> return date ' + str(fields[col.COLUMN_RETURN_DATE]))
+            print('--- ' + COLUMN_RETURN_DATE + ':' + str(fields[col.COLUMN_RETURN_DATE]))
 
         text = text_pieces[self.__PIECE_3]
         ml_extracted = self.ml_parser.parse_text(text)
@@ -351,13 +355,13 @@ class DocProcessor:
             days = delta.days
 
             if days < 0 or days > 4000:
-                print(f"[УВАГА] Нелогічна кількість днів служби: {days}. Перевірте дати.")
+                print(f"--- ⚠️ Нелогічна кількість днів служби: {days}. Перевірте дати.")
                 return 0
 
             return days
 
         except Exception as e:
-            print(f"Помилка розрахунку днів: {e}")
+            print(f"--- ⚠️ Помилка розрахунку днів: {e}")
             return 0
 
     @staticmethod
@@ -405,12 +409,17 @@ class DocProcessor:
 
     @staticmethod
     def _extract_desertion_place(text, file_name=None):
+        sorted_patterns = sorted(
+            PATTERN_DESERTION_PLACE_MAPPING.items(),
+            key=lambda item: len(item[1]),
+            reverse=True
+        )
         if file_name:
-            for pattern, mapping_value in PATTERN_DESERTION_PLACE_MAPPING.items():
+            for pattern, mapping_value in sorted_patterns:
                 if re.search(mapping_value, file_name, re.IGNORECASE):
                     return mapping_value
 
-        for pattern, short_name in PATTERN_DESERTION_PLACE_MAPPING.items():
+        for pattern, short_name in sorted_patterns:
             if re.search(pattern, text, re.IGNORECASE):
                 return short_name
         return NA

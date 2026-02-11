@@ -145,7 +145,7 @@ class ExcelProcessor:
                 self.sheet.cell(row=row, column=ret_date_col).value = None
 
             if s_pib == pib and s_dob == dob and s_rnokpp == rnokpp:
-                print('>>> ID: ' + str(s_pid) + ' des_date='+str(s_des_date))
+                print('--- ID: ' + str(s_pid) + ' des_date='+str(s_des_date))
                 if des_date == s_des_date or s_ret_date == "":
                     print('--- 🔎⚠️: Чувак вже в базі, будемо доповнювати запис! (ID:' + s_pid + ')')
                     return row
@@ -178,7 +178,7 @@ class ExcelProcessor:
                 print(f'>> EXCEL LAST ROW::  {self._find_last_row()}')
         except Exception as e:
             # print(f"Помилка ініціалізації Excel: {e}")
-            raise BaseException(f"Помилка ініціалізації Excel: {e}")
+            raise BaseException(f"⚠️ Помилка ініціалізації Excel: {e}")
 
     def save(self, fileProxy) -> None:
         if self.workbook is None:

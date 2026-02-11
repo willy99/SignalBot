@@ -24,7 +24,6 @@ class DocOldParser(BaseFileParser):
             text = text.replace('\xa0', ' ')
             text = text.replace('\r', '\n')
 
-            print(text)
             return text
 
         except Exception as e:

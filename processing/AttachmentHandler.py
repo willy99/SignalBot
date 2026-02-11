@@ -28,26 +28,25 @@ class AttachmentHandler:
 
         try:
             with StorageFactory.create_client(config.DOCUMENT_STORAGE_PATH) as client:
-                # Створюємо папки (локально або на SMB)
-                client.make_dirs(target_path)
 
-                client.copy_file(source_file, destination_file)
+                if config.PROCESS_DOC:
+                    # Створюємо папки (локально або на SMB)
+                    client.make_dirs(target_path)
+                    client.copy_file(source_file, destination_file)
+                    print(f"📁 Файл впорядковано: {destination_file}")
 
                 data_for_excel = None
                 file_parsed = True
 
                 # 4. Обробка документа
-                if config.PROCESS_DOC:
-                    # Обробляємо ЛОКАЛЬНИЙ файл (source_file), це швидше і надійніше,
-                    # ніж читати назад із мережі для парсингу.
-                    doc_processor = DocProcessor(self.workflow, source_file, original_filename)
-                    data_for_excel = doc_processor.process()
-                    file_parsed = doc_processor.check_for_errors(data_for_excel)
+                doc_processor = DocProcessor(self.workflow, source_file, original_filename)
+                data_for_excel = doc_processor.process()
+                file_parsed = doc_processor.check_for_errors(data_for_excel)
 
-                # 5. Оновлення Excel (ExcelProcessor всередині теж має використовувати фабрику)
+                # 5. Оновлення Excel
                 if config.PROCESS_XLS and data_for_excel is not None:
                     self.workflow.excelProcessor.upsert_record(data_for_excel)
-                print(f"📁 Файл впорядковано: {destination_file}")
+
 
                 # 6. Очищення локального вкладення Signal (опціонально)
                 # self._cleanup_local_source(source_file)
