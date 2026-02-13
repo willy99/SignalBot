@@ -70,8 +70,7 @@ class SMBFileClient(FileStorageClient):
             with open_file(share_path, mode="rb") as f:
                 return io.BytesIO(f.read())
         except Exception as e:
-            print(f"❌ Не вдалося прочитати файл {share_path}: {e}")
-            return None
+            raise BaseException(f"️ ❌ Не вдалося прочитати файл: {e}")
 
     def save_file_from_buffer(self, share_path: str, buffer: io.BytesIO):
         """

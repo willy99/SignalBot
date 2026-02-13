@@ -25,8 +25,9 @@ class DocProcessor:
         self.response = {
             'insertionDate' :None,
         }
-        self.extension = Path(self.file_path).suffix
-        self.engine = ParserFactory.get_parser(file_path)
+        if file_path:
+            self.extension = Path(self.file_path).suffix
+            self.engine = ParserFactory.get_parser(file_path)
         self.ml_parser = MLParser(model_path=config.ML_MODEL_PATH)
 
     def process(self):
@@ -85,11 +86,17 @@ class DocProcessor:
         text = text_pieces[self.__PIECE_1]
 
         if text is not None:
+
             fields[col.COLUMN_DESERTION_DATE] = self._extract_desertion_date(text)
             fields[col.COLUMN_DESERTION_REGION] = self._extract_desertion_region(clean_text(text))
             fields[col.COLUMN_DESERT_CONDITIONS] = self._extract_desert_conditions(text)
             fields[col.COLUMN_DESERTION_PLACE] = self._extract_desertion_place(clean_text(text), get_file_name(self.original_filename))
             fields[col.COLUMN_RETURN_DATE] = self._extract_return_date(text)
+            if self._check_return_sign(text_pieces[self.__PIECE_1]):
+                fields[col.COLUMN_RETURN_DATE] = self._extract_return_date(text) or fields[col.COLUMN_DESERTION_DATE]
+                fields[col.COLUMN_DESERTION_DATE] = NA
+                fields[col.COLUMN_DESERTION_REGION] = NA
+                fields[col.COLUMN_DESERTION_PLACE] = NA
             print('--- ' + COLUMN_RETURN_DATE + ':' + str(fields[col.COLUMN_RETURN_DATE]))
 
         text = text_pieces[self.__PIECE_3]
@@ -101,11 +108,14 @@ class DocProcessor:
             fields[col.COLUMN_PHONE] = self.get_best_match(ml_extracted.get(col.COLUMN_PHONE), self._extract_phone(text))
             fields[col.COLUMN_BIRTHDAY] = self.get_best_match(ml_extracted.get(col.COLUMN_BIRTHDAY), self._extract_birthday(text))
             fields[col.COLUMN_TITLE] = self.get_best_match(ml_extracted.get(col.COLUMN_TITLE), self._extract_title(text))
+            fields[col.COLUMN_TITLE_2] = self._extract_title_2(fields[col.COLUMN_TITLE])
             fields[col.COLUMN_SERVICE_TYPE] = self.get_best_match(ml_extracted.get(col.COLUMN_SERVICE_TYPE), self._extract_service_type(text))
             fields[col.COLUMN_ADDRESS] = self.get_best_match(ml_extracted.get(col.COLUMN_ADDRESS), self._extract_address(clean_text(text)))
             fields[col.COLUMN_BIO] = self.get_best_match(ml_extracted.get(col.COLUMN_BIO), self._extract_bio(clean_text(text), fields[col.COLUMN_NAME]))
             fields[col.COLUMN_ENLISTMENT_DATE] = self.get_best_match(ml_extracted.get(col.COLUMN_ENLISTMENT_DATE), self._extract_conscription_date(text))
-            fields[col.COLUMN_SUBUNIT] = self.get_best_match(ml_extracted.get(col.COLUMN_SUBUNIT), self._extract_military_subunit(text, get_file_name(self.original_filename)))
+            fields[col.COLUMN_SUBUNIT] = self.get_best_match(ml_extracted.get(col.COLUMN_SUBUNIT), self.extract_military_subunit(text, get_file_name(self.original_filename)))
+            fields[col.COLUMN_SUBUNIT2] = self.extract_military_subunit(text, get_file_name(self.original_filename), mapping=PATTERN_SUBUNIT2_MAPPING)
+            fields[col.COLUMN_REVIEW_STATUS] = DEFAULT_REVIEW_STATUS_FOR_EDU_CENTER if fields[col.COLUMN_DESERTION_PLACE] == 'НЦ' else DEFAULT_REVIEW_STATUS
 
         fields[col.COLUMN_SERVICE_DAYS] = self._calculate_service_days(fields[col.COLUMN_ENLISTMENT_DATE], fields[col.COLUMN_DESERTION_DATE])
 
@@ -119,7 +129,6 @@ class DocProcessor:
             print("... ▶️ НЕ ДОДАЄМО, не кейз СЗЧ!")
 
         return result
-
 
     def validateRecord(self, record):
         if record[COLUMN_DESERT_CONDITIONS] == NA and record[COLUMN_RETURN_DATE] is None:
@@ -190,6 +199,12 @@ class DocProcessor:
             if re.search(pattern, text, re.IGNORECASE):
                 return canonical_name
         return NA
+
+    @staticmethod
+    def _extract_title_2(canonical_title):
+        if canonical_title is None: return NA
+        parts = canonical_title.split()
+        return parts[-1] if parts else NA
 
     @staticmethod
     def _extract_service_type(text):
@@ -281,7 +296,7 @@ class DocProcessor:
                 res = re.sub(p, '', res)
             final_res = " ".join(res.split()).strip(PATTERN_CLEANUP_POINTS)
             final_res = re.sub(PATTERN_RTZK_CALLED, '', final_res)
-
+            final_res = re.sub('ЦТК', 'ТЦК', final_res) # виправляємо помилки операторів
             return final_res if final_res else NA
 
         return NA
@@ -365,9 +380,9 @@ class DocProcessor:
             return 0
 
     @staticmethod
-    def _extract_military_subunit(text, file_name=None):
+    def extract_military_subunit(text, file_name=None, mapping=PATTERN_SUBUNIT_MAPPING):
         short_values = set()
-        for val in PATTERN_SUBUNIT_MAPPING.values():
+        for val in mapping.values():
             clean_val = val.replace(r'\1', '').strip()
             if clean_val:
                 short_values.add(clean_val)
@@ -395,7 +410,7 @@ class DocProcessor:
 
         # ЕТАП 2: Пошук у тексті через мапінг (якщо в файлі не знайдено)
         found_subunits = []
-        for pattern, abbreviation in PATTERN_SUBUNIT_MAPPING.items():
+        for pattern, abbreviation in mapping.items():
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 if r'\1' in abbreviation:
@@ -404,8 +419,9 @@ class DocProcessor:
                 else:
                     res = abbreviation
                 found_subunits.append(res)
+                return res
 
-        return found_subunits[-1] if found_subunits else NA
+        return NA
 
     @staticmethod
     def _extract_desertion_place(text, file_name=None):
@@ -438,6 +454,13 @@ class DocProcessor:
                     result = False
         return result
 
+    def _check_return_sign(self, text):
+        print('>>> check for return ' + text)
+        for pattern in PATTERN_RETURN_SIGN:
+            if re.search(pattern, text, re.IGNORECASE):
+                print('>>> return detected!')
+                return True
+        return False
 
     def get_best_match(self, ml_val, regex_val):
         ml_str = str(ml_val or "").strip()

@@ -91,3 +91,13 @@ def format_ukr_date(date_val):
 
     # 3. Якщо жоден формат не підійшов — повертаємо як було (щоб не втратити дані)
     return date_str
+
+def get_typed_value(value):
+        if isinstance(value, str):
+            try:
+                valid_date = datetime.strptime(value, config.EXCEL_DATE_FORMAT)
+                return valid_date
+            except ValueError:
+                return value
+        else:
+            return value

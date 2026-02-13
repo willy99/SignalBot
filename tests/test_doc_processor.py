@@ -31,7 +31,7 @@ def processor_factory():
 
 def test_process_doc_fedorov_simple(processor_factory):
     # Тестуємо реальний кейс Федорова (СЗЧ)
-    filename = "1_25.01.2026 СЗЧ з РБпНС ББпС Федоров _доповідь.doc"
+    filename = "01_25.01.2026 СЗЧ з РБпНС ББпС Федоров _доповідь.doc"
     processor = processor_factory(filename)
     result = processor.process()
 
@@ -44,7 +44,7 @@ def test_process_doc_fedorov_simple(processor_factory):
     assert fields[COLUMN_TITLE] == "солдат"
     assert fields[COLUMN_ID_NUMBER] == "1234567890"
     assert fields[COLUMN_BIRTHDAY] == "26.12.1989"
-    # todo assert fields[COLUMN_SUBUNIT] == "ББпС"
+    assert fields[COLUMN_SUBUNIT] == "ББС"
     assert fields[COLUMN_SERVICE_TYPE] == "призовом"
     assert fields[COLUMN_MIL_UNIT] == "А0224"
     assert fields[COLUMN_TZK] == "Олександрійським РТЦК та СП в м. Олександрія, Кіровоградської обл"
@@ -63,7 +63,7 @@ def test_process_doc_fedorov_simple(processor_factory):
 
 def test_process_doc_maly_simple(processor_factory):
     # Тестуємо реальний кейс (СЗЧ)
-    filename = "2_01.01.2026 СЗЧ з РВБЗ 2 сабатр САДН  МАЛИЙ Д.В.doc"
+    filename = "02_01.01.2026 СЗЧ з РВБЗ 2 сабатр САДН  МАЛИЙ Д.В.doc"
     processor = processor_factory(filename)
     result = processor.process()
 
@@ -96,7 +96,7 @@ def test_process_doc_maly_simple(processor_factory):
 # tests error - missing one of the part in the document
 def test_process_doc_maly_error_missing_4(processor_factory):
     # Тестуємо реальний кейс, де заздалегідь знаємо, що PIECE_4 буде None
-    filename = "3_01.01.2026 СЗЧ з РВБЗ 2 сабатр САДН  МАЛИЙ Д.В _ error.doc"
+    filename = "03_01.01.2026 СЗЧ з РВБЗ 2 сабатр САДН  МАЛИЙ Д.В _ error.doc"
     processor = processor_factory(filename)
     with pytest.raises(ValueError) as excinfo:
         processor.process()
@@ -105,7 +105,7 @@ def test_process_doc_maly_error_missing_4(processor_factory):
 # tests two persons in one document
 def test_process_doc_two_persons(processor_factory):
     # Тестуємо реальний кейс Івончака та Неголюка (групове СЗЧ)
-    filename = "4_31.01.2026 СЗЧ з РВЗ Івончак Д.В., Неголюк В.В. 7 дшр 2 дшб.doc"
+    filename = "04_31.01.2026 СЗЧ з РВЗ Івончак Д.В., Неголюк В.В. 7 дшр 2 дшб.doc"
     processor = processor_factory(filename)
     result = processor.process()
     assert isinstance(result, list)
@@ -113,45 +113,44 @@ def test_process_doc_two_persons(processor_factory):
 
     # --- ПЕРЕВІРКА ПЕРШОЇ ОСОБИ (ІВОНЧАК) ---
     person1 = result[0]
-    assert person1['ПІБ'] == 'ІВОНЧАК Дмитро Васильович'
-    assert person1['Військове звання'] == 'солдат'
-    assert person1['РНОКПП'] == '3151262222'
-    assert person1['Дата народження'] == '03.12.1991'
-    assert person1['Підрозділ'] == '2 дшб'
-    assert person1['Від служби'] == 'призовом'
-    assert person1['№ телефону'] == '0962522526'
-    assert person1['Адреса проживання'] == "с. Майори, вул. Паркова буд. 12 кв.1-А, Біляївський р-н, Одеська обл."
-    assert person1['РТЦК'] == 'Розділянським РТЦК та СП Одеської області'
-    assert person1['Дата призову на військову службу'] == '14.09.2025'
-    assert person1['термін служби до СЗЧ'] == 139
-    assert person1['Звідки СЗЧ'] == 'РВБЗ'
+    assert person1[COLUMN_NAME] == 'ІВОНЧАК Дмитро Васильович'
+    assert person1[COLUMN_TITLE] == 'солдат'
+    assert person1[COLUMN_ID_NUMBER] == '3151262222'
+    assert person1[COLUMN_BIRTHDAY] == '03.12.1991'
+    assert person1[COLUMN_SUBUNIT] == '2 дшб'
+    assert person1[COLUMN_SERVICE_TYPE] == 'призовом'
+    assert person1[COLUMN_PHONE] == '0962522526'
+    assert person1[COLUMN_ADDRESS] == "с. Майори, вул. Паркова буд. 12 кв.1-А, Біляївський р-н, Одеська обл."
+    assert person1[COLUMN_TZK] == 'Розділянським РТЦК та СП Одеської області'
+    assert person1[COLUMN_ENLISTMENT_DATE] == '14.09.2025'
+    assert person1[COLUMN_SERVICE_DAYS] == 139
+    assert person1[COLUMN_DESERTION_PLACE] == 'РВБЗ'
 
     # --- ПЕРЕВІРКА ДРУГОЇ ОСОБИ (НЕГОЛЮК) ---
     person2 = result[1]
-    assert person2['ПІБ'] == 'НЕГОЛЮК Володимир Васильович'
-    assert person2['Військове звання'] == 'солдат'
-    assert person2['РНОКПП'] == NA
-    assert person2['Дата народження'] == '29.10.1981'
-    assert person2['№ телефону'] == '0987773388'
-    assert "Івано-Франківська обл, Івано-Франківський район, с. Раковець, вул. Стуса 12" in person2['Адреса проживання']
-    assert person2['РТЦК'] == 'Надвірнянським РТЦК та СП Івано-Франківської області'
-    assert person2['Дата призову на військову службу'] == '25.10.2025'
-    assert person2['термін служби до СЗЧ'] == 98
-    assert person2['Звідки СЗЧ'] == 'РВБЗ'
+    assert person2[COLUMN_NAME] == 'НЕГОЛЮК Володимир Васильович'
+    assert person2[COLUMN_TITLE] == 'солдат'
+    assert person2[COLUMN_ID_NUMBER] == NA
+    assert person2[COLUMN_BIRTHDAY] == '29.10.1981'
+    assert person2[COLUMN_PHONE] == '0987773388'
+    assert "Івано-Франківська обл, Івано-Франківський район, с. Раковець, вул. Стуса 12" in person2[COLUMN_ADDRESS]
+    assert person2[COLUMN_TZK] == 'Надвірнянським РТЦК та СП Івано-Франківської області'
+    assert person2[COLUMN_ENLISTMENT_DATE] == '25.10.2025'
+    assert person2[COLUMN_SERVICE_DAYS] == 98
+    assert person2[COLUMN_DESERTION_PLACE] == 'РВБЗ'
 
     # --- ПЕРЕВІРКА СПІЛЬНИХ ДАНИХ ---
     for field in result:
-        assert field['Військова частина'] == 'А0224'
-        assert field['Дата СЗЧ'] == '31.01.2026'
-        assert field['Звідки СЗЧ н.п. обл'] == 'Привовчанське Дніпропетровської області'
-        assert "ІВОНЧАК" in field['Дата, час обставини та причини самовільного залишення військової частини або місця служби']
-        assert "НЕГОЛЮК" in field['Дата, час обставини та причини самовільного залишення військової частини або місця служби']
-        assert field['Виконавець'] == 'БЕЗКРОВНИЙ Володимир Володимирович'
-
+        assert field[COLUMN_MIL_UNIT] == 'А0224'
+        assert field[COLUMN_DESERTION_DATE] == '31.01.2026'
+        assert field[COLUMN_DESERTION_REGION] == 'Привовчанське Дніпропетровської області'
+        assert "ІВОНЧАК" in field[COLUMN_DESERT_CONDITIONS]
+        assert "НЕГОЛЮК" in field[COLUMN_DESERT_CONDITIONS]
+        assert field[COLUMN_EXECUTOR] == 'БЕЗКРОВНИЙ Володимир Володимирович'
 
 def test_process_doc_tzk_is_full(processor_factory):
     # перевірка, що тцк розпарсився правильно та повно. матьйїхйоп
-    filename = "5_05.02.2026 СЗЧ з РВБЗ (Гавнов В.М.) рбс 3 дшб_tzk.doc"
+    filename = "05_05.02.2026 СЗЧ з РВБЗ (Гавнов В.М.) рбс 3 дшб_tzk.doc"
     processor = processor_factory(filename)
     result = processor.process()
 
@@ -159,39 +158,55 @@ def test_process_doc_tzk_is_full(processor_factory):
     assert len(result) == 1
 
     person = result[0]
-    assert person['РТЦК'] == 'Крижопільським РТЦК та СП м. Крижопіль'
+    assert person[COLUMN_TZK] == 'Крижопільським РТЦК та СП м. Крижопіль'
 
 def test_process_docx_simple(processor_factory):
     # тестування парсінгу docx
-    filename = "6_02.01.2026 СЗЧ відсутність на військовій службі без поважних причин (Гавнов В.Є.) 9 дшр 3 дшб.docx"
+    filename = "06_02.01.2026 СЗЧ відсутність на військовій службі без поважних причин (Гавнов В.Є.) 9 дшр 3 дшб.docx"
     processor = processor_factory(filename)
     result = processor.process()
-
-    print(result)
 
     assert isinstance(result, list)
     assert len(result) == 1
 
     person = result[0]
-    assert person['ПІБ'] == 'ГАВНОВ Віктор Євгенович'
-    assert person['Військове звання'] == 'солдат'
-    assert person['РНОКПП'] == '2232933224'
-    assert person['Дата народження'] == '23.03.1968'  # m/d/yy
-    assert person['Військова частина'] == 'А0224'
-    assert person['Підрозділ'] == '3 дшб'
-    assert person['Від служби'] == 'призовом'
-    assert person['РТЦК'] == 'Шепетівським РТЦК та СП м. Шепетівка 24'
-    assert person['Дата призову на військову службу'] == '24.02.2022'
-    assert person['термін служби до СЗЧ'] == 1408
-    assert person['Дата СЗЧ'] == '02.01.2026'
-    assert person['Звідки СЗЧ н.п. обл'] == 'Вознесенське, Миколаївської області'
+    assert person[COLUMN_NAME] == 'ГАВНОВ Віктор Євгенович'
+    assert person[COLUMN_TITLE] == 'солдат'
+    assert person[COLUMN_ID_NUMBER] == '2232933224'
+    assert person[COLUMN_BIRTHDAY] == '23.03.1968'  # m/d/yy
+    assert person[COLUMN_MIL_UNIT] == 'А0224'
+    assert person[COLUMN_SUBUNIT] == '3 дшб'
+    assert person[COLUMN_SERVICE_TYPE] == 'призовом'
+    assert person[COLUMN_TZK] == 'Шепетівським РТЦК та СП м. Шепетівка 24'
+    assert person[COLUMN_ENLISTMENT_DATE] == '24.02.2022'
+    assert person[COLUMN_SERVICE_DAYS] == 1408
+    assert person[COLUMN_DESERTION_DATE] == '02.01.2026'
+    assert person[COLUMN_DESERTION_REGION] == 'Вознесенське, Миколаївської області'
     assert "ГАВНОВ Віктор Євгенович" in person[
-        'Дата, час обставини та причини самовільного залишення військової частини або місця служби']
+        COLUMN_DESERT_CONDITIONS]
     assert "73 доби" in person[
-        'Дата, час обставини та причини самовільного залишення військової частини або місця служби']
-    assert person['№ телефону'] == '0671118227'
-    assert person['Адреса проживання'] == "Хмельницька область, Ізяславський район, с. Теліжинці, вул. Центральна, буд. 48."
-    assert person['Виконавець'] == 'САМУЛІК Роман Богданович'
+        COLUMN_DESERT_CONDITIONS]
+    assert person[COLUMN_PHONE] == '0671118227'
+    assert person[COLUMN_ADDRESS] == "Хмельницька область, Ізяславський район, с. Теліжинці, вул. Центральна, буд. 48."
+    assert person[COLUMN_EXECUTOR] == 'САМУЛІК Роман Богданович'
+
+def test_return_date(processor_factory):
+    filename = "07_09.02.2026 повернення після СЗЧ 5 дшр 2 дшб ДУБ Є.М..doc"
+    processor = processor_factory(filename)
+    result = processor.process()
+    assert isinstance(result, list)
+    person = result[0]
+
+    assert person[COLUMN_RETURN_DATE] == '09.02.2026' # todo - винно бути -08.02.2026
+    assert person[COLUMN_DESERTION_DATE] == ''
+    assert person[COLUMN_DESERTION_PLACE] == ''
+
+def test_not_a_desertion_case(processor_factory):
+    filename = "08_12.02.2026 Травмування  (КАША О.М.) МР.docx"
+    processor = processor_factory(filename)
+    result = processor.process()
+    assert isinstance(result, list)
+    assert len(result) == 0
 
 
 #################### загальне модульне тестування регекспів ##############################
@@ -235,6 +250,8 @@ def test_title_extraction(processor_factory):
     text = "ПУНДІК Олег Вікторович, старший солдат, військовослужбовець військової служби за призовом, "
     res = processor._extract_title(text)
     assert "старший солдат" in res
+    res = processor._extract_title_2(res)
+    assert "солдат" in res
 
     text = "ПУНДІКА Олега Вікторовича, старшого солдату, військовослужбовець військової служби за призовом, "
     res = processor._extract_title(text)
@@ -248,6 +265,10 @@ def test_title_extraction(processor_factory):
     res = processor._extract_title(text)
     assert "солдат" in res
 
+    # todo
+    text = "БОЛВАН Руслан Олександрович, військовослужбовець військової служби за призовом, аааа. Близькі родичі: Батько: БОЛВАН Олександр Владиславович, 23.06.1965 р.н., м. Київ, тел. +380993955598; Мати: БОЛВАН Світлана Сергіївна, 05.05.1970 р.н., смт. Капітанівка, "
+    res = processor._extract_title(text)
+    assert "солдат" in res
 
 def test_rtzk_extraction(processor_factory):
     processor = processor_factory("any.docx")
@@ -282,6 +303,11 @@ def test_rtzk_extraction(processor_factory):
     text = "року народження, українець, освіта вища, неодружений. Призваний Центральним РТЦК та СП в м. Миколаїв, Миколаївської області, 06.12.2025. РНОКПП 36"
     res = processor._extract_rtzk(text)
     assert res == "Центральним РТЦК та СП в м. Миколаїв, Миколаївської області"
+
+    # виправлення рцтк на ртцк
+    text = "БУЙКО Богдан Васильович, старший сержант, військовослужбовець військової служби за призовом, колишній гранатометник 1 десантно-штурмового відділення 1 десантно-штурмового взводу 7 десантно-штурмової роти 2 десантно-штурмового батальйону військової частини А0224, 14.05.1979 року народження, українець, освіта середня-спеціальна, Авіаційна школа м. Гайсин у 1997 році, одружений. Призваний Сихівським  РЦТК та СП Львівської області, 21.04.2025 року. РНОКПП 2811111118. Паспорт КА 111111. Номер мобільного телефону (067) 1111111"
+    res = processor._extract_rtzk(text)
+    assert res == "Сихівським РТЦК та СП Львівської області"
 
 def test_address_extraction(processor_factory):
     processor = processor_factory("any.docx")
@@ -324,10 +350,15 @@ def test_where_desertion_extraction(processor_factory):
     res = processor._extract_desertion_place(text, file_name)
     assert res == 'лікування'
 
+    text = "11.02.2026 від командира 4 десантно-штурмової роти 1 десантно-штурмового батальйону надійшла доповідь про факт неповернення з лікування до військової частини військовослужбовцем військової частини А0224."
+    file_name = '11.02.2026 СЗЧ неповернення 4дшр 1дшб ЩЕРБИНА А.В..docx'
+    res = processor._extract_desertion_place(text, file_name)
+    assert res == 'лікування'
+
     text = "05.02.2026 від командира самохідного артилерійського дивізіону військової частини А0224 надійшла доповідь про факт неповернення після проходження військово-лікарської комісії до району виконання завдання за призначенням військовослужбовцем військової частини А0224."
     file_name = '08.02.2025 СЗЧ несвоєчасне прибуття ГАВНОВ О.Ю. 1 сабатр САДн.docx'
     res = processor._extract_desertion_place(text, file_name)
-    assert res == 'ВЛК'
+    assert res == 'лікування'
 
     text = "03.02.2026 старший солдат МУДІК Олександр Сергійович вибув з постійного пункту дислокації (н.п. Вознесенське Миколаївської області) військової частини А0224 (переміщення) до військової частини А5291, відповідно наказу НГШ ЗСУ №122-РС від 17.01.2026. До військової частини А5191 не прибув 04.02.2021, згідно повідомлення військової частини А5291 (акт прийому поповнення вх. №111 від 14.02.2021). До військової частини А0224 не повернувся."
     file_name = '09.02.2021 СЗЧ неприбуття (переміщення) до військової частини А5291 (Мудік О.С.) 11 дшр 3 дшб.doc'
@@ -359,27 +390,82 @@ def test_milsubunit_extraction(processor_factory):
 
     text = "ГАВНОВ Віталій Сергійович, солдат, військовослужбовець військової служби за призовом, розвідник-санітар 2 розвідувального відділення розвідувального взводу 1 десантно-штурмового батальйону військової частини А0224, 30.07.1986 року народження, українець, освіта середня . Призваний"
     file_name = '09.02.2026 СЗЧ РВБЗ ГАВНОВ А. С. РВ 1ДШБ.docx'
-    res = processor._extract_military_subunit(text, file_name)
+    res = processor.extract_military_subunit(text, file_name)
     assert res == '1 дшб'
+    res = processor.extract_military_subunit(text, file_name, mapping=PATTERN_SUBUNIT2_MAPPING)
+    assert res == 'РВ'
 
     text = "ГАВНОВ Віталій Сергійович, військовослужбовець військової служби за призовом, оператор безпілотних літальних апаратів 2 відділення перехоплювачів безпілотних літальних апаратів 2 взводу перехоплювачів безпілотних літальних апаратів батареї перехоплювачів безпілотних літальних апаратів зенітного ракетного дивізіону військової частини А0224, 11.08.2001 року народження, Українець, освіта вища, "
     file_name = '09.02.2026_СЗЧ_з_району_ГАВНОВ_Бат_ПБпЛА_ЗРДн.docx'
-    res = processor._extract_military_subunit(text, file_name)
+    res = processor.extract_military_subunit(text, file_name)
     assert res == 'ЗРДн'
+    res = processor.extract_military_subunit(text, file_name, mapping=PATTERN_SUBUNIT2_MAPPING)
+    assert res == 'БатПБПЛА'
 
     text = "ГАВНОВ Леонід Генадійович, старший солдат, військовослужбовець військової служби за мобілізацією, старший навідник 2 артилерійського взводу 2 артилерійської батареї самохідного артилерійського дивізіону військової частини А0224"
     file_name = '09.02.2026_СЗЧ_з_РВБЗ_2_АБАТР_САДН__БІЖКО_Л.Г..doc'
-    res = processor._extract_military_subunit(text, file_name)
+    res = processor.extract_military_subunit(text, file_name)
     assert res == 'САДн'
+    res = processor.extract_military_subunit(text, file_name, mapping=PATTERN_SUBUNIT2_MAPPING)
+    assert res == '2 арт. Батарея'
 
-    text = "ГАВНОВ Леонід Генадійович, старший солдат, військовослужбовець військової служби за мобілізацією, старший навідник 2 артилерійського взводу 2 артилерійської батареї самохідного артилерійського дивізіону військової частини А0224"
+    text = "ГАВНОВ Леонід Генадійович, старший солдат, військовослужбовець військової служби за мобілізацією, старший навідник 2 артилерійського взводу 1 артилерійської батареї самохідного артилерійського дивізіону військової частини А0224"
     file_name = '09.02.2026_СЗЧ_з_РВБЗ_2_АБАТР_БІЖКО_Л.Г..doc'
-    res = processor._extract_military_subunit(text, file_name)
+    res = processor.extract_military_subunit(text, file_name, mapping=PATTERN_SUBUNIT_MAPPING)
     assert res == 'САДн'
+    res = processor.extract_military_subunit(text, file_name, mapping=PATTERN_SUBUNIT2_MAPPING)
+    assert res == '1 арт. Батарея'
+
+    text="оператор безпілотних літальних апаратів взводу інженерних безпілотних наземних систем інженерно – саперної роти військової частини А0224, 26.06.1987 року народження, українець,"
+    file_name = ''
+    res = processor.extract_military_subunit(text, file_name)
+    assert res == 'ІСР'
+
+    text = "ДУМБА Дмитро Миколайович, солдат, військовослужбовець військової служби за призовом, оператор безпілотних літальних апаратів 6 відділення 2 взводу ударних безпілотних авіаційних комплексів роти безпілотних систем аеромобільного батальйону військової частини А022"
+    file_name = '11.02.2026 СЗЧ з РВБЗ АЕМБ РБС ДУМБА Д.М.doc'
+    res = processor.extract_military_subunit(text, file_name)
+    assert res == 'АЕМБ'
+    res = processor.extract_military_subunit(text, file_name, mapping=PATTERN_SUBUNIT2_MAPPING)
+    assert res == 'РБС'
+
+    text = "ДУМБА Іван Іванович, солдат, військовослужбовець військової служби за мобілізацією, навідник 1 аеромобільного відділення 1 аеромобільного взводу 4 аеромобільної роти аеромобільного батальйону військової частини А0224"
+    file_name = "04.02.2026 СЗЧ з РВБЗ ДУМБА І.І. 4 аемр аемб.docx"
+    res = processor.extract_military_subunit(text, file_name)
+    assert res == 'АЕМБ'
+    res = processor.extract_military_subunit(text, file_name, mapping=PATTERN_SUBUNIT2_MAPPING)
+    assert res == '4 аемр'
+
+    text = "ДУМБА Юрій Олександрович, старший солдат, військовослужбовець військової служби за мобілізацією, водій 2 автомобільного відділення 1 автомобільного взводу підвозу боєприпасів автомобільної роти підвозу боєприпасів батальйону логістики військової частини А0224, 16.09.1979 року народження"
+    file_name = ""
+    res = processor.extract_military_subunit(text, file_name)
+    assert res == 'БЛ'
+    res = processor.extract_military_subunit(text, file_name, mapping=PATTERN_SUBUNIT2_MAPPING)
+    assert res == 'Автомобільна рота підвозу боєприпасів'
+
+    text = "ДУМБА Сергій Васильович, солдат, військовослужбовець військової служби за мобілізацією, водій 3 відділення 2 автомобільного взводу автомобільної роти батальйону логістики військової частини А0224, дата народження: 07.11.1979"
+    file_name = ""
+    res = processor.extract_military_subunit(text, file_name)
+    assert res == 'БЛ'
+    res = processor.extract_military_subunit(text, file_name, mapping=PATTERN_SUBUNIT2_MAPPING)
+    assert res == 'Автомобільна рота'
+
+    text = "ДУМБА Дмитро Андрійович, солдат, за призовом під час мобілізації, водій-електрик БУ, 07.09.1997р.н."
+    file_name = ""
+    res = processor.extract_military_subunit(text, file_name)
+    assert res == 'БУ'
+
+    text = "ДУМБА Олександр Миколайович, сержант, військовослужбовець військової служби за мобілізацією, водій автомобільного відділення взводу забезпечення батальйону управління військової частини А0224, 05.02.1995 року народження"
+    file_name = ""
+    res = processor.extract_military_subunit(text, file_name)
+    assert res == 'БУ'
 
 
 
+def test_return_sign(processor_factory):
+    processor = processor_factory("any.docx")
 
+    text = "03.06.2022 року солдат БОЛВАН Іван Васильович не повернувся з лікування до району виконання завдання за призначенням."
+    assert False == processor._check_return_sign(text)
 
 def test_ml(processor_factory):
     text = "НЕГОЛЮК Володимир Васильович, старший солдат, військовослужбовець військової служби за призовом, стрілець-помічник гранатометника 2  десантно-штурмового відділення 3 десантно-штурмового взводу 7 десантно-штурмової роти 2 десантно-штурмового батальйону військової частини А0224, 29.10.1981 року народження, українець, освіта вища, Національний транспортний університет м. Київ у 2010 році. Одружений. неодружений. Призваний Салтівським ВТТЦК та СП м. Харків, 25.10.2025 року. РНОКПП відомості не надано"

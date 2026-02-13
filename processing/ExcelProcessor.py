@@ -7,7 +7,7 @@ from dics.deserter_xls_dic import *
 from dics.deserter_xls_dic import NA
 from typing import List, Dict, Any
 from storage.StorageFactory import StorageFactory
-from utils.utils import format_ukr_date
+from utils.utils import format_ukr_date, get_typed_value
 
 class ExcelProcessor:
     def __init__(self, file_path, batch_processing=False):
@@ -75,7 +75,7 @@ class ExcelProcessor:
                         cell = self.sheet.cell(row=existing_row, column=idx)
                         # Оновлюємо тільки якщо в базі пусто, а в нових даних щось є
                         if (not cell.value or cell.value == NA) and value:
-                            cell.value = value
+                            cell.value = get_typed_value(value)
                             print('--- оновлюємо ' + str(value))
             else:
                 current_id += 1
@@ -104,7 +104,7 @@ class ExcelProcessor:
                 for col_name, value in data_dict.items():
                     idx = self.column_map.get(col_name.lower())
                     if idx:
-                        self.sheet.cell(row=target_insert_row, column=idx).value = value
+                        self.sheet.cell(row=target_insert_row, column=idx).value = get_typed_value(value)
 
                 # 4. Фіксуємо висоту
                 self.sheet.row_dimensions[target_insert_row].height = 15
@@ -119,6 +119,7 @@ class ExcelProcessor:
         rnokpp = str(data_dict.get(COLUMN_ID_NUMBER, '')).strip()
         des_date = str(data_dict.get(COLUMN_DESERTION_DATE, '')).strip()
         ret_date = str(data_dict.get(COLUMN_RETURN_DATE, '')).strip()
+        ret_reserve_date = str(data_dict.get(COLUMN_RETURN_TO_RESERVE_DATE, '')).strip()
 
         pid_col = self.column_map.get(COLUMN_INCREMEMTAL.lower())
         pib_col = self.column_map.get(COLUMN_NAME.lower())
@@ -126,6 +127,7 @@ class ExcelProcessor:
         rnokpp_col = self.column_map.get(COLUMN_ID_NUMBER.lower())
         des_date_col = self.column_map.get(COLUMN_DESERTION_DATE.lower())
         ret_date_col = self.column_map.get(COLUMN_RETURN_DATE.lower())
+        ret_reserve_date_col = self.column_map.get(COLUMN_RETURN_TO_RESERVE_DATE.lower())
 
         print('--- 🔎: Пошук чувака в базі:: ' + str(pib) + ' || ' + str(dob) + ' || ' + str(rnokpp) + '; сзч||взад:' + str(des_date) + ' || ' + str(ret_date))
         if not all([pib_col, dob_col, rnokpp_col, des_date_col, ret_date_col]):
@@ -139,14 +141,18 @@ class ExcelProcessor:
             s_rnokpp = str(self.sheet.cell(row=row, column=rnokpp_col).value or "").strip()
             s_des_date = format_ukr_date(str(self.sheet.cell(row=row, column=des_date_col).value or "").strip())
             s_ret_date = format_ukr_date(str(self.sheet.cell(row=row, column=ret_date_col).value or "").strip())
+            s_ret_reserve_date = format_ukr_date(str(self.sheet.cell(row=row, column=ret_reserve_date_col).value or "").strip())
             # todo if 12/31/20 - КОСТИЛЬ!
             if s_ret_date == '31.12.2020':
                 s_ret_date = ''
                 self.sheet.cell(row=row, column=ret_date_col).value = None
+            if s_ret_reserve_date == '31.12.2020':
+                s_ret_reserve_date = ''
+                self.sheet.cell(row=row, column=ret_reserve_date_col).value = None
 
             if s_pib == pib and s_dob == dob and s_rnokpp == rnokpp:
                 print('--- ID: ' + str(s_pid) + ' des_date='+str(s_des_date))
-                if des_date == s_des_date or s_ret_date == "":
+                if des_date == s_des_date or (s_ret_date == "" and s_ret_reserve_date == ""):
                     print('--- 🔎⚠️: Чувак вже в базі, будемо доповнювати запис! (ID:' + s_pid + ')')
                     return row
                 # last_found = row
@@ -192,7 +198,8 @@ class ExcelProcessor:
                 print("❌ Помилка: Openpyxl згенерував 0 байт даних!")
                 return
             output.seek(0)
-            fileProxy.save_file_from_buffer(self.file_path, output)
+            with fileProxy as smb:
+                smb.save_file_from_buffer(self.file_path, output)
             print(f"--- ✔️ EXCEL УСПІШНО ОНОВЛЕНО ({size} байт)")
         except Exception as e:
             print(f"❌ Критична помилка при збереженні: {e}")

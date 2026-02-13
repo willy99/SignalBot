@@ -7,7 +7,7 @@ from processing.BatchProcessor import BatchProcessor
 import traceback
 
 from report.ExcelReport import ExcelReporter
-
+from processing.converter.ColumnConverter import ColumnConverter
 
 class MyWorkFlow:
 
@@ -26,7 +26,6 @@ class MyWorkFlow:
         self.client = SignalClient()
         self.db = MyDataBase()
         self.stats = Stat()  # Створюємо об'єкт статистики
-        self.batchProcessor = None
         self.excelFilePath = None
 
     def initExcelProcessor(self, excelFilePath):
@@ -113,7 +112,8 @@ class MyWorkFlow:
         text = text.lower().strip()
 
         print(f"DEBUG: User={user_id}, State={current_state}, Text='{text}'")
-        main_menu = "Ви у Головному меню:\n1. Batch обробка\n2. Статистика\n3. Вихід"
+        main_menu = "Ви у Головному меню:\n1. Різна обробка\n2. Статистика\n3. Вихід"
+        process_menu = "ОБРОБКА MENU:\n1. Batch обробка файлів\n2. Конвертація полів\n3. Вихід"
         menu_prompt = "Напишіть 'меню' для початку роботи."
 
         if text == "меню" or text == "start" or text == "menu":
@@ -121,11 +121,9 @@ class MyWorkFlow:
             return main_menu
 
         if current_state == "MAIN_MENU":
-            if text == "1" or text == "batch":
-                self.batchProcessor = BatchProcessor(self, self.excelFilePath)
-                self.batchProcessor.start_processing(0)
-                self.batchProcessor = None
-                return "Піджигаємо!"
+            if text == "1":
+                self.db.set_user_state(user_id, "PROCESS")
+                return process_menu
             elif text == "2":
                 self.db.set_user_state(user_id, "STAT")
                 result = self.stats.get_report()
@@ -137,6 +135,18 @@ class MyWorkFlow:
             elif text == "0":
                 return main_menu
 
+        elif current_state == 'PROCESS':
+            if text == "0":
+                self.db.set_user_state(user_id, "MAIN_MENU")
+                return main_menu
+            if text == "1" or text == 'batch':
+                batch_processor = BatchProcessor(self, self.excelFilePath)
+                batch_processor.start_processing(0)
+                return "OK"
+            if text == "2" or text == 'convert':
+                column_converter = ColumnConverter(self.excelFilePath)
+                column_converter.convert()
+                return "OK"
         elif current_state == "STAT":
             if text == "0":
                 self.db.set_user_state(user_id, "MAIN_MENU")
