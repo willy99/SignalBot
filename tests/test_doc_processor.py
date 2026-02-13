@@ -265,7 +265,6 @@ def test_title_extraction(processor_factory):
     res = processor._extract_title(text)
     assert "солдат" in res
 
-    # todo
     text = "БОЛВАН Руслан Олександрович, військовослужбовець військової служби за призовом, аааа. Близькі родичі: Батько: БОЛВАН Олександр Владиславович, 23.06.1965 р.н., м. Київ, тел. +380993955598; Мати: БОЛВАН Світлана Сергіївна, 05.05.1970 р.н., смт. Капітанівка, "
     res = processor._extract_title(text)
     assert "солдат" in res
