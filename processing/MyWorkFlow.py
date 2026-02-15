@@ -5,9 +5,10 @@ from connection.MyDataBase import MyDataBase
 from processing.Stat import Stat
 from processing.BatchProcessor import BatchProcessor
 import traceback
-
+from storage.LoggerManager import LoggerManager
 from report.ExcelReport import ExcelReporter
 from processing.converter.ColumnConverter import ColumnConverter
+from storage.BackupData import BackupData
 
 class MyWorkFlow:
 
@@ -19,6 +20,9 @@ class MyWorkFlow:
     }
 
     def __init__(self):
+        self.log_manager = LoggerManager()
+        self.logger = self.log_manager.get_logger()
+
         self.excelProcessor = None
         self.wordProcessor = None
         self.reporter = None
@@ -28,9 +32,12 @@ class MyWorkFlow:
         self.stats = Stat()  # Створюємо об'єкт статистики
         self.excelFilePath = None
 
+
+        self.backuper = BackupData(self.log_manager)
+
     def initExcelProcessor(self, excelFilePath):
-        self.excelProcessor = ExcelProcessor(excelFilePath)
-        self.reporter = ExcelReporter(self.excelProcessor)
+        self.excelProcessor = ExcelProcessor(excelFilePath, log_manager=self.log_manager,)
+        self.reporter = ExcelReporter(self.excelProcessor, log_manager=self.log_manager,)
         self.excelFilePath = excelFilePath
 
     def parseSignalData(self, data):
@@ -39,7 +46,7 @@ class MyWorkFlow:
             params = data.get("params", {})
             envelope = params.get("envelope", {})
 
-            # print(str(data))
+            # self.logger.debug(str(data))
             # 1. Обробка вхідного повідомлення від когось іншого
             if "dataMessage" in envelope:
                 self.stats.messagesProcessed += 1
@@ -59,12 +66,12 @@ class MyWorkFlow:
                 # process attachments
                 file_saved = False
                 if len(attachments) > 0:
-                    print('--------------------------🔓 BEGIN ------------------------------------------ ')
+                    self.logger.debug('--------------------------🔓 BEGIN ------------------------------------------ ')
                     for att in attachments:
                         att_id = att.get("id")
                         filename = att.get("filename")
 
-                        print(f"📎 Отримано файл: {filename} (ID: {att_id})")
+                        self.logger.debug(f"📎 Отримано файл: {filename} (ID: {att_id})")
                         file_saved = self.attachmentHandler.handle_attachment(att_id, filename)
                         self.client.send_reaction(
                             group_id,
@@ -73,17 +80,17 @@ class MyWorkFlow:
                             source_uuid,
                             timestamp
                         )
-                    print('--------------------------🔓 END -------------------------------------------- ')
+                    self.logger.debug('--------------------------🔓 END -------------------------------------------- ')
 
 
                 elif message_text:
                     response = ''
-                    print('Check is message in answers' + str(message_text) + ' ' + str(message_text in self.ANSWERS))
+                    self.logger.debug('Check is message in answers' + str(message_text) + ' ' + str(message_text in self.ANSWERS))
                     if message_text.lower() in self.ANSWERS:
                         response = self.ANSWERS[message_text.lower()]
                     else:
                         response = self.getResponseAndMove(source, message_text)
-                    print(f"🤖 Відповідаю: {response}")
+                    self.logger.debug(f"🤖 Відповідаю: {response}")
                     if group_id is None:
                         self.client.send_message(source, response)
 
@@ -101,8 +108,8 @@ class MyWorkFlow:
         except Exception as e:
             stack_trace = traceback.format_exc()
 
-            print("--- FULL STACK TRACE ---")
-            print(stack_trace)
+            self.logger.debug("--- FULL STACK TRACE ---")
+            self.logger.debug(stack_trace)
             return f"❌ Помилка парсингу: {e}"
 
         return None
@@ -111,9 +118,10 @@ class MyWorkFlow:
         current_state = self.db.get_user_state(user_id)
         text = text.lower().strip()
 
-        print(f"DEBUG: User={user_id}, State={current_state}, Text='{text}'")
+        self.logger.debug(f"DEBUG: User={user_id}, State={current_state}, Text='{text}'")
         main_menu = "Ви у Головному меню:\n1. Різна обробка\n2. Статистика\n3. Вихід"
         process_menu = "ОБРОБКА MENU:\n1. Batch обробка файлів\n2. Конвертація полів\n3. Вихід"
+        stat_menu = ":\n1. Статистика і звіти \n2. Звіт по СЗЧ - по підрозділам\n3. Звіт по СЗЧ - monthly\n4. Призвіща\n5. СЗЧ по підрозділам\n0. Вихід"
         menu_prompt = "Напишіть 'меню' для початку роботи."
 
         if text == "меню" or text == "start" or text == "menu":
@@ -127,7 +135,7 @@ class MyWorkFlow:
             elif text == "2":
                 self.db.set_user_state(user_id, "STAT")
                 result = self.stats.get_report()
-                result += ":\n1. Статистика по файлам\n2. Звіт по СЗЧ - today\n3. Звіт по СЗЧ - monthly\n4. Призвіща\n0. Вихід"
+                result += stat_menu
                 return result
             elif text == "4" or text == "вихід":
                 self.db.set_user_state(user_id, "START")
@@ -159,6 +167,8 @@ class MyWorkFlow:
                 return self.reporter.get_montly_report()
             if text == "4":
                 return self.reporter.get_all_names_report()
+            if text == "5":
+                return self.reporter.get_detailed_stats()
             else:
                 return "Фігня-цифра"
 

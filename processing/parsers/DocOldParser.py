@@ -9,7 +9,7 @@ class DocOldParser(BaseFileParser):
 
         # Якщо textutil повернув сміття (немає кирилиці або забагато дивних символів)
         if not text or self._is_garbage(text):
-            print("⚠️ textutil не впорався, пробуємо antiword...")
+            self.logger.warning("⚠️ textutil не впорався, пробуємо antiword...")
             text = self._try_antiword()
 
         return text
@@ -33,7 +33,7 @@ class DocOldParser(BaseFileParser):
             )
             return result.stdout.decode('utf-8', errors='replace')
         except Exception as e:
-            print(f"❌ antiword не встановлено або помилка: {e}")
+            self.logger.error(f"❌ antiword не встановлено або помилка: {e}")
             return ""
 
     def _is_garbage(self, text):

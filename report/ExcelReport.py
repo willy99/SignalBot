@@ -4,40 +4,170 @@ from typing import Any, Optional
 import config
 from dics.deserter_xls_dic import *
 from collections import defaultdict
+from storage.LoggerManager import LoggerManager
 
 class ExcelReporter:
-    def __init__(self, excelProcessor):
+    def __init__(self, excelProcessor, log_manager: LoggerManager):
         # Завантажуємо файл у режимі read_only для швидкості
         self.excelProcessor = excelProcessor
+        self.logger = log_manager.get_logger()
+
+    def get_detailed_stats(self):
+        """Збирає повну статистику по підрозділах, званнях та термінах СЗЧ."""
+
+        # Ініціалізуємо вкладений словник (автоматично створює гілки)
+        stats = defaultdict(lambda: defaultdict(lambda: {
+            'офіцер': {'under_3': 0, 'over_3': 0},
+            'рядовий_сержант': {'under_3': 0, 'over_3': 0}
+        }))
+
+        # Отримуємо індекси стовпців з вашого column_map
+        unit_idx = self.excelProcessor.column_map.get(COLUMN_SUBUNIT.lower())  # Підрозділ
+        sub_unit_idx = self.excelProcessor.column_map.get(COLUMN_SUBUNIT2.lower())  # Саб-підрозділ
+        rank_idx = self.excelProcessor.column_map.get(COLUMN_TITLE_2.lower())  # Звання
+        days_idx = self.excelProcessor.column_map.get(COLUMN_DESERTION_TERM.lower())  # К-сть днів в СЗЧ
+        des_date_idx = self.excelProcessor.column_map.get(COLUMN_DESERTION_DATE.lower())
+
+        # Читаємо весь заповнений діапазон
+        sheet = self.excelProcessor.sheet
+        last_row = sheet.range('A' + str(sheet.cells.last_cell.row)).end('up').row
+        if last_row < 2: return {}
+
+        # Завантажуємо дані в пам'ять (Data Matrix)
+        data = sheet.range((2, 1), (last_row, sheet.used_range.columns.count)).value
+        if last_row == 2: data = [data]
+
+        for row in data:
+            unit = str(row[unit_idx - 1] or "Не вказано").strip()
+            sub_unit = str(row[sub_unit_idx - 1] or "Не вказано").strip()
+            rank = str(row[rank_idx - 1] or "").lower().strip()
+            des_date = row[des_date_idx - 1]
+            if not self.accept_date(des_date, [2026]):
+                continue
+
+            # Логіка визначення терміну (припускаємо, що в колонці число днів)
+            try:
+                days = 4 if str(row[days_idx - 1]) == 'більше 3 діб' else 0
+            except ValueError:
+                days = 0
+
+            period_key = 'under_3' if days <= 3 else 'over_3'
+
+            # Групування по званнях
+            # Додай сюди всі варіації офіцерських звань, які є в базі
+            officer_keywords = ['офіцер']
+            is_officer = any(word in rank for word in officer_keywords)
+            rank_key = 'офіцер' if is_officer else 'рядовий_сержант'
+
+            # Інкремент статистики
+            stats[unit][sub_unit][rank_key][period_key] += 1
+
+        for unit, sub_units in stats.items():
+            self.logger.debug(f"### ⚔️ {unit}")
+            for sub, roles in sub_units.items():
+                over = roles['рядовий_сержант']['over_3'] + roles['офіцер']['over_3']
+                under = roles['рядовий_сержант']['under_3'] + roles['офіцер']['under_3']
+                if over > 0 or under > 0:
+                    self.logger.debug(f"* **{sub}:** 🟢 до 3: {under} | 🔴 понад 3: {over}")
+        return self.format_detailed_report(stats)
+
+    def format_detailed_report(self, stats):
+        # Заголовок таблиці
+        header = f"{'ПІДРОЗДІЛ':<18} | {'Р/С <3':<6} | {'Р/С >3':<6} | {'ОФ <3':<5} | {'ОФ >3':<5}"
+        separator = "-" * len(header)
+
+        lines = [
+            "📊 *ЗВІТ ПО ПІДРОЗДІЛАХ (2026)*",
+            "```",  # Початок моноширинного блоку
+            header,
+            "━" * len(header)
+        ]
+
+        for unit, sub_units in stats.items():
+            lines.append(f"{unit}")  # Назва батальйону/дивізіону
+
+            for sub, roles in sub_units.items():
+                # Отримуємо значення
+                rs_u3 = roles['рядовий_сержант']['under_3']
+                rs_o3 = roles['рядовий_сержант']['over_3']
+                of_u3 = roles['офіцер']['under_3']
+                of_o3 = roles['офіцер']['over_3']
+
+                # Пропускаємо порожні підрозділи (якщо треба)
+                if rs_u3 == 0 and rs_o3 == 0 and of_u3 == 0 and of_o3 == 0:
+                    continue
+
+                # Форматуємо рядок:
+                # -- назва (15 симв), значення центровані в колонках
+                row = f"-- {sub[:15]:<15} | {rs_u3:^6} | {rs_o3:^6} | {of_u3:^5} | {of_o3:^5}"
+                lines.append(row)
+
+            lines.append(separator)
+
+        lines.append("```")  # Кінець моноширинного блоку
+        return "\n".join(lines)
+
+    def accept_date(self, raw_date, year_set):
+        # Перевірка: чи це взагалі дата і чи вона за 2026 рік
+        if not isinstance(raw_date, datetime):
+            # Якщо Excel віддав рядок замість дати, спробуємо перетворити (опціонально)
+            try:
+                if isinstance(raw_date, str):
+                    # Формат залежить від того, як введено в Excel (напр. 12.02.2026)
+                    raw_date = datetime.strptime(raw_date, "%d.%m.%Y")
+                else:
+                    return False
+                    #continue  # Пропускаємо, якщо порожньо або не дата
+            except:
+                return False
+
+        # Фільтр по року
+        if raw_date.year in year_set:
+            return True
 
     def get_summary_report(self) -> str:
-        """Генерує текстовий звіт по СЗЧ."""
+        """Генерує текстовий звіт по СЗЧ за допомогою xlwings."""
         total_count = 0
         today_count = 0
-
-        # Отримуємо сьогоднішню дату у форматі, як вона в Екселі (наприклад, '2/6/26')
-        # Або порівнюємо як об'єкти datetime
         today = datetime.now().date()
 
-        # Індекси стовпців (зменшуємо на 1, якщо використовуємо iter_rows)
+        # В xlwings індекси стовпців часто базуються на 1 (як в Excel),
+        # тому для роботи зі списками Python нам знадобиться (index - 1)
         pib_idx = self.excelProcessor.column_map.get(COLUMN_NAME.lower())
         date_added_idx = self.excelProcessor.column_map.get(COLUMN_INSERT_DATE.lower())
         id_idx = self.excelProcessor.column_map.get(COLUMN_INCREMEMTAL.lower())
 
-        if not id_idx or not pib_idx or not date_added_idx:
+        if not all([id_idx, pib_idx, date_added_idx]):
             return "❌ Помилка: Не знайдено необхідні стовпці для звіту."
 
-        # Пропускаємо заголовок (min_row=2)
-        for row in self.excelProcessor.sheet.iter_rows(min_row=2, values_only=True):
+        # Отримуємо останній рядок
+        last_row = self.excelProcessor.sheet.range('A' + str(self.excelProcessor.sheet.cells.last_cell.row)).end(
+            'up').row
+
+        if last_row < 2:
+            return "📊 База порожня."
+
+        # Зчитуємо всі дані одним махом (це значно швидше, ніж ітерація по клітинках)
+        # Зверни увагу: ми беремо діапазон від 2-го рядка до останнього
+        data = self.excelProcessor.sheet.range((2, 1),
+                                               (last_row, self.excelProcessor.sheet.used_range.columns.count)).value
+
+        # Якщо в таблиці лише один рядок даних, xlwings поверне список, а не список списків.
+        # Робимо перевірку, щоб завжди працювати з матрицею.
+        if last_row == 2:
+            data = [data]
+
+        for row in data:
+            # В xlwings індекси у списку data відповідають (index - 1)
             pib_value = row[pib_idx - 1]
             date_val = row[date_added_idx - 1]
-            id_value = row[id_idx - 1]
 
             # 1. Рахуємо загальну кількість (якщо є ПІБ)
             if pib_value and str(pib_value).strip():
                 total_count += 1
 
                 # 2. Рахуємо кількість за сьогодні
+                # xlwings автоматично конвертує дати Excel в об'єкти datetime Python
                 if date_val:
                     if self._is_today(date_val, today):
                         today_count += 1
@@ -151,7 +281,7 @@ class ExcelReporter:
         # Якщо список занадто довгий для одного повідомлення (Telegram limit ~4096 chars)
         full_report = f"{header}{formatted_list}{footer}"
 
-        print(full_report)
+        self.logger.debug(full_report)
 
         if len(full_report) > 4000:
             return (f"{header}_Список занадто довгий для відображення в одному повідомленні._\n"

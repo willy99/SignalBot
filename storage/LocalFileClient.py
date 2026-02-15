@@ -2,10 +2,13 @@ import os
 import shutil
 import io
 from storage.FileStorageClient import FileStorageClient
+from storage.LoggerManager import LoggerManager
 
 class LocalFileClient(FileStorageClient):
 
-    def __init__(self):
+    def __init__(self, path, log_manager: LoggerManager):
+        self.separator = '/'
+        self.logger = log_manager.get_logger()
         pass
 
     def __enter__(self):
@@ -17,9 +20,9 @@ class LocalFileClient(FileStorageClient):
     def make_dirs(self, path: str):
         try:
             os.makedirs(path, exist_ok=True)
-            # print(f"📁 Локальну директорію перевірено: {path}")
+            # self.logger.debug(f"📁 Локальну директорію перевірено: {path}")
         except Exception as e:
-            print(f"❌ Помилка створення локальної директорії: {e}")
+            self.logger.error(f"❌ Помилка створення локальної директорії: {e}")
             raise
 
     def get_file_buffer(self, path: str) -> io.BytesIO:
@@ -27,7 +30,7 @@ class LocalFileClient(FileStorageClient):
             with open(path, 'rb') as f:
                 return io.BytesIO(f.read())
         except Exception as e:
-            print(f"❌ Не вдалося прочитати локальний файл {path}: {e}")
+            self.logger.error(f"❌ Не вдалося прочитати локальний файл {path}: {e}")
             return None
 
     def save_file_from_buffer(self, path: str, buffer: io.BytesIO):
@@ -35,33 +38,50 @@ class LocalFileClient(FileStorageClient):
             buffer.seek(0)
             with open(path, 'wb') as f:
                 f.write(buffer.read())
-            print(f"💾 Файл збережено локально: {path}")
+            self.logger.debug(f"💾 Файл збережено локально: {path}")
         except Exception as e:
-            print(f"❌ Помилка збереження локального файлу: {e}")
+            self.logger.error(f"❌ Помилка збереження локального файлу: {e}")
             raise
 
     def copy_file(self, source_path: str, dest_path: str):
         try:
             shutil.copy2(source_path, dest_path)
-            print(f"🚚 Файл скопійовано локально: {dest_path}")
+            self.logger.debug(f"🚚 Файл скопійовано локально: {dest_path}")
         except Exception as e:
-            print(f"❌ Помилка локального копіювання: {e}")
+            self.logger.error(f"❌ Помилка локального копіювання: {e}")
             raise
 
-    def list_files(self, path: str) -> list:
-        """
-        Повертає список назв файлів та папок у вказаній локальній директорії.
-        :param path: Шлях до локальної папки.
-        """
+    def list_files(self, path: str, silent: bool = False) -> list:
         try:
             if os.path.exists(path) and os.path.isdir(path):
                 return os.listdir(path)
             else:
-                print(f"⚠️ Шлях {path} не існує або не є директорією.")
+                self.logger.warning(f"⚠️ Шлях {path} не існує або не є директорією.")
                 return []
         except Exception as e:
-            print(f"❌ Помилка отримання списку локальних файлів ({path}): {e}")
+            self.logger.error(f"❌ Помилка отримання списку локальних файлів ({path}): {e}")
             return []
+
+    def remove_file(self, path: str):
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+                # self.logger.debug(f"🗑️ Файл видалено: {path}")
+        except Exception as e:
+            self.logger.error(f"❌ Помилка видалення локального файлу: {e}")
+            raise
+
+    def remove_dir(self, path: str, recursive: bool = True):
+        try:
+            if os.path.exists(path):
+                if recursive:
+                    shutil.rmtree(path)
+                else:
+                    os.rmdir(path)
+                # self.logger.debug(f"🗑️ Папку видалено: {path}")
+        except Exception as e:
+            self.logger.error(f"❌ Помилка видалення локальної папки: {e}")
+            raise
 
     def close(self):
         pass

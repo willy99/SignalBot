@@ -1,216 +1,277 @@
-import openpyxl
+import xlwings as xw
+import os
+
 import io
 import warnings
 from copy import copy
-from config import DESERTER_TAB_NAME
+from config import DESERTER_TAB_NAME, EXCEL_CHUNK_SIZE
 from dics.deserter_xls_dic import *
 from dics.deserter_xls_dic import NA
 from typing import List, Dict, Any
-from storage.StorageFactory import StorageFactory
 from utils.utils import format_ukr_date, get_typed_value
+import traceback
+from storage.LoggerManager import LoggerManager
 
 class ExcelProcessor:
-    def __init__(self, file_path, batch_processing=False):
+    def __init__(self, file_path, log_manager: LoggerManager, batch_processing=False):
         self.file_path: str = file_path
         self.workbook = None
         self.sheet = None
         self.column_map: Dict[str, int] = {}  # {назва: номер_колонки}
         self.batch_processing = batch_processing
-        self.fileProxy = StorageFactory.create_client(file_path)
+        self.logger = log_manager.get_logger()
 
         warnings.filterwarnings("ignore", category=UserWarning)
-        with self.fileProxy as smb:
-            self._load_workbook(smb) # reading file to check it exists
-            if not self.batch_processing:
-                self.workbook = None
-            self.file_buffer = None
+        self.abs_path = os.path.abspath(file_path)
+        self.app = xw.App(visible=False, add_book=False)
+        self._load_workbook()
 
     def upsert_record(self, records_list: List[Dict[str, Any]]) -> None:
         if not records_list:
             return
-        # Якщо ми не в батчі і воркбук не завантажений - завантажуємо
-        if self.workbook is None:
-            with self.fileProxy as smb:
-                self._load_workbook(smb)
-
-        self._processRow(records_list)
-        # Якщо НЕ батч - зберігаємо негайно
-        if not self.batch_processing:
-            with self.fileProxy as smb:
-                self.save(smb)
-
-        # print(f"Додано запис у рядок {next_row}")
+        self._load_workbook()
+        try:
+            self._processRow(records_list)
+            if not self.batch_processing:
+                self.save()
+        except Exception as e:
+            self.logger.error(f"❌ Помилка під час upsert_record: {e}")
+            traceback.print_exc()
+            if self.workbook:
+                self.workbook.close()
+                self.workbook = None
 
     def _processRow(self, records_list):
         id_col_idx = self.column_map.get(COLUMN_INCREMEMTAL.lower())
         if not id_col_idx:
-            print("❌ Помилка: Не знайдено колонку №")
+            self.logger.error("❌ Помилка: Не знайдено колонку №")
             return
-        target_insert_row = 2
-        for row in range(2, self.sheet.max_row + 2):
-            cell_val = self.sheet.cell(row=row, column=id_col_idx).value
-            if cell_val is None or str(cell_val).strip() == "":
-                target_insert_row = row
-                break
 
-        # 3. Визначаємо останній існуючий ID (з рядка над target_insert_row)
-        last_val = self.sheet.cell(row=target_insert_row - 1, column=id_col_idx).value
-        max_col = len(self.column_map) if self.column_map else self.sheet.max_column
+        last_used_row = self.sheet.used_range.last_cell.row
+        last_row_with_data = self.sheet.range((last_used_row, id_col_idx)).end('up').row
+        target_insert_row = last_row_with_data + 1
+
+        last_val = self.sheet.range((last_row_with_data, id_col_idx)).value
+
         try:
-            current_id = int(last_val) if last_val and str(last_val).isdigit() else 0
+            if last_val is not None:
+                # Спершу перетворюємо на float (на випадок 11164.0), а потім на int
+                current_id = int(float(last_val))
+            else:
+                current_id = 0
         except (ValueError, TypeError):
+            self.logger.warning(f'--- ⚠️ Помилка отримання поточного ID. Останнє значення: {last_val}')
             current_id = 0
 
-        # 2. Перебір кожного словника в масиві
+        self.logger.debug(f'--- Визначено останній ID: {current_id} (з рядка {last_row_with_data})')
+
+        # 3. Перебір кожного словника в масиві
         for data_dict in records_list:
-            # пошук чувака в базі
-
             existing_row = self._find_existing_row(data_dict)
+
             if existing_row:
-                # Дивимося на дати повернення та сзч
-                # Логіка оновлення:: якщо дата повернення порожня, а це довідка повернення - пхаємо цю дату
                 for col_name, value in data_dict.items():
                     idx = self.column_map.get(col_name.lower())
                     if idx:
-                        cell = self.sheet.cell(row=existing_row, column=idx)
-                        # Оновлюємо тільки якщо в базі пусто, а в нових даних щось є
-                        if (not cell.value or cell.value == NA) and value:
-                            cell.value = get_typed_value(value)
-                            print('--- оновлюємо ' + str(value))
+                        # Кортеж тут!
+                        current_cell = self.sheet.range((existing_row, idx))
+                        if (not current_cell.value or current_cell.value == NA) and value:
+                            current_cell.value = get_typed_value(value)
+                            self.logger.debug(f'--- [Рядок {existing_row}] оновлюємо {col_name}: {value}')
             else:
+                # --- СТВОРЕННЯ НОВОГО ---
                 current_id += 1
-                # Вставляємо новий порожній рядок
-                self.sheet.insert_rows(target_insert_row)
-                sample_row = target_insert_row - 1 if target_insert_row > 2 else 2
 
-                for col_idx in range(1, max_col + 1):
-                    new_cell = self.sheet.cell(row=target_insert_row, column=col_idx)
-                    old_cell = self.sheet.cell(row=sample_row, column=col_idx)
+                # Вставляємо новий рядок через native Excel API
+                # Це автоматично копіює стилі та формули з рядка вище
+                try:
+                    self.sheet.range((target_insert_row, 1)).api.entire_row.insert()
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Спроба вставки №2 через інший синтаксис...")
+                    self.sheet.range(f'{target_insert_row - 1}:{target_insert_row - 1}').copy()
+                    # 2. Вставляємо скопійоване зі зсувом вниз (це створить новий рядок з форматом)
+                    self.sheet.range(f'{target_insert_row}:{target_insert_row}').insert(shift='down')
 
-                    # Копіюємо стилі
-                    if old_cell.has_style:
-                        new_cell.font = copy(old_cell.font)
-                        new_cell.border = copy(old_cell.border)
-                        new_cell.number_format = copy(old_cell.number_format)
+                # 1. Записуємо ID в першу колонку
+                self.sheet.range((target_insert_row, id_col_idx)).value = current_id
 
-                        new_alignment = copy(old_cell.alignment)
-                        new_alignment.wrapText = False  # Один рядок
-                        new_alignment.vertical = 'center'
-                        new_cell.alignment = new_alignment
-
-                # 3. Записуємо ID та дані
-                self.sheet.cell(row=target_insert_row, column=1).value = current_id
-
+                # 2. Записуємо всі інші дані
                 for col_name, value in data_dict.items():
                     idx = self.column_map.get(col_name.lower())
                     if idx:
-                        self.sheet.cell(row=target_insert_row, column=idx).value = get_typed_value(value)
+                        self.sheet.range((target_insert_row, idx)).value = get_typed_value(value)
 
-                # 4. Фіксуємо висоту
-                self.sheet.row_dimensions[target_insert_row].height = 15
+                # 3. Додаткове налаштування (висота та вирівнювання, якщо Excel не підхопив сам)
+                new_row_range = self.sheet.range(f'{target_insert_row}:{target_insert_row}')
+                new_row_range.row_height = 15
+                # На Маці api.VerticalAlignment для центру (Excel constant: -4108)
+                try:
+                    new_row_range.api.vertical_alignment = -4108
+                    new_row_range.api.wrap_text = False
+                except:
+                    pass
 
-                # Переходимо до наступного рядка для наступного словника
+                self.logger.debug(f'--- [+] Додано новий запис ID:{current_id} у рядок {target_insert_row}')
+
+                # Переходимо до наступного рядка
                 target_insert_row += 1
 
     def _find_existing_row(self, data_dict: Dict[str, Any]):
-        """Шукає номер рядка за ПІБ, Датою народження та РНОКПП."""
+        """Шукає номер рядка за ПІБ, Датою народження та РНОКПП через xlwings (Mac-версія)."""
+
+        # 1. Готуємо вхідні дані
         pib = str(data_dict.get(COLUMN_NAME, '')).strip().lower()
         dob = str(data_dict.get(COLUMN_BIRTHDAY, '')).strip()
         rnokpp = str(data_dict.get(COLUMN_ID_NUMBER, '')).strip()
         des_date = str(data_dict.get(COLUMN_DESERTION_DATE, '')).strip()
-        ret_date = str(data_dict.get(COLUMN_RETURN_DATE, '')).strip()
-        ret_reserve_date = str(data_dict.get(COLUMN_RETURN_TO_RESERVE_DATE, '')).strip()
 
-        pid_col = self.column_map.get(COLUMN_INCREMEMTAL.lower())
-        pib_col = self.column_map.get(COLUMN_NAME.lower())
-        dob_col = self.column_map.get(COLUMN_BIRTHDAY.lower())
-        rnokpp_col = self.column_map.get(COLUMN_ID_NUMBER.lower())
-        des_date_col = self.column_map.get(COLUMN_DESERTION_DATE.lower())
-        ret_date_col = self.column_map.get(COLUMN_RETURN_DATE.lower())
-        ret_reserve_date_col = self.column_map.get(COLUMN_RETURN_TO_RESERVE_DATE.lower())
+        # Отримуємо індекси (xlwings 1-indexed)
+        idx_map = self.column_map
+        pib_col = idx_map.get(COLUMN_NAME.lower())
+        dob_col = idx_map.get(COLUMN_BIRTHDAY.lower())
+        rnokpp_col = idx_map.get(COLUMN_ID_NUMBER.lower())
+        des_col = idx_map.get(COLUMN_DESERTION_DATE.lower())
+        ret_col = idx_map.get(COLUMN_RETURN_DATE.lower())
+        res_col = idx_map.get(COLUMN_RETURN_TO_RESERVE_DATE.lower())
+        id_col = idx_map.get(COLUMN_INCREMEMTAL.lower())
 
-        print('--- 🔎: Пошук чувака в базі:: ' + str(pib) + ' || ' + str(dob) + ' || ' + str(rnokpp) + '; сзч||взад:' + str(des_date) + ' || ' + str(ret_date))
-        if not all([pib_col, dob_col, rnokpp_col, des_date_col, ret_date_col]):
+        if not all([pib_col, dob_col, rnokpp_col, des_col]):
+            self.logger.error(f"--- ❌ Помилка: Не всі обов'язкові колонки знайдені")
             return None
-        last_found = None
 
-        for row in range(2, self.sheet.max_row + 1):
-            s_pid = str(self.sheet.cell(row=row, column=pid_col).value or "").strip().lower()
-            s_pib = str(self.sheet.cell(row=row, column=pib_col).value or "").strip().lower()
-            s_dob = format_ukr_date(str(self.sheet.cell(row=row, column=dob_col).value or "").strip())
-            s_rnokpp = str(self.sheet.cell(row=row, column=rnokpp_col).value or "").strip()
-            s_des_date = format_ukr_date(str(self.sheet.cell(row=row, column=des_date_col).value or "").strip())
-            s_ret_date = format_ukr_date(str(self.sheet.cell(row=row, column=ret_date_col).value or "").strip())
-            s_ret_reserve_date = format_ukr_date(str(self.sheet.cell(row=row, column=ret_reserve_date_col).value or "").strip())
-            # todo if 12/31/20 - КОСТИЛЬ!
-            if s_ret_date == '31.12.2020':
-                s_ret_date = ''
-                self.sheet.cell(row=row, column=ret_date_col).value = None
-            if s_ret_reserve_date == '31.12.2020':
-                s_ret_reserve_date = ''
-                self.sheet.cell(row=row, column=ret_reserve_date_col).value = None
+        self.logger.debug(f'--- 🔎: Пошук в базі: {pib} || {dob} || {rnokpp}')
 
+        try:
+            last_row = self.sheet.range((1048576, id_col)).end('up').row
+        except Exception:
+            last_row = self.sheet.used_range.last_cell.row
+
+        if last_row < 2:
+            return None
+
+        # 3. Отримання масиву через чанки (кине Exception при помилці)
+        data_range = self._fetch_records_by_chunks(last_row, len(self.column_map))
+
+        # self.logger.debug('--- data length ' + str(len(data_range)))
+        # --- ЗАХИСТ ВІД 'NoneType' ---
+        if not data_range or not isinstance(data_range, list) or last_row == 1 or not isinstance(data_range, list):
+            self.logger.error("⚠️ Критична помилка: Не вдалося зчитати дані з листа")
+            return None
+
+        for i, row_data in enumerate(data_range):
+            # Додамо ще одну перевірку всередині циклу
+            if not row_data or not isinstance(row_data, list):
+                continue
+
+            # Індексація в row_data 0-базова, тому всюди -1
+            s_pib = row_data[pib_col - 1].lower()
+            s_dob = format_ukr_date(row_data[dob_col - 1])
+            s_rnokpp = str(row_data[rnokpp_col - 1])
+            if s_rnokpp.endswith('.0'): s_rnokpp = s_rnokpp[:-2]
+            s_des_date = format_ukr_date(row_data[des_col - 1])
+
+            # Якщо треба змінити значення, використовуємо кортеж для range
+            s_ret_date = format_ukr_date(row_data[ret_col - 1])
+            s_res_date = format_ukr_date(row_data[res_col - 1])
+            # Костиль 31.12.2020
+            if s_ret_date == '31.12.2020' or s_res_date == '31.12.2020':
+                if s_ret_date == '31.12.2020':
+                    s_ret_date = ""
+                if s_res_date == '31.12.2020':
+                    s_res_date = ""
+
+            # Перевірка збігу
             if s_pib == pib and s_dob == dob and s_rnokpp == rnokpp:
-                print('--- ID: ' + str(s_pid) + ' des_date='+str(s_des_date))
-                if des_date == s_des_date or (s_ret_date == "" and s_ret_reserve_date == ""):
-                    print('--- 🔎⚠️: Чувак вже в базі, будемо доповнювати запис! (ID:' + s_pid + ')')
-                    return row
-                # last_found = row
-        print('--- 🔎➕: Чувака немає, додаємо')
-        return last_found
+                if des_date == s_des_date or (not s_ret_date and not s_res_date):
+                    s_id = row_data[id_col - 1]
+                    self.logger.debug(f'--- 🔎🤘: Чувака знайдено (ID:{s_id}), рядок {i}')
+                    if s_ret_date == '31.12.2020':
+                        self.sheet.range((i, ret_col)).value = None
+                    if s_res_date == '31.12.2020':
+                        self.sheet.range((i, res_col)).value = None
+                    return i
 
-    def _find_last_row(self):
-        return self.sheet.max_row
+        self.logger.debug('--- 🔎➕: Чувака немає, додаємо новий рядок')
+        return None
+
+    def _fetch_records_by_chunks(self, last_row: int, num_cols: int) -> List[List[Any]]:
+        """Зчитує дані з Excel частинами. Кидає помилку, якщо дані не зачитані."""
+        chunk_size = EXCEL_CHUNK_SIZE
+        all_data = []
+
+        for start_row in range(1, last_row + 1, chunk_size):
+            end_row = min(start_row + chunk_size - 1, last_row)
+            try:
+                # ndim=2 гарантує, що ми завжди отримаємо список списків
+                chunk = self.sheet.range((start_row, 1), (end_row, num_cols)).options(ndim=2).value
+
+                if chunk is None:
+                    raise ValueError(f"Excel повернув порожній чанк (None) на рядках {start_row}-{end_row}")
+
+                all_data.extend(chunk)
+
+            except Exception as e:
+                self.logger.error(f"❌ Критична помилка зчитування чанка {start_row}-{end_row}")
+                raise Exception(f"Неможливо прочитати дані Excel: {e}")
+
+        return all_data
 
     def _build_column_map(self):
         """Створює словник імен колонок для швидкого доступу"""
         if self.sheet:
-            header_row = next(self.sheet.iter_rows(min_row=1, max_row=1))
-            for cell in header_row:
-                if cell.value:
-                    clean_name = str(cell.value).strip().lower()
-                    self.column_map[clean_name] = cell.column
+            header_values = self.sheet.range('1:1').value
+            for idx, val in enumerate(header_values):
+                if val:
+                    clean_name = str(val).strip().lower()
+                    self.column_map[clean_name] = idx + 1
 
-
-    def _load_workbook(self, fileProxy) -> None:
+    def _load_workbook(self) -> None:
         try:
-            print(f'>> LOADING WORKBOOK...')
-            self.file_buffer = fileProxy.get_file_buffer(self.file_path)
-            if self.file_buffer:
-                # 2. Працюємо з Excel
-                self.workbook = openpyxl.load_workbook(self.file_buffer, data_only=True)
-                self.sheet = self.workbook[DESERTER_TAB_NAME]
+            try:
+                # Проста перевірка на "вошивість" зв'язку з Excel
+                _ = self.app.api
+            except:
+                self.logger.debug(">> Excel process was dead, restarting...")
+                self.app = xw.App(visible=False, add_book=False)
+
+            if self.workbook is None:
+                self.logger.debug(f'>> OPENING WORKBOOK: {self.abs_path}')
+                self.workbook = self.app.books.open(self.abs_path)
+                self.sheet = self.workbook.sheets[DESERTER_TAB_NAME]
                 self._build_column_map()
-                print(f'>> EXCEL LAST ROW::  {self._find_last_row()}')
+                self.logger.debug(f'>> EXCEL TOUCHED SUCCESSFULLY')
+
         except Exception as e:
-            # print(f"Помилка ініціалізації Excel: {e}")
+            # self.logger.debug(f"Помилка ініціалізації Excel: {e}")
+            traceback.print_exc()
             raise BaseException(f"⚠️ Помилка ініціалізації Excel: {e}")
 
-    def save(self, fileProxy) -> None:
+    def save(self) -> None:
         if self.workbook is None:
-            print("⚠️ Спроба зберегти порожній воркбук. Скасовано.")
+            self.logger.error("⚠️ Спроба зберегти порожній воркбук. Скасовано.")
             return
         try:
-            output = io.BytesIO()
-            self.workbook.save(output)
-            size = output.tell()
-            if size == 0:
-                print("❌ Помилка: Openpyxl згенерував 0 байт даних!")
-                return
-            output.seek(0)
-            with fileProxy as smb:
-                smb.save_file_from_buffer(self.file_path, output)
-            print(f"--- ✔️ EXCEL УСПІШНО ОНОВЛЕНО ({size} байт)")
+            self.workbook.save()
+            self.logger.debug(f"--- ✔️ EXCEL УСПІШНО ОНОВЛЕНО")
         except Exception as e:
-            print(f"❌ Критична помилка при збереженні: {e}")
-        finally:
-            output.close()
-            if not self.batch_processing:
-                self.workbook = None  # Очищуємо для наступних ітерацій
+            self.logger.error(f"❌ Критична помилка при збереженні: {e}")
 
     def close(self):
-        """Очищення ресурсів"""
-        if self.workbook:
-            self.workbook.close()
-        self.workbook = None
-        self.sheet = None
+        try:
+            if self.workbook:
+                self.workbook.close()
+            # Перевіряємо, чи app ще живий перед тим як вийти
+            if self.app and self.app.api:
+                self.app.quit()
+        except:
+            pass
+        finally:
+            self.workbook = None
+            self.app = None
+
+    def __del__(self):
+        """Автоматичне закриття при видаленні об'єкта"""
+        try:
+            self.close()
+        except:
+            pass

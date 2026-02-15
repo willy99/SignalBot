@@ -33,6 +33,7 @@ def main():
         print(f"❌ Помилка з'єднання: {e}")
     finally:
         workflow.client.close()
+        workflow.excelProcessor.close()
 
 
 if __name__ == "__main__":

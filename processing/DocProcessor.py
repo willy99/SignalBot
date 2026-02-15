@@ -22,16 +22,17 @@ class DocProcessor:
         self.original_filename = original_filename
         self.workflow = workflow
         self.insertion_date = insertion_date
+        self.logger = workflow.log_manager.get_logger()
         self.response = {
             'insertionDate' :None,
         }
         if file_path:
             self.extension = Path(self.file_path).suffix
-            self.engine = ParserFactory.get_parser(file_path)
-        self.ml_parser = MLParser(model_path=config.ML_MODEL_PATH)
+            self.engine = ParserFactory.get_parser(file_path, workflow.log_manager)
+        self.ml_parser = MLParser(model_path=config.ML_MODEL_PATH, log_manager=self.workflow.log_manager)
 
     def process(self):
-        print(f"--- Обробка тексту... {self.extension}")
+        self.logger.debug(f"--- Обробка тексту... {self.extension}")
         doc_pieces = {}
 
         # Отримуємо основні блоки
@@ -42,13 +43,13 @@ class DocProcessor:
         raw_piece_3 = self.engine.extract_text_between(PATTERN_PIECE_3_START, PATTERN_PIECE_3_END, True) or ""
 
         if doc_pieces[self.__PIECE_HEADER] is None:
-            print('>>> ⚠️header :' + str(doc_pieces[self.__PIECE_HEADER]))
+            self.logger.warning('>>> ⚠️header :' + str(doc_pieces[self.__PIECE_HEADER]))
         if doc_pieces[self.__PIECE_1] is None:
-            print('>>> ⚠️ 1 :' + str(doc_pieces[self.__PIECE_1]))
+            self.logger.warning('>>> ⚠️ 1 :' + str(doc_pieces[self.__PIECE_1]))
         if raw_piece_3 is None:
-            print('>>> ⚠️ 2 :' + str(raw_piece_3))
+            self.logger.warning('>>> ⚠️ 2 :' + str(raw_piece_3))
         if doc_pieces[self.__PIECE_4] is None:
-            print('>>> ⚠️ 4 :' + str(doc_pieces[self.__PIECE_4]))
+            self.logger.warning('>>> ⚠️ 4 :' + str(doc_pieces[self.__PIECE_4]))
 
         persons = self.cut_into_person(raw_piece_3)
         all_final_records = []
@@ -66,7 +67,7 @@ class DocProcessor:
         self.workflow.stats.attachmentWordProcessed += 1
         self.workflow.stats.doc_names.append(self.original_filename)
 
-        print(f"--- ✔️ Обробка закінчено. Знайдено осіб: {len(all_final_records)}")
+        self.logger.debug(f"--- ✔️ Обробка закінчено. Знайдено осіб: {len(all_final_records)}")
         return all_final_records
 
     def process_fields(self, text_pieces):
@@ -97,7 +98,7 @@ class DocProcessor:
                 fields[col.COLUMN_DESERTION_DATE] = NA
                 fields[col.COLUMN_DESERTION_REGION] = NA
                 fields[col.COLUMN_DESERTION_PLACE] = NA
-            print('--- ' + COLUMN_RETURN_DATE + ':' + str(fields[col.COLUMN_RETURN_DATE]))
+            self.logger.debug('--- ' + COLUMN_RETURN_DATE + ':' + str(fields[col.COLUMN_RETURN_DATE]))
 
         text = text_pieces[self.__PIECE_3]
         ml_extracted = self.ml_parser.parse_text(text)
@@ -105,16 +106,20 @@ class DocProcessor:
             fields[col.COLUMN_NAME] = self.get_best_match(ml_extracted.get(col.COLUMN_NAME), self._extract_name(text))
             fields[col.COLUMN_ID_NUMBER] = self.get_best_match(ml_extracted.get(col.COLUMN_ID_NUMBER), self._extract_id_number(text))
             fields[col.COLUMN_TZK] = self._extract_rtzk(clean_text(text))
+            fields[col.COLUMN_TZK_REGION] = None #todo
             fields[col.COLUMN_PHONE] = self.get_best_match(ml_extracted.get(col.COLUMN_PHONE), self._extract_phone(text))
             fields[col.COLUMN_BIRTHDAY] = self.get_best_match(ml_extracted.get(col.COLUMN_BIRTHDAY), self._extract_birthday(text))
-            fields[col.COLUMN_TITLE] = self.get_best_match(ml_extracted.get(col.COLUMN_TITLE), self._extract_title(text))
+            fields[col.COLUMN_TITLE] = self._extract_title(text)
             fields[col.COLUMN_TITLE_2] = self._extract_title_2(fields[col.COLUMN_TITLE])
             fields[col.COLUMN_SERVICE_TYPE] = self.get_best_match(ml_extracted.get(col.COLUMN_SERVICE_TYPE), self._extract_service_type(text))
             fields[col.COLUMN_ADDRESS] = self.get_best_match(ml_extracted.get(col.COLUMN_ADDRESS), self._extract_address(clean_text(text)))
             fields[col.COLUMN_BIO] = self.get_best_match(ml_extracted.get(col.COLUMN_BIO), self._extract_bio(clean_text(text), fields[col.COLUMN_NAME]))
             fields[col.COLUMN_ENLISTMENT_DATE] = self.get_best_match(ml_extracted.get(col.COLUMN_ENLISTMENT_DATE), self._extract_conscription_date(text))
             fields[col.COLUMN_SUBUNIT] = self.get_best_match(ml_extracted.get(col.COLUMN_SUBUNIT), self.extract_military_subunit(text, get_file_name(self.original_filename)))
-            fields[col.COLUMN_SUBUNIT2] = self.extract_military_subunit(text, get_file_name(self.original_filename), mapping=PATTERN_SUBUNIT2_MAPPING)
+            subunit2 = self.extract_military_subunit(text_pieces[self.__PIECE_3], get_file_name(self.original_filename), mapping=PATTERN_SUBUNIT2_MAPPING)
+            if subunit2 is NA:
+                subunit2 = self.extract_military_subunit(text_pieces[self.__PIECE_1],get_file_name(self.original_filename), mapping=PATTERN_SUBUNIT2_MAPPING)
+            fields[col.COLUMN_SUBUNIT2] = subunit2
             fields[col.COLUMN_REVIEW_STATUS] = DEFAULT_REVIEW_STATUS_FOR_EDU_CENTER if fields[col.COLUMN_DESERTION_PLACE] == 'НЦ' else DEFAULT_REVIEW_STATUS
 
         fields[col.COLUMN_SERVICE_DAYS] = self._calculate_service_days(fields[col.COLUMN_ENLISTMENT_DATE], fields[col.COLUMN_DESERTION_DATE])
@@ -126,7 +131,7 @@ class DocProcessor:
         if self.validateRecord(fields):
             result.append(fields)
         else:
-            print("... ▶️ НЕ ДОДАЄМО, не кейз СЗЧ!")
+            self.logger.debug("... ▶️ НЕ ДОДАЄМО, не кейз СЗЧ!")
 
         return result
 
@@ -164,7 +169,7 @@ class DocProcessor:
 
             if len(person_data) > 20:
                 persons.append(person_data)
-                print('... 🏃‍♂️ПЕРСОНА: ' + self._extract_name(person_data))
+                self.logger.debug('... 🏃‍♂️ПЕРСОНА: ' + self._extract_name(person_data))
 
         return persons
 
@@ -211,7 +216,7 @@ class DocProcessor:
         for pattern, result in PATTERN_SERVICE_TYPE_MAPPING.items():
             if re.search(pattern, text, re.IGNORECASE):
                 return result
-        return "призовом" # default
+        return DEFAULT_SERVICE_TYPE # default
 
     @staticmethod
     def _extract_id_number(text):
@@ -355,8 +360,7 @@ class DocProcessor:
 
         return NA
 
-    @staticmethod
-    def _calculate_service_days(conscription_date_str, desertion_date_str):
+    def _calculate_service_days(self, conscription_date_str, desertion_date_str):
         if conscription_date_str == NA or desertion_date_str == NA:
             return 0
         try:
@@ -370,17 +374,16 @@ class DocProcessor:
             days = delta.days
 
             if days < 0 or days > 4000:
-                print(f"--- ⚠️ Нелогічна кількість днів служби: {days}. Перевірте дати.")
+                self.logger.error(f"--- ⚠️ Нелогічна кількість днів служби: {days}. Перевірте дати.")
                 return 0
 
             return days
 
         except Exception as e:
-            print(f"--- ⚠️ Помилка розрахунку днів: {e}")
+            self.logger.warning(f"--- ⚠️ Помилка розрахунку днів: {e}")
             return 0
 
-    @staticmethod
-    def extract_military_subunit(text, file_name=None, mapping=PATTERN_SUBUNIT_MAPPING):
+    def extract_military_subunit(self, text, file_name=None, mapping=PATTERN_SUBUNIT_MAPPING):
         short_values = set()
         for val in mapping.values():
             clean_val = val.replace(r'\1', '').strip()
@@ -449,16 +452,16 @@ class DocProcessor:
             for col_name, value in data_dict.items():
                 if value == NA:
                     error = 'КОЛОНКА ' + col_name + ' ПОРОЖНЯ!'
-                    print('------ ⚠️ ' + error)
+                    self.logger.warning('------ ⚠️ ' + error)
                     self.workflow.stats.add_error(self.original_filename, error)
                     result = False
         return result
 
     def _check_return_sign(self, text):
-        print('>>> check for return ' + text)
+        self.logger.debug('>>> check for return ' + text)
         for pattern in PATTERN_RETURN_SIGN:
             if re.search(pattern, text, re.IGNORECASE):
-                print('>>> return detected!')
+                self.logger.debug('>>> return detected!')
                 return True
         return False
 

@@ -1,5 +1,6 @@
 # Ігнорувати конкретну папку з даними
 signal-data/
+logs/
 
 .env
 __pycache__/

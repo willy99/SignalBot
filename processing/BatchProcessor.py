@@ -11,11 +11,12 @@ class BatchProcessor:
     def __init__(self, workflow, excel_file_path):
         self.workflow = workflow
         # Вмикаємо режим батчу
-        self.excelProcessor = ExcelProcessor(excel_file_path, batch_processing=True)
-        self.fileProxy = StorageFactory.create_client(excel_file_path)
+        self.excelProcessor = ExcelProcessor(excel_file_path, log_manager=workflow.log_manager, batch_processing=True)
+        self.fileProxy = StorageFactory.create_client(excel_file_path, self.workflow.log_manager)
+        self.logger = self.workflow.log_manager.get_logger()
 
     def start_processing(self, days_back=1):
-        print("🚀 >>> BATCH STARTED")
+        self.logger.debug("🚀 >>> BATCH STARTED")
 
         try:
             # 1. Формуємо список папок для читання (сьогодні + попередні дні)
@@ -30,14 +31,14 @@ class BatchProcessor:
                     files_to_process.extend([(folder, f) for f in files if f.endswith(('.pdf', '.doc', '.docx'))])
 
                 if not files_to_process:
-                    print("📭 Немає нових файлів для обробки в " + str(folder))
+                    self.logger.debug("📭 Немає нових файлів для обробки в " + str(folder))
                     return
 
                 # 3. Обробляємо кожен файл
                 for folder, file_name in files_to_process:
-                    print('--------------------------🔓 BEGIN ------------------------------------------ ')
+                    self.logger.debug('--------------------------🔓 BEGIN ------------------------------------------ ')
                     full_path = self.fix_slashes(os.path.join(folder, file_name))
-                    print(f"📄 Обробка: {file_name}")
+                    self.logger.debug(f"📄 Обробка: {file_name}")
                     current_folder_date = self._extract_date_from_folder(folder)
 
                     try:
@@ -58,25 +59,25 @@ class BatchProcessor:
                         if data_for_excel:
                             self.excelProcessor.upsert_record(data_for_excel)
                     except Exception as e:
-                        print(f"❌ Помилка у файлі {file_name}: {e}")
+                        self.logger.error(f"❌ Помилка у файлі {file_name}: {e}")
                     finally:
                         if os.path.exists(local_path):
                             try:
                                 os.remove(local_path)
                             except Exception as cleanup_error:
-                                print(f"⚠️ Не вдалося видалити {file_name}: {cleanup_error}")
-                        print('--------------------------🔓 END -------------------------------------------- ')
+                                self.logger.error(f"⚠️ Не вдалося видалити {file_name}: {cleanup_error}")
+                        self.logger.debug('--------------------------🔓 END -------------------------------------------- ')
 
                 # 4. ФІНАЛЬНЕ ЗБЕРЕЖЕННЯ (один раз на весь батч)
-                print("💾 Збереження результатів у Excel...")
+                self.logger.debug("💾 Збереження результатів у Excel...")
                 self.excelProcessor.save(smb)
 
         except Exception as e:
-            print(f"🔴 КРИТИЧНА ПОМИЛКА БАТЧУ: {e}")
+            self.logger.error(f"🔴 КРИТИЧНА ПОМИЛКА БАТЧУ: {e}")
             traceback.print_exc()
         finally:
             self.excelProcessor.close()
-            print("🏁 >>> BATCH FINISHED")
+            self.logger.debug("🏁 >>> BATCH FINISHED")
 
     def _get_folders_list(self, days_back: int):
         """
@@ -88,7 +89,7 @@ class BatchProcessor:
         for i in range(days_back + 1):
             target_date = today - timedelta(days=i)
             # Використовуємо ваш новий метод для генерації шляху Рік\Місяць\День
-            path = self.fileProxy.get_target_document_folder_path(target_date)
+            path = self.fileProxy.get_target_folder_path(target_date, config.DOCUMENT_STORAGE_PATH)
             folders.append(path)
 
         return folders

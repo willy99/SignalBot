@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
 import re
+from storage.LoggerManager import LoggerManager
 
 class BaseFileParser(ABC):
-    def __init__(self, file_path):
+    def __init__(self, file_path, log_manager: LoggerManager):
         self.file_path = file_path
+        self.logger = log_manager.get_logger()
 
     @abstractmethod
     def get_full_text(self):

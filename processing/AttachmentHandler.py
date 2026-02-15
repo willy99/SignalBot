@@ -5,35 +5,38 @@ from utils.utils import get_effective_date
 import json
 from storage.StorageFactory import StorageFactory
 import unicodedata
+import traceback
 
 class AttachmentHandler:
     def __init__(self, workflow):
         self.workflow = workflow
-        self.fileProxy = StorageFactory.create_client(config.DOCUMENT_STORAGE_PATH)
+        self.logger = self.workflow.log_manager.get_logger()
+        self.fileProxy = StorageFactory.create_client(config.DOCUMENT_STORAGE_PATH, self.workflow.log_manager)
 
     def handle_attachment(self, attachment_id, original_filename):
+        # create backup of existing excel file
+        self.workflow.backuper.make_backup()
+
         effective_date = get_effective_date()
 
         original_filename = unicodedata.normalize('NFC', original_filename)
 
-        target_path = self.fileProxy.get_target_document_folder_path(effective_date)
-        separator = "\\" if config.DOCUMENT_STORAGE_PATH.startswith("\\\\") else os.sep
+        target_path = self.fileProxy.get_target_folder_path(effective_date, config.DOCUMENT_STORAGE_PATH)
 
-        destination_file = f"{target_path}{separator}{original_filename}"
 
         source_file = os.path.join(config.SIGNAL_ATTACHMENTS_DIR, attachment_id)
         if not os.path.exists(source_file):
-            print(f"❌ Файл {attachment_id} не знайдено в системній папці.")
+            self.logger.error(f"❌ Файл {attachment_id} не знайдено в системній папці.")
             return False
 
         try:
-            with StorageFactory.create_client(config.DOCUMENT_STORAGE_PATH) as client:
-
+            with StorageFactory.create_client(config.DOCUMENT_STORAGE_PATH, self.workflow.log_manager) as client:
+                destination_file = f"{target_path}{client.separator}{original_filename}"
                 if config.PROCESS_DOC:
                     # Створюємо папки (локально або на SMB)
                     client.make_dirs(target_path)
                     client.copy_file(source_file, destination_file)
-                    print(f"📁 Файл впорядковано: {destination_file}")
+                    self.logger.debug(f"📁 Файл впорядковано: {destination_file}")
 
                 data_for_excel = None
                 file_parsed = True
@@ -53,7 +56,11 @@ class AttachmentHandler:
                 return file_parsed
 
         except Exception as e:
-            print(f"❌ Помилка під час обробки вкладення: {e}")
+            stack_trace = traceback.format_exc()
+            self.logger.debug("--- FULL STACK TRACE ---")
+            self.logger.debug(stack_trace)
+
+            self.logger.error(f"❌ Помилка під час обробки вкладення: {e}")
         return False
 
     def download_attachment(self, client, attachment_id):
@@ -79,10 +86,9 @@ class AttachmentHandler:
         return None
 
     def _cleanup_local_source(self, path):
-        """Видаляє тимчасовий файл вкладення Signal після обробки"""
         try:
             if os.path.exists(path):
                 os.remove(path)
-                # print(f"🧹 Локальний файл видалено: {path}")
+                # self.logger.debug(f"🧹 Локальний файл видалено: {path}")
         except Exception as e:
-            print(f"⚠️ Не вдалося видалити локальний файл: {e}")
+            self.logger.error(f"⚠️ Не вдалося видалити локальний файл: {e}")

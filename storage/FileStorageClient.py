@@ -22,7 +22,15 @@ class FileStorageClient(ABC):
         """Спільний метод для копіювання файлів"""
         pass
 
-    def list_files(self, path: str) -> list:
+    def list_files(self, path: str, silent: bool = False) -> list:
+        pass
+
+    @abstractmethod
+    def remove_file(self, path: str):
+        pass
+
+    @abstractmethod
+    def remove_dir(self, path: str, recursive: bool = True):
         pass
 
     def __enter__(self):
@@ -35,17 +43,16 @@ class FileStorageClient(ABC):
     def close(self):
         pass
 
-    def get_target_document_folder_path(self, effective_date: datetime.date) -> str:
-        # 1. Формуємо назви для кожного рівня
+    def get_target_folder_path(self, effective_date: datetime.date, base_path: str) -> str:
+        """Формує ієрархію папок Рік/Місяць/День на основі базового шляху."""
         year_folder = effective_date.strftime(config.FOLDER_YEAR_FORMAT)
         month_folder = effective_date.strftime(config.FOLDER_MONTH_FORMAT)
         day_folder = effective_date.strftime(config.FOLDER_DAY_FORMAT)
 
-        separator = "\\" if config.DOCUMENT_STORAGE_PATH.startswith("\\\\") else os.sep
+        separator = "\\" if base_path.startswith("\\\\") else os.sep
 
-        # 3. Збираємо шлях
         target_path = (
-            f"{config.DOCUMENT_STORAGE_PATH.rstrip(separator)}"
+            f"{base_path.rstrip(separator)}"
             f"{separator}{year_folder}"
             f"{separator}{month_folder}"
             f"{separator}{day_folder}"

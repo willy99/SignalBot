@@ -4,6 +4,7 @@ from processing.DocProcessor import DocProcessor
 from dics.deserter_xls_dic import *
 from processing.parsers.MLParser import MLParser
 import config
+from storage.LoggerManager import LoggerManager
 
 class MockWorkflow:
     """Заглушка для workflow, щоб збирати статистику без бота"""
@@ -45,7 +46,7 @@ def test_process_doc_fedorov_simple(processor_factory):
     assert fields[COLUMN_ID_NUMBER] == "1234567890"
     assert fields[COLUMN_BIRTHDAY] == "26.12.1989"
     assert fields[COLUMN_SUBUNIT] == "ББС"
-    assert fields[COLUMN_SERVICE_TYPE] == "призовом"
+    assert fields[COLUMN_SERVICE_TYPE] == "призивом"
     assert fields[COLUMN_MIL_UNIT] == "А0224"
     assert fields[COLUMN_TZK] == "Олександрійським РТЦК та СП в м. Олександрія, Кіровоградської обл"
     assert fields[COLUMN_ENLISTMENT_DATE] == "22.11.2025"
@@ -118,7 +119,7 @@ def test_process_doc_two_persons(processor_factory):
     assert person1[COLUMN_ID_NUMBER] == '3151262222'
     assert person1[COLUMN_BIRTHDAY] == '03.12.1991'
     assert person1[COLUMN_SUBUNIT] == '2 дшб'
-    assert person1[COLUMN_SERVICE_TYPE] == 'призовом'
+    assert person1[COLUMN_SERVICE_TYPE] == 'призивом'
     assert person1[COLUMN_PHONE] == '0962522526'
     assert person1[COLUMN_ADDRESS] == "с. Майори, вул. Паркова буд. 12 кв.1-А, Біляївський р-н, Одеська обл."
     assert person1[COLUMN_TZK] == 'Розділянським РТЦК та СП Одеської області'
@@ -176,7 +177,7 @@ def test_process_docx_simple(processor_factory):
     assert person[COLUMN_BIRTHDAY] == '23.03.1968'  # m/d/yy
     assert person[COLUMN_MIL_UNIT] == 'А0224'
     assert person[COLUMN_SUBUNIT] == '3 дшб'
-    assert person[COLUMN_SERVICE_TYPE] == 'призовом'
+    assert person[COLUMN_SERVICE_TYPE] == 'призивом'
     assert person[COLUMN_TZK] == 'Шепетівським РТЦК та СП м. Шепетівка 24'
     assert person[COLUMN_ENLISTMENT_DATE] == '24.02.2022'
     assert person[COLUMN_SERVICE_DAYS] == 1408
@@ -213,27 +214,27 @@ def test_not_a_desertion_case(processor_factory):
 
 def test_name_extraction(processor_factory):
     processor = processor_factory("any.docx")
-    text = "ГАВНОВЄЗЕРСЬКИЙ Олег Вікторович, старший солдат, військовослужбовець військової служби за призовом, "
+    text = "ГАВНОВЄЗЕРСЬКИЙ Олег Вікторович, старший солдат, військовослужбовець військової служби за призивом, "
     res = processor._extract_name(text)
     assert "ГАВНОВЄЗЕРСЬКИЙ Олег Вікторович" in res
 
-    text = "САЛТИКОВ-ЩЕДРІН Олег Вікторович, старший солдат, військовослужбовець військової служби за призовом, "
+    text = "САЛТИКОВ-ЩЕДРІН Олег Вікторович, старший солдат, військовослужбовець військової служби за призивом, "
     res = processor._extract_name(text)
     assert "САЛТИКОВ-ЩЕДРІН Олег Вікторович" in res
 
-    text = "САЛТИКОВ-ЩЕДРІН Олег Вікторович-Огли, старший солдат, військовослужбовець військової служби за призовом, "
+    text = "САЛТИКОВ-ЩЕДРІН Олег Вікторович-Огли, старший солдат, військовослужбовець військової служби за призивом, "
     res = processor._extract_name(text)
     assert "САЛТИКОВ-ЩЕДРІН Олег Вікторович-Огли" in res
 
-    text = "САЛТИКОВ-ЩЕДРІН Олег Вікторович-Огли-Піздик, старший солдат, військовослужбовець військової служби за призовом, "
+    text = "САЛТИКОВ-ЩЕДРІН Олег Вікторович-Огли-Піздик, старший солдат, військовослужбовець військової служби за призивом, "
     res = processor._extract_name(text)
     assert "САЛТИКОВ-ЩЕДРІН Олег Вікторович-Огли" in res
 
-    text = "Салтіков Олег Вікторович, старший солдат, військовослужбовець військової служби за призовом, "
+    text = "Салтіков Олег Вікторович, старший солдат, військовослужбовець військової служби за призивом, "
     res = processor._extract_name(text)
     assert "" in res
 
-    text = "Текст попереду ПРОТОН Олег Вікторович, старший солдат, військовослужбовець військової служби за призовом, "
+    text = "Текст попереду ПРОТОН Олег Вікторович, старший солдат, військовослужбовець військової служби за призивом, "
     res = processor._extract_name(text)
     assert "ПРОТОН Олег Вікторович" in res
 
@@ -307,6 +308,15 @@ def test_rtzk_extraction(processor_factory):
     text = "БУЙКО Богдан Васильович, старший сержант, військовослужбовець військової служби за призовом, колишній гранатометник 1 десантно-штурмового відділення 1 десантно-штурмового взводу 7 десантно-штурмової роти 2 десантно-штурмового батальйону військової частини А0224, 14.05.1979 року народження, українець, освіта середня-спеціальна, Авіаційна школа м. Гайсин у 1997 році, одружений. Призваний Сихівським  РЦТК та СП Львівської області, 21.04.2025 року. РНОКПП 2811111118. Паспорт КА 111111. Номер мобільного телефону (067) 1111111"
     res = processor._extract_rtzk(text)
     assert res == "Сихівським РТЦК та СП Львівської області"
+
+    text = "БУЙКО Юрій Станіславович, військовослужбовець військової служби за призовом, зарахований до тимчасово прибулого особового складу військової частини А7018, що був відряджений до військової частини А0224, 31.10.1975 року народження, Українець, освіта середня, розлучений. Призваний Покровсько-Тернівським РТЦК та СП м. Кривий Ріг 24.02.2022 року. "
+    res = processor._extract_rtzk(text)
+    assert res == "Покровсько-Тернівським РТЦК та СП м. Кривий Ріг"
+
+    text = "БУЙКО Олександр Володимирович, військовослужбовець військової служби за призовом, зарахований до тимчасово прибулого особового складу військової частини А7018, що був відряджений до військової частини А0224, 13.11.1983 року народження, Українець, освіта середня, цивільний шлюб. Призваний Новокодацьким РТЦК та СП м. Дніпра 06.12.2024 року. "
+    res = processor._extract_rtzk(text)
+    assert res == "Новокодацьким РТЦК та СП м. Дніпра"
+
 
 def test_address_extraction(processor_factory):
     processor = processor_factory("any.docx")
@@ -468,7 +478,9 @@ def test_return_sign(processor_factory):
 
 def test_ml(processor_factory):
     text = "НЕГОЛЮК Володимир Васильович, старший солдат, військовослужбовець військової служби за призовом, стрілець-помічник гранатометника 2  десантно-штурмового відділення 3 десантно-штурмового взводу 7 десантно-штурмової роти 2 десантно-штурмового батальйону військової частини А0224, 29.10.1981 року народження, українець, освіта вища, Національний транспортний університет м. Київ у 2010 році. Одружений. неодружений. Призваний Салтівським ВТТЦК та СП м. Харків, 25.10.2025 року. РНОКПП відомості не надано"
-    parser = MLParser(model_path=config.ML_MODEL_PATH)
+    log_manager = LoggerManager()
+
+    parser = MLParser(model_path=config.ML_MODEL_PATH, log_manager=log_manager)
     extracted = parser.parse_text(text)
     assert extracted[COLUMN_TZK] == 'Салтівським ВТТЦК та СП м. Харків'
     assert extracted[COLUMN_TITLE] == 'старший солдат'

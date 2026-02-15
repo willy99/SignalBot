@@ -1,10 +1,12 @@
 import spacy
 import re
+from storage.LoggerManager import LoggerManager
 
 class MLParser:
-    def __init__(self, model_path="./output_model/model-best"):
-        print(f"Завантаження ML-моделі з {model_path}...")
+    def __init__(self, model_path, log_manager: LoggerManager):
         self.nlp = spacy.load(model_path)
+        self.logger = log_manager.get_logger()
+        self.logger.debug(f"Завантаження ML-моделі з {model_path}...")
 
     def parse_text(self, text: str):
         if not text or not isinstance(text, str):
