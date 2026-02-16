@@ -10,6 +10,7 @@ class MockWorkflow:
     """Заглушка для workflow, щоб збирати статистику без бота"""
 
     def __init__(self):
+        self.log_manager = LoggerManager()
         self.stats = type('Stats', (), {
             'attachmentWordProcessed': 0,
             'attachmentPDFProcessed': 0,
@@ -49,6 +50,7 @@ def test_process_doc_fedorov_simple(processor_factory):
     assert fields[COLUMN_SERVICE_TYPE] == "призивом"
     assert fields[COLUMN_MIL_UNIT] == "А0224"
     assert fields[COLUMN_TZK] == "Олександрійським РТЦК та СП в м. Олександрія, Кіровоградської обл"
+    assert fields[COLUMN_TZK_REGION] == "Кіровоградська область"
     assert fields[COLUMN_ENLISTMENT_DATE] == "22.11.2025"
     assert fields[COLUMN_SERVICE_DAYS] == 64
     assert fields[COLUMN_DESERTION_DATE] == "25.01.2026"
@@ -83,6 +85,7 @@ def test_process_doc_maly_simple(processor_factory):
     assert fields[COLUMN_SERVICE_TYPE] == "контрактом"
     assert fields[COLUMN_MIL_UNIT] == "А0224"
     assert fields[COLUMN_TZK] == "Покровсько-Тернівським РТЦК та СП, м. Кривий Ріг, Дніпропетровської області"
+    assert fields[COLUMN_TZK_REGION] == "Дніпропетровська область"
     assert fields[COLUMN_ENLISTMENT_DATE] == "23.11.2020"
     assert fields[COLUMN_SERVICE_DAYS] == 1865
     assert fields[COLUMN_DESERTION_DATE] == "01.01.2026"
@@ -123,6 +126,7 @@ def test_process_doc_two_persons(processor_factory):
     assert person1[COLUMN_PHONE] == '0962522526'
     assert person1[COLUMN_ADDRESS] == "с. Майори, вул. Паркова буд. 12 кв.1-А, Біляївський р-н, Одеська обл."
     assert person1[COLUMN_TZK] == 'Розділянським РТЦК та СП Одеської області'
+    assert person1[COLUMN_TZK_REGION] == "Одеська область"
     assert person1[COLUMN_ENLISTMENT_DATE] == '14.09.2025'
     assert person1[COLUMN_SERVICE_DAYS] == 139
     assert person1[COLUMN_DESERTION_PLACE] == 'РВБЗ'
@@ -136,9 +140,12 @@ def test_process_doc_two_persons(processor_factory):
     assert person2[COLUMN_PHONE] == '0987773388'
     assert "Івано-Франківська обл, Івано-Франківський район, с. Раковець, вул. Стуса 12" in person2[COLUMN_ADDRESS]
     assert person2[COLUMN_TZK] == 'Надвірнянським РТЦК та СП Івано-Франківської області'
+    assert person2[COLUMN_TZK_REGION] == "Івано-Франківська область"
     assert person2[COLUMN_ENLISTMENT_DATE] == '25.10.2025'
     assert person2[COLUMN_SERVICE_DAYS] == 98
     assert person2[COLUMN_DESERTION_PLACE] == 'РВБЗ'
+    assert "31.01.2026 о 16:00 під час перевірки особового складу 7 десантно-штурмової роти 2 десантно-штурмового батальйону командиром підрозділу капітаном БЕШЛЯГОЮ Р.В. було виявлено відсутність військовослужбовців солдата ІВОНЧАКА Дмитра Васильовича та солдата НЕГОЛЮКА Володимира Васильовича, які самовільно залишили район зосередження 7 десантно-штурмової роти 2 десантно-штурмового батальйону військової частини А0224 поблизу н.п. Привовчанське Дніпропетровської області" in person2[COLUMN_DESERT_CONDITIONS]
+    assert "31.01.2026 року від командира 7 десантно-штурмової роти 2 десантно-штурмового батальйону надійшла доповідь про факт самовільного залишення району виконання завдання за призначенням військовослужбовця військової частини А0224 солдата ІВОНЧАКА Дмитра Васильовича та солдата НЕГОЛЮКА Володимира Васильовича (без зброї" not in person2[COLUMN_DESERT_CONDITIONS]
 
     # --- ПЕРЕВІРКА СПІЛЬНИХ ДАНИХ ---
     for field in result:
@@ -160,6 +167,7 @@ def test_process_doc_tzk_is_full(processor_factory):
 
     person = result[0]
     assert person[COLUMN_TZK] == 'Крижопільським РТЦК та СП м. Крижопіль'
+    assert person[COLUMN_TZK_REGION] == "Вінницька область"
 
 def test_process_docx_simple(processor_factory):
     # тестування парсінгу docx
@@ -178,18 +186,19 @@ def test_process_docx_simple(processor_factory):
     assert person[COLUMN_MIL_UNIT] == 'А0224'
     assert person[COLUMN_SUBUNIT] == '3 дшб'
     assert person[COLUMN_SERVICE_TYPE] == 'призивом'
-    assert person[COLUMN_TZK] == 'Шепетівським РТЦК та СП м. Шепетівка 24'
+    assert person[COLUMN_TZK] == 'Шепетівським РТЦК та СП м. Шепетівка'
     assert person[COLUMN_ENLISTMENT_DATE] == '24.02.2022'
     assert person[COLUMN_SERVICE_DAYS] == 1408
     assert person[COLUMN_DESERTION_DATE] == '02.01.2026'
     assert person[COLUMN_DESERTION_REGION] == 'Вознесенське, Миколаївської області'
-    assert "ГАВНОВ Віктор Євгенович" in person[
+    assert "З 01.08.2025 по 17.10.2025 був на стаціонарному лікуванні в КНП “Хмільницька центральна лікарня”. 30.12.2025 прибув до пункту постійної дислокації військової частини А0224 (н.п. Вознесенське, Миколаївської області" in person[
         COLUMN_DESERT_CONDITIONS]
-    assert "73 доби" in person[
+    assert "З 18.10.2025 по 29.12.2025 солдат ГАВНОВ Віктор Євгенович був відсутній на військовій службі, підтверджуючих документів не надав (відсутній на військовій службі 73 доби)" in person[
         COLUMN_DESERT_CONDITIONS]
     assert person[COLUMN_PHONE] == '0671118227'
     assert person[COLUMN_ADDRESS] == "Хмельницька область, Ізяславський район, с. Теліжинці, вул. Центральна, буд. 48."
     assert person[COLUMN_EXECUTOR] == 'САМУЛІК Роман Богданович'
+    assert person[COLUMN_RETURN_DATE] == '30.12.2025'
 
 def test_return_date(processor_factory):
     filename = "07_09.02.2026 повернення після СЗЧ 5 дшр 2 дшб ДУБ Є.М..doc"
@@ -210,7 +219,35 @@ def test_not_a_desertion_case(processor_factory):
     assert len(result) == 0
 
 
+def test_desertion_date_is_correct(processor_factory):
+    filename = "09_15.02.2026 СЗЧ з лікування БУЙНОВ С.В. 3дшр 1дшб.doc"
+    processor = processor_factory(filename)
+    result = processor.process()
+    assert isinstance(result, list)
+    assert len(result) == 1
+    person = result[0]
+
+    assert person[COLUMN_RETURN_DATE] is None
+    assert person[COLUMN_DESERTION_DATE] == '13.02.2026'  # винно бути не 15.02.2026!
+
+
+
 #################### загальне модульне тестування регекспів ##############################
+
+def test_military_unit(processor_factory):
+    processor = processor_factory("any.docx")
+    text = "ДОПОВІДЬ про факт не прибуття до місця несення служби військовослужбовця військової частини А0224 (Командування ДШВ) Десантно-штурмових військ Збройних Сил України"
+    res = processor._extract_mil_unit(text)
+    assert res == 'А0224'
+
+    text = "ДОПОВІДЬ про факт самовільного залишення району виконання завдання військовослужбовцями військової частини А0224 (Командування ДШВ) Десантно-штурмових військ Збройних Сил України"
+    res = processor._extract_mil_unit(text)
+    assert res == 'А0224'
+
+    text = "ДОПОВІДЬ про факт самовільного залишення району виконання завдання за призначенням військовослужбовців зарахованих до тимчасово прибулого особового складу військової частини А7018, що був відряджений до військової частини А0224 (Командування ДШВ) Десантно-штурмових військ Збройних Сил України "
+    res = processor._extract_mil_unit(text)
+    assert res == 'А7018'
+
 
 def test_name_extraction(processor_factory):
     processor = processor_factory("any.docx")
@@ -313,9 +350,35 @@ def test_rtzk_extraction(processor_factory):
     res = processor._extract_rtzk(text)
     assert res == "Покровсько-Тернівським РТЦК та СП м. Кривий Ріг"
 
+    text = "БУЙНОВ Антон Олександрович, солдат, військовослужбовець військової служби за призовом, гранатометник 1 аеромобільного відділення 1 аеромобільного взводу 3 аеромобільної роти аеромобільного батальйону військової частини А0224, 22.11.1985 року народження, українець, освіта середня, не одружений. Призваний 4 відділ Миколаївського РТЦК та СП м. Миколаїв, 27.11.2025 року. Номер мобільного телефону +380611111119."
+    res = processor._extract_rtzk(text)
+    assert res == "4 відділ Миколаївського РТЦК та СП м. Миколаїв"
+
     text = "БУЙКО Олександр Володимирович, військовослужбовець військової служби за призовом, зарахований до тимчасово прибулого особового складу військової частини А7018, що був відряджений до військової частини А0224, 13.11.1983 року народження, Українець, освіта середня, цивільний шлюб. Призваний Новокодацьким РТЦК та СП м. Дніпра 06.12.2024 року. "
     res = processor._extract_rtzk(text)
     assert res == "Новокодацьким РТЦК та СП м. Дніпра"
+
+
+def test_conscription_date(processor_factory):
+    processor = processor_factory("any.docx")
+
+    text = "БУЙНОВ Олег Леонідович, Одружений. неодружений. Призваний Салтівським ВТТЦК та СП м. Харків. РНОКПП відомості не надано"
+    res = processor._extract_conscription_date(text)
+    assert res == NA
+
+    text = "БУЙНОВ Сергій Володимирович, солдат, військовослужбовець військової служби за призовом, стрілець-номер обслуги 1 десантно-штурмового відділення 2 десантно-штурмового взводу 3 десантно-штурмової роти 1 десантно-штурмового батальйону військової частини А0224, 21.09.1981 року народження, українець, освіта фахова передвища (молодший спеціаліст), не одружений. Призваний  Вознесенським РТЦК та СП Миколаївської області, 11.11.2025. РНОКПП 2111111111. Паспорт 001111111, виданий 4831 31.08.2017. Номер мобільного телефону +380681111115"
+    res = processor._extract_conscription_date(text)
+    assert res == "11.11.2025"
+
+    text = "БУЙНОВ Олег Леонідович, солдат, 23.07.1993 року народження, ВІН 010521111111111111104, ІПН 3111111110, паспорт 011111111 виданий 0510 від 01.11.2019 призваний 04.02.2026 Вінницьким ОМТЦК ти СП, закінчив Вінницький державний педагогічний університет у 2016р. вчитель фізкультури, номер мобільного телефону 0961111114. Адреса проживання військовослужбовця: м. Вінниця, вул. Покришкіна 11в. Близькі родичі: Батько НЕКЛЮДОВ Леонід Миколайович, тел. 0671111120"
+    res = processor._extract_conscription_date(text)
+    assert res == "04.02.2026"
+
+    text = "БУЙНОВ Олег Леонідович, Одружений. неодружений. Призваний Салтівським ВТТЦК та СП м. Харків, 25.10.2025 року. РНОКПП відомості не надано"
+    res = processor._extract_conscription_date(text)
+    assert res == "25.10.2025"
+
+
 
 
 def test_address_extraction(processor_factory):
@@ -366,6 +429,11 @@ def test_where_desertion_extraction(processor_factory):
 
     text = "05.02.2026 від командира самохідного артилерійського дивізіону військової частини А0224 надійшла доповідь про факт неповернення після проходження військово-лікарської комісії до району виконання завдання за призначенням військовослужбовцем військової частини А0224."
     file_name = '08.02.2025 СЗЧ несвоєчасне прибуття ГАВНОВ О.Ю. 1 сабатр САДн.docx'
+    res = processor._extract_desertion_place(text, file_name)
+    assert res == 'лікування'
+
+    text = "13.02.2026 року солдат БУЙНОВ Станіслав Миколайович не прибув з військово-лікарської комісії до району виконання завдання за призначенням, документів що підтверджують продовження лікування в інших лікувальних закладах не надав."
+    file_name = '16.02.2026 СЗЧ неповернення після проходження ВЛК (Буйнов С.М.) рв 3 дшб(2).doc'
     res = processor._extract_desertion_place(text, file_name)
     assert res == 'лікування'
 

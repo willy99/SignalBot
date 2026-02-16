@@ -24,12 +24,13 @@ class ExcelProcessor:
         warnings.filterwarnings("ignore", category=UserWarning)
         self.abs_path = os.path.abspath(file_path)
         self.app = xw.App(visible=False, add_book=False)
-        self._load_workbook()
+        self._load_workbook(DESERTER_TAB_NAME) #default tab name
 
     def upsert_record(self, records_list: List[Dict[str, Any]]) -> None:
         if not records_list:
             return
-        self._load_workbook()
+        sheet_name = records_list[0].get(COLUMN_MIL_UNIT, None)
+        self._load_workbook(sheet_name)
         try:
             self._processRow(records_list)
             if not self.batch_processing:
@@ -87,7 +88,6 @@ class ExcelProcessor:
                 try:
                     self.sheet.range((target_insert_row, 1)).api.entire_row.insert()
                 except Exception as e:
-                    self.logger.warning(f"⚠️ Спроба вставки №2 через інший синтаксис...")
                     self.sheet.range(f'{target_insert_row - 1}:{target_insert_row - 1}').copy()
                     # 2. Вставляємо скопійоване зі зсувом вниз (це створить новий рядок з форматом)
                     self.sheet.range(f'{target_insert_row}:{target_insert_row}').insert(shift='down')
@@ -225,7 +225,7 @@ class ExcelProcessor:
                     clean_name = str(val).strip().lower()
                     self.column_map[clean_name] = idx + 1
 
-    def _load_workbook(self) -> None:
+    def _load_workbook(self, sheet_name) -> None:
         try:
             try:
                 # Проста перевірка на "вошивість" зв'язку з Excel
@@ -237,14 +237,19 @@ class ExcelProcessor:
             if self.workbook is None:
                 self.logger.debug(f'>> OPENING WORKBOOK: {self.abs_path}')
                 self.workbook = self.app.books.open(self.abs_path)
-                self.sheet = self.workbook.sheets[DESERTER_TAB_NAME]
-                self._build_column_map()
-                self.logger.debug(f'>> EXCEL TOUCHED SUCCESSFULLY')
+                self._switch_to_sheet(sheet_name)
+                self.logger.debug(f'>> EXCEL TOUCHED SUCCESSFULLY, sheet ' + sheet_name)
 
         except Exception as e:
             # self.logger.debug(f"Помилка ініціалізації Excel: {e}")
             traceback.print_exc()
             raise BaseException(f"⚠️ Помилка ініціалізації Excel: {e}")
+
+    def _switch_to_sheet(self, sheet_name):
+        if not sheet_name:
+            raise ValueError(f"Військова частина не визначена!")
+        self.sheet = self.workbook.sheets[sheet_name]
+        self._build_column_map()
 
     def save(self) -> None:
         if self.workbook is None:

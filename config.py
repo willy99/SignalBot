@@ -15,6 +15,7 @@ BACKUP_DIR = 'exchange\\projekt407\\backups'
 
 DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_copy_pasha.xlsx"
 DESERTER_TAB_NAME : Final = "А0224"
+DESERTER_RESERVE_TAB_NAME : Final = "А7018"
 
 # DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025.xlsx"
 
@@ -30,6 +31,7 @@ FOLDER_DAY_FORMAT : Final = "%d.%m.%Y"    # Наприклад: 2026.01.28
 # Година, після якої дата вважається наступним днем (0-23)
 DAY_ROLLOVER_HOUR : Final = 16
 BACKUP_KEEP_DAYS = 30 # тримати бекапи не старіше ніж N діб
+LOGGER_FILE_NAME = 'bot_log.log'
 
 PROCESS_DOC : Final = True   # copy doc file from signal to date-folder
 PROCESS_XLS : Final = True # immediate process doc to excel. if false, batch can be applied later on

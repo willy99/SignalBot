@@ -1,13 +1,12 @@
 import logging
 import os
-from datetime import datetime
-
+import config
 
 class LoggerManager:
     def __init__(self, log_name="DeserterBot"):
         self.log_dir = "logs"
         self._ensure_log_dir()
-        self.log_file = os.path.join(self.log_dir, f"{datetime.now().strftime('%Y-%m-%d')}.log")
+        self.log_file = os.path.join(self.log_dir, config.LOGGER_FILE_NAME)
 
         self.logger = logging.getLogger(log_name)
         self.logger.setLevel(logging.DEBUG)

@@ -87,12 +87,11 @@ class DocProcessor:
         text = text_pieces[self.__PIECE_1]
 
         if text is not None:
-
-            fields[col.COLUMN_DESERTION_DATE] = self._extract_desertion_date(text)
-            fields[col.COLUMN_DESERTION_REGION] = self._extract_desertion_region(clean_text(text))
             fields[col.COLUMN_DESERT_CONDITIONS] = self._extract_desert_conditions(text)
+            fields[col.COLUMN_DESERTION_REGION] = self._extract_desertion_region(fields[col.COLUMN_DESERT_CONDITIONS])
+            fields[col.COLUMN_DESERTION_DATE] = self._extract_desertion_date(fields[col.COLUMN_DESERT_CONDITIONS])
             fields[col.COLUMN_DESERTION_PLACE] = self._extract_desertion_place(clean_text(text), get_file_name(self.original_filename))
-            fields[col.COLUMN_RETURN_DATE] = self._extract_return_date(text)
+            fields[col.COLUMN_RETURN_DATE] = self._extract_return_date(fields[col.COLUMN_DESERT_CONDITIONS])
             if self._check_return_sign(text_pieces[self.__PIECE_1]):
                 fields[col.COLUMN_RETURN_DATE] = self._extract_return_date(text) or fields[col.COLUMN_DESERTION_DATE]
                 fields[col.COLUMN_DESERTION_DATE] = NA
@@ -106,7 +105,7 @@ class DocProcessor:
             fields[col.COLUMN_NAME] = self.get_best_match(ml_extracted.get(col.COLUMN_NAME), self._extract_name(text))
             fields[col.COLUMN_ID_NUMBER] = self.get_best_match(ml_extracted.get(col.COLUMN_ID_NUMBER), self._extract_id_number(text))
             fields[col.COLUMN_TZK] = self._extract_rtzk(clean_text(text))
-            fields[col.COLUMN_TZK_REGION] = None #todo
+            fields[col.COLUMN_TZK_REGION] = self._extract_rtzk_region(fields[col.COLUMN_TZK])
             fields[col.COLUMN_PHONE] = self.get_best_match(ml_extracted.get(col.COLUMN_PHONE), self._extract_phone(text))
             fields[col.COLUMN_BIRTHDAY] = self.get_best_match(ml_extracted.get(col.COLUMN_BIRTHDAY), self._extract_birthday(text))
             fields[col.COLUMN_TITLE] = self._extract_title(text)
@@ -244,18 +243,16 @@ class DocProcessor:
 
     @staticmethod
     def _extract_conscription_date(text):
-        id_match = re.search(PATTERN_ID_MARKER, text, re.IGNORECASE)
-        if not id_match:
-            return NA
 
-        pos_id = id_match.start()
-        lookback_area = text[max(0, pos_id - 150):pos_id]
+        start_match = re.search(PATTERN_RTZK_CALLED, text)
 
+        print('>> start_match.start() ' + str(start_match.start()) )
+        lookback_area = text[start_match.start():-1]
+        print('>>> lookback_area ' + str(lookback_area))
         # 2. Шукаємо всі дати в цій зоні
         dates = re.findall(PATTERN_DATE, lookback_area)
-
         if dates:
-            found_date = dates[-1]
+            found_date = dates[0]
             return format_to_excel_date(found_date)
 
         return NA
@@ -291,19 +288,30 @@ class DocProcessor:
         return NA
 
     @staticmethod
-    def _extract_rtzk(text):
+    def _extract_rtzk(text: str) -> str:
         match = re.search(PATTERN_RTZK, text)
-        if match:
-            res = match.group(1).strip()
-            res = re.sub(PATTERN_RTZK_DATE_CLEANUP, '', res)
+        if not match:
+            return NA
 
-            for p in PATTERN_RTZK_TRASH:
-                res = re.sub(p, '', res)
-            final_res = " ".join(res.split()).strip(PATTERN_CLEANUP_POINTS)
-            final_res = re.sub(PATTERN_RTZK_CALLED, '', final_res)
-            final_res = re.sub('ЦТК', 'ТЦК', final_res) # виправляємо помилки операторів
-            return final_res if final_res else NA
+        res = match.group(1).strip()
+        print('res = ' + res)
+        for p in PATTERN_RTZK_TRASH:
+            res = re.sub(p, '', res)
 
+        res = res.rstrip('., ')
+
+        res = re.sub(r'(?i)ЦТК', 'ТЦК', res)
+        res = " ".join(res.split())
+
+        return res
+
+    @staticmethod
+    def _extract_rtzk_region(tck_text: str) -> str:
+        if not tck_text or tck_text == NA:
+            return NA
+        for pattern, region_name in PATTERN_REGION:
+            if re.search(pattern, tck_text):
+                return region_name
         return NA
 
     @staticmethod
@@ -328,6 +336,13 @@ class DocProcessor:
             has_absence = any(marker in clean_para for marker in PATTERN_DESERT_ABSENCE_MARKERS)
 
             if has_check or has_absence:
+
+                # взяти тільки необхідну частину а не весь гарбедж
+                marker = PATTERN_DESERTION_CONDITIONS_ACTUAL_PART_AFTER
+                if marker in para:
+                    parts = para.split(marker, 1)
+                    actual_text = parts[1].strip()
+                    return actual_text
                 return " ".join(para.split())
 
         return NA
