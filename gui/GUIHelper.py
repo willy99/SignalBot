@@ -6,7 +6,6 @@ from gui.PersonSearch import PersonSearch
 from gui.PersonEditor import PersonEditor
 import threading
 
-
 class GUIHelper:
     def __init__(self):
         self.current_page = "search_pib"
@@ -46,6 +45,7 @@ class GUIHelper:
 
     def render_menu(self):
         with use_scope('menu_area', clear=True):
+            clear()
             put_row([
                 put_button('🔍 Пошук ПІБ/ІПН', onclick=lambda: self.navigate('search_pib'),
                            color='primary', outline=self.current_page != 'search_pib'),
@@ -62,6 +62,7 @@ class GUIHelper:
 
     def show_page(self):
         """Диспетчер сторінок — сюди переїхала ваша логіка"""
+        clear('content_area')
         with use_scope('content_area', clear=True):
             if self.current_page == "search_pib":
                 self.run_search_flow()
@@ -107,25 +108,26 @@ class GUIHelper:
         def save_to_excel(updated_data):
             sheet = self.workflow.excelProcessor.sheet
             headers = self.workflow.excelProcessor.header
-            print('>>> header ' + str(headers))
+            max_col = max(headers.values())
+            current_row_values = list(sheet.range((row_idx, 1), (row_idx, max_col)).value)
 
+            # 3. Оновлюємо значення у списку
             for key, val in updated_data.items():
                 if key in headers:
                     col_idx = headers[key]
-
-                    sheet.cells(row_idx, col_idx).value = val
+                    # Індексація в Python починається з 0, а в Excel з 1
+                    current_row_values[col_idx - 1] = val
                 else:
-                    print(f"⚠️ Попередження: Ключ '{key}' не знайдено в заголовках Excel")
-            put_success(f"💾 Збережено в рядок {row_idx}")
+                    print(f"⚠️ Ключ '{key}' не знайдено в Excel")
+            sheet.range((row_idx, 1), (row_idx, max_col)).value = current_row_values
 
-        # 2. ФІЗИЧНЕ ЗБЕРЕЖЕННЯ ФАЙЛУ (Ось це ви шукали)
-        try:
-            self.workflow.excelProcessor.workbook.save()  # Або .save(path)
-            put_success(f"💾 Дані записано та файл збережено (рядок {row_idx})")
-        except Exception as e:
-            put_error(f"Помилка при збереженні файлу: {e}")
+            try:
+                self.workflow.excelProcessor.workbook.save()
+                put_success(f"💾 Дані записано та файл збережено (рядок {row_idx})")
+            except Exception as e:
+                put_error(f"Помилка при збереженні файлу: {e}")
 
-        editor = PersonEditor(row_data, save_to_excel)
+        editor = PersonEditor(row_data, save_to_excel, self)
         editor.show()
 
     def run_erdr_flow(self):

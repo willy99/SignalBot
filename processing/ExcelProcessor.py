@@ -258,6 +258,7 @@ class ExcelProcessor:
         self._build_column_map()
 
     def save(self) -> None:
+        print('>>> in workbook sqave method')
         if self.workbook is None:
             self.logger.error("⚠️ Спроба зберегти порожній воркбук. Скасовано.")
             return

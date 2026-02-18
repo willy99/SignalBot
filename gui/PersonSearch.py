@@ -57,6 +57,11 @@ class PersonSearch:
                     if isinstance(cell, (datetime.datetime, datetime.date)):
                         # Перетворюємо дату на рядок відразу
                         serialized_row.append(cell.strftime(config.EXCEL_DATE_FORMAT))
+                    elif isinstance(cell, float):
+                        if cell.is_integer():
+                            serialized_row.append(int(cell))
+                        else:
+                            serialized_row.append(cell)
                     else:
                         serialized_row.append(cell)
                 results.append({

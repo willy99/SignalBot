@@ -1,6 +1,7 @@
 import json
 
 import config
+from config import DESERTER_TAB_NAME
 from processing.MyWorkFlow import MyWorkFlow
 
 import threading
@@ -24,7 +25,8 @@ def listen_hotkeys(workflow_obj):
 def main():
     workflow = MyWorkFlow()
     # if config.PROCESS_XLS:
-    workflow.initExcelProcessor(config.DESERTER_XLSX_FILE_PATH) # one-time init
+    workflow.initExcelProcessor(config.DESERTER_XLSX_FILE_PATH)
+    workflow.excelProcessor.switch_to_sheet(DESERTER_TAB_NAME)
 
     hotkey_thread = threading.Thread(
         target=listen_hotkeys,
