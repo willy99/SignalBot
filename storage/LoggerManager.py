@@ -32,11 +32,24 @@ class LoggerManager:
         console_handler.setFormatter(formatter)
         self.logger.addHandler(console_handler)
 
-    def clear_log(self):
-        """Очищує вміст поточного лог-файлу."""
-        with open(self.log_file, 'w', encoding='utf-8'):
-            pass  # Просто відкриваємо на запис і закриваємо
-        self.logger.debug("--- 🔄 Лог-файл очищено після архівації ---")
+    def clear_log(self, keep_lines=5):
+        try:
+            if os.path.exists(self.log_file):
+                # 1. Читаємо всі рядки
+                with open(self.log_file, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+
+                # 2. Залишаємо тільки хвіст (наприклад, останні 5 рядків)
+                tail = lines[-keep_lines:] if len(lines) > keep_lines else lines
+
+                # 3. Перезаписуємо файл цим хвостом
+                with open(self.log_file, 'w', encoding='utf-8') as f:
+                    f.writelines(tail)
+
+                self.logger.debug(f"--- 🔄 Лог очищено. Залишено останніх рядків: {len(tail)} ---")
+        except Exception as e:
+            # Важливо не дати скрипту впасти, якщо лог зайнятий іншим процесом
+            print(f"Помилка при очищенні логу: {e}")
 
     def get_logger(self):
         return self.logger

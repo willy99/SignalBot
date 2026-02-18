@@ -13,7 +13,9 @@ EXCEL_DIR = 'exchange\\projekt407'
 DOC_DIR : Final = "exchange\\ДД"
 BACKUP_DIR = 'exchange\\projekt407\\backups'
 
-DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_copy_pasha.xlsx"
+#DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_copy_pasha.xlsx"
+DESERTER_XLSX: Final = "Тестовий Майданчик - не чипати.xlsx"
+
 DESERTER_TAB_NAME : Final = "А0224"
 DESERTER_RESERVE_TAB_NAME : Final = "А7018"
 

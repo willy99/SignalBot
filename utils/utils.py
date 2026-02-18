@@ -1,5 +1,6 @@
 import datetime
 from datetime import timedelta
+from datetime import datetime, date
 import config
 import os
 from typing import Any
@@ -22,8 +23,26 @@ def get_effective_date():
     return now
 
 
-from datetime import datetime
 
+def to_html_date(val):
+    """Перетворює будь-який вхідний формат дати в YYYY-MM-DD для браузера"""
+    if not val:
+        return ""
+
+    # 1. Якщо прийшов об'єкт datetime від xlwings
+    if isinstance(val, (datetime, date)):
+        return val.strftime('%Y-%m-%d')
+
+    # 2. Якщо прийшов рядок (наприклад, з вашого config.EXCEL_DATE_FORMAT)
+    try:
+        dt = datetime.strptime(str(val).strip(), config.EXCEL_DATE_FORMAT)
+        return dt.strftime('%Y-%m-%d')
+    except (ValueError, TypeError):
+        # 3. Якщо формат невідомий, пробуємо стандартний ISO
+        try:
+            return datetime.fromisoformat(str(val)).strftime('%Y-%m-%d')
+        except:
+            return ""
 
 def format_to_excel_date(date_val: Any) -> str:
     """
@@ -101,3 +120,18 @@ def get_typed_value(value):
                 return value
         else:
             return value
+
+
+def check_birthday_id_number(birthday: datetime, idn: str)-> bool:
+    if idn is None or birthday is None or idn == '':
+        return True
+    # Обчислюємо дату з РНОКПП
+    base_date = datetime(1899, 12, 31)
+    days_count = int(idn[:5])
+    birthday_calculated_dt = base_date + timedelta(days=days_count)
+    birthday_calculated = format_ukr_date(birthday_calculated_dt).strip()
+    birthday_table = format_ukr_date(birthday).strip() if birthday else None
+    if birthday_table != birthday_calculated:
+        print('------ ⚠️ В таблиці:' + str(birthday_table) + ' А шо винно бути:' + str(birthday_calculated))
+        return False
+    return True

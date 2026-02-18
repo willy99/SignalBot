@@ -1,7 +1,8 @@
+import logging
 from pathlib import Path
 from .parsers.ParserFactory import ParserFactory
 import config
-from utils.utils import format_to_excel_date, get_file_name, clean_text
+from utils.utils import format_to_excel_date, get_file_name, clean_text, check_birthday_id_number
 import dics.deserter_xls_dic as col
 from dics.deserter_xls_dic import *
 from datetime import datetime
@@ -92,6 +93,7 @@ class DocProcessor:
             fields[col.COLUMN_DESERTION_DATE] = self._extract_desertion_date(fields[col.COLUMN_DESERT_CONDITIONS])
             fields[col.COLUMN_DESERTION_PLACE] = self._extract_desertion_place(clean_text(text), get_file_name(self.original_filename))
             fields[col.COLUMN_RETURN_DATE] = self._extract_return_date(fields[col.COLUMN_DESERT_CONDITIONS])
+            fields[col.COLUMN_DESERTION_TYPE] = self._extract_desertion_type(text, fields[col.COLUMN_DESERTION_PLACE])
             if self._check_return_sign(text_pieces[self.__PIECE_1]):
                 fields[col.COLUMN_RETURN_DATE] = self._extract_return_date(text) or fields[col.COLUMN_DESERTION_DATE]
                 fields[col.COLUMN_DESERTION_DATE] = NA
@@ -105,13 +107,15 @@ class DocProcessor:
             fields[col.COLUMN_NAME] = self.get_best_match(ml_extracted.get(col.COLUMN_NAME), self._extract_name(text))
             fields[col.COLUMN_ID_NUMBER] = self.get_best_match(ml_extracted.get(col.COLUMN_ID_NUMBER), self._extract_id_number(text))
             fields[col.COLUMN_TZK] = self._extract_rtzk(clean_text(text))
-            fields[col.COLUMN_TZK_REGION] = self._extract_rtzk_region(fields[col.COLUMN_TZK])
             fields[col.COLUMN_PHONE] = self.get_best_match(ml_extracted.get(col.COLUMN_PHONE), self._extract_phone(text))
             fields[col.COLUMN_BIRTHDAY] = self.get_best_match(ml_extracted.get(col.COLUMN_BIRTHDAY), self._extract_birthday(text))
             fields[col.COLUMN_TITLE] = self._extract_title(text)
             fields[col.COLUMN_TITLE_2] = self._extract_title_2(fields[col.COLUMN_TITLE])
             fields[col.COLUMN_SERVICE_TYPE] = self.get_best_match(ml_extracted.get(col.COLUMN_SERVICE_TYPE), self._extract_service_type(text))
             fields[col.COLUMN_ADDRESS] = self.get_best_match(ml_extracted.get(col.COLUMN_ADDRESS), self._extract_address(clean_text(text)))
+            fields[col.COLUMN_TZK_REGION] = self._extract_rtzk_region(fields[col.COLUMN_TZK])
+            if fields[col.COLUMN_TZK_REGION] == NA:
+                fields[col.COLUMN_TZK_REGION] = self._extract_rtzk_region(fields[col.COLUMN_ADDRESS])
             fields[col.COLUMN_BIO] = self.get_best_match(ml_extracted.get(col.COLUMN_BIO), self._extract_bio(clean_text(text), fields[col.COLUMN_NAME]))
             fields[col.COLUMN_ENLISTMENT_DATE] = self.get_best_match(ml_extracted.get(col.COLUMN_ENLISTMENT_DATE), self._extract_conscription_date(text))
             fields[col.COLUMN_SUBUNIT] = self.get_best_match(ml_extracted.get(col.COLUMN_SUBUNIT), self.extract_military_subunit(text, get_file_name(self.original_filename)))
@@ -126,17 +130,27 @@ class DocProcessor:
         text = text_pieces[self.__PIECE_4]
         fields[col.COLUMN_EXECUTOR] = self._extract_name(text)
 
-        #validate the case
-        if self.validateRecord(fields):
+        if self.is_desertion_case(fields):
+            # validate the case
+            self.validate_record(fields)
             result.append(fields)
         else:
             self.logger.debug("... ▶️ НЕ ДОДАЄМО, не кейз СЗЧ!")
 
         return result
 
-    def validateRecord(self, record):
+    def is_desertion_case(self, record):
         if record[COLUMN_DESERT_CONDITIONS] == NA and record[COLUMN_RETURN_DATE] is None:
             return False
+        return True
+
+    def validate_record(self, record):
+        if not check_birthday_id_number(record[COLUMN_BIRTHDAY], record[COLUMN_ID_NUMBER]):
+            self.logger.warning('------ ⚠️ Невідповідність дати народження та ІПН! ' + str(record[COLUMN_BIRTHDAY] + '/' + str(record[COLUMN_ID_NUMBER])))
+            return False
+
+        # might be exceptions here later, if critical errors
+
         return True
 
     def validatePieces(self, doc_pieces):
@@ -246,9 +260,7 @@ class DocProcessor:
 
         start_match = re.search(PATTERN_RTZK_CALLED, text)
 
-        print('>> start_match.start() ' + str(start_match.start()) )
         lookback_area = text[start_match.start():-1]
-        print('>>> lookback_area ' + str(lookback_area))
         # 2. Шукаємо всі дати в цій зоні
         dates = re.findall(PATTERN_DATE, lookback_area)
         if dates:
@@ -289,7 +301,7 @@ class DocProcessor:
 
     @staticmethod
     def _extract_rtzk(text: str) -> str:
-        match = re.search(PATTERN_RTZK, text)
+        match = re.search(PATTERN_RTZK, text, re.IGNORECASE)
         if not match:
             return NA
 
@@ -334,7 +346,6 @@ class DocProcessor:
             clean_para = " ".join(para.split()).lower()
             has_check = any(marker in clean_para for marker in PATTERN_DESERT_CHECK_MARKERS)
             has_absence = any(marker in clean_para for marker in PATTERN_DESERT_ABSENCE_MARKERS)
-
             if has_check or has_absence:
 
                 # взяти тільки необхідну частину а не весь гарбедж
@@ -458,6 +469,16 @@ class DocProcessor:
                 return short_name
         return NA
 
+    @staticmethod
+    def _extract_desertion_type(text, desertion_where):
+        des_type = 'СЗЧ'
+        for pattern, short_name in PATTERN_DESERTION_TYPE_MAPPING.items():
+            if re.search(pattern, text, re.IGNORECASE):
+                return short_name
+        if desertion_where == 'НЦ':
+            des_type = 'СЗЧ з А2900'
+        return des_type
+
     def check_for_errors(self, data_for_excel):
         result = True
         if not data_for_excel:
@@ -473,10 +494,9 @@ class DocProcessor:
         return result
 
     def _check_return_sign(self, text):
-        self.logger.debug('>>> check for return ' + text)
         for pattern in PATTERN_RETURN_SIGN:
             if re.search(pattern, text, re.IGNORECASE):
-                self.logger.debug('>>> return detected!')
+                self.logger.debug('--- ✌️ ВИЯВЛЕНО ПОВЕРНЕННЯ! УРА')
                 return True
         return False
 

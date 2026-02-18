@@ -18,6 +18,7 @@ class ExcelProcessor:
         self.workbook = None
         self.sheet = None
         self.column_map: Dict[str, int] = {}  # {назва: номер_колонки}
+        self.header: Dict[str, int] = {}
         self.batch_processing = batch_processing
         self.logger = log_manager.get_logger()
 
@@ -182,14 +183,16 @@ class ExcelProcessor:
 
             # Перевірка збігу
             if s_pib == pib and s_dob == dob and s_rnokpp == rnokpp:
+                actual_excel_row = i + 1
+
                 if des_date == s_des_date or (not s_ret_date and not s_res_date):
                     s_id = row_data[id_col - 1]
-                    self.logger.debug(f'--- 🔎🤘: Чувака знайдено (ID:{s_id}), рядок {i}')
-                    if s_ret_date == '31.12.2020':
-                        self.sheet.range((i, ret_col)).value = None
-                    if s_res_date == '31.12.2020':
-                        self.sheet.range((i, res_col)).value = None
-                    return i
+                    self.logger.debug(f'--- 🔎🤘 Чувака знайдено (ID:{s_id}), рядок {actual_excel_row}' + str(' Попередня Дата повернення:' + str(s_ret_date)))
+                    if '31.12.2020' in s_ret_date:
+                        self.sheet.range((actual_excel_row, ret_col)).value = None
+                    if '31.12.2020' in s_res_date:
+                        self.sheet.range((actual_excel_row, res_col)).value = None
+                    return actual_excel_row
 
         self.logger.debug('--- 🔎➕: Чувака немає, додаємо новий рядок')
         return None
@@ -222,8 +225,10 @@ class ExcelProcessor:
             header_values = self.sheet.range('1:1').value
             for idx, val in enumerate(header_values):
                 if val:
-                    clean_name = str(val).strip().lower()
-                    self.column_map[clean_name] = idx + 1
+                    clean_name = str(val).strip()
+                    clean_name_lower = clean_name.lower()
+                    self.column_map[clean_name_lower] = idx + 1
+                    self.header[clean_name] = idx + 1
 
     def _load_workbook(self, sheet_name) -> None:
         try:
@@ -237,7 +242,7 @@ class ExcelProcessor:
             if self.workbook is None:
                 self.logger.debug(f'>> OPENING WORKBOOK: {self.abs_path}')
                 self.workbook = self.app.books.open(self.abs_path)
-                self._switch_to_sheet(sheet_name)
+                self.switch_to_sheet(sheet_name)
                 self.logger.debug(f'>> EXCEL TOUCHED SUCCESSFULLY, sheet ' + sheet_name)
 
         except Exception as e:
@@ -245,9 +250,10 @@ class ExcelProcessor:
             traceback.print_exc()
             raise BaseException(f"⚠️ Помилка ініціалізації Excel: {e}")
 
-    def _switch_to_sheet(self, sheet_name):
+    def switch_to_sheet(self, sheet_name):
         if not sheet_name:
             raise ValueError(f"Військова частина не визначена!")
+        sheet_name = sheet_name
         self.sheet = self.workbook.sheets[sheet_name]
         self._build_column_map()
 

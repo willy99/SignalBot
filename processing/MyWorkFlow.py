@@ -152,7 +152,7 @@ class MyWorkFlow:
                 batch_processor.start_processing(0)
                 return "OK"
             if text == "2" or text == 'convert':
-                column_converter = ColumnConverter(self.excelFilePath)
+                column_converter = ColumnConverter(self.excelFilePath, self)
                 column_converter.convert()
                 return "OK"
         elif current_state == "STAT":

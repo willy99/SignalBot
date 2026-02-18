@@ -1,48 +1,190 @@
-from dics.deserter_xls_dic import *
-from openpyxl.styles import PatternFill
-from processing.DocProcessor import DocProcessor
-from processing.ExcelProcessor import ExcelProcessor
+import xlwings as xw
 import traceback
+from dics.deserter_xls_dic import *
+from processing.DocProcessor import DocProcessor
+from utils.utils import format_ukr_date
+from datetime import datetime, timedelta
 
 class ColumnConverter:
-    def __init__(self, excel_file_path):
-        self.excelProcessor = ExcelProcessor(excel_file_path, batch_processing=True)
-        self.docProcessor = DocProcessor(None, None, None)
+    def __init__(self, excel_file_path, workflow):
+        self.file_path = excel_file_path
+        self.workflow = workflow
+        # Ініціалізуємо DocProcessor (без прив'язки до файлу, просто як двигун)
+        self.docProcessor = DocProcessor(workflow, None, None)
+        self.app = None
+        self.wb = None
+
+    def _get_column_index(self, sheet, col_name):
+        """Допоміжний метод для пошуку індексу колонки за назвою (1-based)"""
+        header_row = sheet.range('1:1').value
+        try:
+            # Знаходимо індекс (xlwings повертає 0-based список, додаємо 1)
+            return header_row.index(col_name) + 1
+        except (ValueError, TypeError):
+            print(f"Колонку '{col_name}' не знайдено в хедері.")
+            return None
 
     def convert(self):
-        pass
+        # Тут можна викликати всі методи конвертації
+        self._check_birthday_by_id()
 
-
-    def _convert_subunit2(self):
-        print("#convert")
-        subunit_col = self.excelProcessor.column_map.get(COLUMN_SUBUNIT2.lower())
-        bio_col = self.excelProcessor.column_map.get(COLUMN_BIO.lower())
-        cond_col = self.excelProcessor.column_map.get(COLUMN_DESERT_CONDITIONS.lower())
+    def _convert_region(self):
+        print("--- Початок конвертації ---")
 
         try:
-            if not all([subunit_col, bio_col]):
-                return None
+            # Підключаємось до Excel (видимим чи невидимим)
+            self.app = xw.App(visible=False)
+            self.wb = self.app.books.open(self.file_path)
+            sheet = self.wb.sheets[0]  # Беремо перший лист
 
-            for row in range(2, self.excelProcessor.sheet.max_row + 1):
-                s_bio = str(self.excelProcessor.sheet.cell(row=row, column=bio_col).value or "").strip()
-                s_cond = str(self.excelProcessor.sheet.cell(row=row, column=cond_col).value or "").strip()
-                cell = self.excelProcessor.sheet.cell(row=row, column=subunit_col)
+            # Отримуємо індекси колонок
+            rtzk_col = self._get_column_index(sheet, COLUMN_TZK)
+            address_col = self._get_column_index(sheet, COLUMN_ADDRESS)
+            rtzk_region_col = self._get_column_index(sheet, COLUMN_TZK_REGION)
 
-                if (s_bio is None or s_bio.strip() == '') and (s_cond is None or s_cond == ''):
-                    pale_red_fill = PatternFill(start_color='FFC7CE',
-                                                end_color='FFC7CE',
-                                                fill_type='solid')
-                    cell.fill = pale_red_fill
-                mil_subunit2 = self.docProcessor.extract_military_subunit(s_bio, None, PATTERN_SUBUNIT2_MAPPING)
-                if mil_subunit2 is NA:
-                    # fallback
-                    mil_subunit2 = self.docProcessor.extract_military_subunit(s_cond, None, PATTERN_SUBUNIT2_MAPPING)
-                cell.value = mil_subunit2
+            if not all([rtzk_region_col, rtzk_col, address_col]):
+                print("!!! Необхідні колонки для мапінгу відсутні!")
+                return
 
-            self.excelProcessor.save(self.excelProcessor.fileProxy)
+            # Визначаємо останній рядок
+            last_row = sheet.range('A' + str(sheet.cells.last_cell.row)).end('up').row
+            print(f"Обробка {last_row - 1} рядків...")
+
+            # Для швидкості зчитуємо цілі діапазони в пам'ять (list of lists)
+
+            rtzk_values = sheet.range((2, rtzk_col), (last_row, rtzk_col)).value
+            rtzk_region_values = sheet.range((2, rtzk_region_col), (last_row, rtzk_region_col)).value
+            address_values = sheet.range((2, address_col), (last_row, address_col)).value
+
+            # Список для результатів, які ми запишемо одним махом
+            results = []
+
+            for i in range(len(rtzk_values)):
+                row_idx = i + 2  # для логування або стилізації
+                rtzk = str(rtzk_values[i] or "").strip()
+                address = str(address_values[i] or "").strip()
+                rtzk_region = str(rtzk_region_values[i] or "").strip()
+
+                # Логіка підсвічування порожніх даних
+                if not rtzk and not address:
+                    results.append([''])
+                    continue
+                    # У xlwings колір задається через RGB кортеж
+                    # sheet.range((row_idx, subunit_col)).color = (255, 199, 206)  # Pale Red
+
+                # Екстракція підрозділу
+                region_my = self.docProcessor._extract_rtzk_region(rtzk)
+                if region_my == NA:
+                    region_my = self.docProcessor._extract_rtzk_region(address)
+                # print(str(i) + ': ' + region_my + ' vs ' + rtzk_region + " ( " + rtzk + ' || ' + address + ')')
+                if rtzk_region and region_my != rtzk_region:
+                    print('>>> Incorrect: ' + region_my + ' vs ' + rtzk_region + " (" + rtzk + '||' + address + ')')
+                if region_my == NA and rtzk_region:
+                    region_my = rtzk_region
+                    # print('>>> MISSING: ' + region_my + ' vs ' + rtzk_region + " (" + rtzk + '||' + address + ')')
+
+                results.append([region_my])
+
+            # Записуємо всі результати в колонку одним зверненням (це набагато швидше)
+            print('processed: ' + str(len(results)) + " vs values " + str(len(rtzk_values)))
+            sheet.range((2, rtzk_region_col)).value = results
+
+            self.wb.save()
+            print("✅ Конвертацію Subunit2 завершено успішно.")
+
         except Exception as e:
-            print(f"🔴 КРИТИЧНА ПОМИЛКА БАТЧУ: {e}")
+            print(f"🔴 КРИТИЧНА ПОМИЛКА: {e}")
+            print(traceback.format_exc())
+        finally:
+            if self.wb:
+                self.wb.close()
+            if self.app:
+                self.app.quit()
+            print("🏁 Excel сесію закрито.")
+
+
+    def _check_birthday_by_id(self):
+        print("--- Початок перевірки ДН по РНОКПП ---")
+
+        try:
+            # Ініціалізація Excel
+            self.app = xw.App(visible=False)
+            self.wb = self.app.books.open(self.file_path)
+            sheet = self.wb.sheets[0]
+
+            # Отримуємо індекси колонок
+            id_col = self._get_column_index(sheet, COLUMN_ID_NUMBER)
+            birth_col = self._get_column_index(sheet, COLUMN_BIRTHDAY)
+            name_col = self._get_column_index(sheet, COLUMN_NAME)
+
+            if not all([id_col, birth_col, name_col]):
+                print("!!! Необхідні колонки відсутні в Excel!")
+                return
+
+            # Визначаємо останній рядок по колонці Прізвища (зазвичай вона найбільш заповнена)
+            # 1. Визначаємо номер останнього можливого рядка в Excel (напр. 1048576)
+            max_excel_row = sheet.cells.last_cell.row
+
+            # 2. Знаходимо останній заповнений рядок у конкретній колонці (name_col)
+            # Це аналог натискання Cmd+Up у самому низу Excel
+            last_row = sheet.cells(max_excel_row, name_col).end('up').row
+
+            print(f"Загальна кількість рядків для аналізу: {last_row}")
+
+            base_date = datetime(1899, 12, 31)
+
+            for row in range(7000, last_row + 1):
+                try:
+                    # Читаємо значення построчно
+                    id_val = sheet.cells(row, id_col).value
+                    bth_val = sheet.cells(row, birth_col).value
+                    name_val = sheet.cells(row, name_col).value
+
+                    # Якщо ПІБ порожнє - ймовірно, це кінець даних або сміття
+                    if not name_val:
+                        continue
+
+                    # Валідація та очищення ID
+                    if id_val is None:
+                        continue
+
+                    # Обробка float (Excel часто віддає числа як 123.0)
+                    id_str = str(int(float(id_val))) if isinstance(id_val, (float, int)) else str(id_val).strip()
+
+                    if len(id_str) != 10 or not id_str.isdigit():
+                        print(f"Рядок {row}: Некоректний формат РНОКПП '{id_str}'")
+                        continue
+
+                    # Обчислюємо дату з РНОКПП
+                    days_count = int(id_str[:5])
+                    birthday_calculated_dt = base_date + timedelta(days=days_count)
+                    birthday_calculated = format_ukr_date(birthday_calculated_dt).strip()
+
+                    # Отримуємо дату з таблиці
+                    birthday_table = format_ukr_date(bth_val).strip() if bth_val else "відсутня"
+
+                    # Порівняння
+                    if birthday_table != birthday_calculated:
+                        print(f"❌ Невідповідність [Рядок {row}]: {name_val}")
+                        print(f"   РНОКПП: {id_str} -> {birthday_calculated}")
+                        print(f"   В таблиці: {birthday_table}")
+
+                        # Опціонально: підсвічуємо помилку в Excel
+                        # sheet.cells(row, id_col).color = (255, 100, 100)
+
+                except Exception as row_error:
+                    # Якщо помилка в одному рядку - пропускаємо і йдемо далі
+                    print(f"⚠️ Помилка обробки рядка {row}: {row_error}")
+                    continue
+
+            print("✅ Перевірку завершено.")
+
+        except Exception as e:
+            print(f"🔴 КРИТИЧНА ПОМИЛКА: {e}")
             traceback.print_exc()
         finally:
-            self.excelProcessor.close()
-            print("🏁 >>> CONVERSION FINISHED")
+            if self.wb:
+                self.wb.close()
+            if self.app:
+                self.app.quit()
+            print("🏁 Excel сесію закрито.")

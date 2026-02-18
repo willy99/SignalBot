@@ -3,10 +3,35 @@ import json
 import config
 from processing.MyWorkFlow import MyWorkFlow
 
+import threading
+from pynput import keyboard
+from gui.GUIHelper import GUIHelper
+
+
+def listen_hotkeys(workflow_obj):
+    """Функція для фонового прослуховування клавіш"""
+    helper = GUIHelper()
+    # Важливо: використовуємо lambda, щоб функція не викликалася сама при старті
+    hotkeys = {
+        '<cmd>+<shift>+9': lambda: helper.open_editor_from_excel(workflow_obj),
+        '<ctrl>+<shift>+9': lambda: helper.open_editor_from_excel(workflow_obj)
+    }
+
+    print("⌨️  Слухаю комбінацію Cmd+Shift+9...")
+    with keyboard.GlobalHotKeys(hotkeys) as h:
+        h.join()
+
 def main():
     workflow = MyWorkFlow()
     # if config.PROCESS_XLS:
     workflow.initExcelProcessor(config.DESERTER_XLSX_FILE_PATH) # one-time init
+
+    hotkey_thread = threading.Thread(
+        target=listen_hotkeys,
+        args=(workflow,),  # Передаємо об'єкт як аргумент
+        daemon=True
+    )
+    hotkey_thread.start()
 
     try:
         workflow.client.host = config.TCP_HOST

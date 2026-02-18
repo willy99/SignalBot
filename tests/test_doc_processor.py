@@ -96,6 +96,7 @@ def test_process_doc_maly_simple(processor_factory):
     assert "Дніпропетровська обл., м. Кривий Ріг, вул. Ф. Караманиця, буд. 11А, кв 12" in fields[COLUMN_ADDRESS]
     assert fields[COLUMN_RETURN_DATE] is None
     assert fields[COLUMN_EXECUTOR] == "БОЙКО Віктор Олександрович"
+    assert fields[COLUMN_DESERTION_TYPE] == 'СЗЧ'
 
 # tests error - missing one of the part in the document
 def test_process_doc_maly_error_missing_4(processor_factory):
@@ -358,6 +359,75 @@ def test_rtzk_extraction(processor_factory):
     res = processor._extract_rtzk(text)
     assert res == "Новокодацьким РТЦК та СП м. Дніпра"
 
+    text = "БУЙКО Олексій Миколайович, майстер-сержант, військовослужбовець військової служби за контрактом, командир господарчого відділення самохідного артилерійського дивізіону військової частини А0224, 22.03.1982 року народження, освіта середня, одружений. Призваний Новоодеським РВК Миколаївської обл., 04.02.2013 року. РНОКПП 3003117373, номер мобільного телефону 0687849466. "
+    res = processor._extract_rtzk(text)
+    assert res == "Новоодеським РВК Миколаївської обл"
+
+    text = "Призваний: Миколаївським МТЦК та СП, 02.09.2025, РНОКПП: 3344514975"
+    res = processor._extract_rtzk(text)
+    assert res == "Миколаївським МТЦК та СП"
+
+    text = "Призваний 28.08.2024 року Вознесенським РТЦК та СП м. Вознесенськ Миколаївської області."
+    res = processor._extract_rtzk(text)
+    assert res == "Вознесенським РТЦК та СП м. Вознесенськ Миколаївської області"
+
+
+def test_rtzk_region_extraction(processor_factory):
+    processor = processor_factory("any.docx")
+
+    text = "Призваний Центральним РТЦК та СП м. Київ 06.12.2024 року. "
+    res = processor._extract_rtzk_region(text)
+    assert "Київська область" in res
+
+    text = "Призваний Київським РТЦК та СП"
+    res = processor._extract_rtzk_region(text)
+    assert "Київська область" in res
+
+    text = "Призваний Центральним РТЦК та СП м. Обухів, Київська обл."
+    res = processor._extract_rtzk_region(text)
+    assert "Київська область" in res
+
+    text = "Призваний Новокодацьким РТЦК та СП м. Дніпра 06.12.2024 року. "
+    res = processor._extract_rtzk_region(text)
+    assert "Дніпропетровська область" in res
+
+    text = "Кіровоградська обл., м. Олександрія, вул. Перспективна, буд. 16 кв. 52"
+    res = processor._extract_rtzk_region(text)
+    assert "Кіровоградська область" in res
+
+    text = "Чернівецька обл., м. Олександрія, вул. Сумська, буд. 16 кв. 52"
+    res = processor._extract_rtzk_region(text)
+    assert "Чернівецька область" in res
+
+    text = "Кропивницьким РТЦК та СП, м. Кропивницький"
+    res = processor._extract_rtzk_region(text)
+    assert "Кіровоградська область" in res
+
+    text = "Кропивницький МТЦК та СП."
+    res = processor._extract_rtzk_region(text)
+    assert "Кіровоградська область" in res
+
+    text = "Кам’янський РТЦК та СП м. Кам’янка Дніпропетровської області"
+    res = processor._extract_rtzk_region(text)
+    assert "Дніпропетровська область" in res
+
+    text = "Київський РТЦК та СП м. Одеса"
+    res = processor._extract_rtzk_region(text)
+    assert "Одеська область" in res
+
+    text = "Дубинським РТЦК та СП Рівненської обл."
+    res = processor._extract_rtzk_region(text)
+    assert "Рівненська область" in res
+
+    text = "Миколаївський РТЦК та СП"
+    res = processor._extract_rtzk_region(text)
+    assert "Миколаївська область" in res
+
+    text = "місто Вінниця, вулиця Нагірна 21ж, квартира 21."
+    res = processor._extract_rtzk_region(text)
+    assert "Вінницька область" in res
+
+
 
 def test_conscription_date(processor_factory):
     processor = processor_factory("any.docx")
@@ -536,6 +606,14 @@ def test_milsubunit_extraction(processor_factory):
     res = processor.extract_military_subunit(text, file_name)
     assert res == 'БУ'
 
+def test_desertion_type_extraction(processor_factory):
+    processor = processor_factory("any.docx")
+
+    text = "16.02.2026 близько 14:00 солдат БУЙНОВ Антон Олександрович, солдат БАРАНЧУК Максим Володимирович та солдат СКАЧКУК Сергій Іванович здійснили самовільне залишення району виконання бойового завдання підрозділом поблизу населеного пункту Шевченко Добропільської міської громади Покровського району Донецької області. Військовослужбовець: солдат БУЙНОВ Антон Олександрович з особистою зброєю (5,45 x 39 мм автомат АК-74, номер зброї 6811118, набої 5,45 x 39 в кількості 400 шт., граната DM52 – 2 шт.) солдат БАРАНЧУК Максим Володимирович з особистою зброєю (5,45 x 39 мм автомат АК-74, номер зброї 6811119, набої 5,45 x 45 в кількості 400 шт., граната DM52 – 2 шт.) солдат СКАЧКУК Сергій Іванович з особистою зброєю (5,45 x 39 мм автомат АК-74, номер зброї 6722224, набої 5,45 x 39 в кількості 400 шт"
+    where = processor._extract_desertion_place(text)
+    assert where == 'РВБЗ'
+    res = processor._extract_desertion_type(text, where)
+    assert res == 'СЗЧ зброя'
 
 
 def test_return_sign(processor_factory):
@@ -544,9 +622,20 @@ def test_return_sign(processor_factory):
     text = "03.06.2022 року солдат БОЛВАН Іван Васильович не повернувся з лікування до району виконання завдання за призначенням."
     assert False == processor._check_return_sign(text)
 
+def test_desertion_sign(processor_factory):
+    processor = processor_factory("any.docx")
+    text = "16.02.2026 від командира аеромобільного батальйону надійшла доповідь про факт необережного поводження зі зброєю військовослужбовців військової частини А0224. Попередньо встановлено, що особовий склад підрозділів військової частини А0224 відповідно до бойового наказу командира військової частини А0224 №3/3т/БН від 15.02.2026 веде наступальні (штурмові) дій батальйонів I ешелону на глибину виконання найближчого та подальшого завдання при проведенні наступальних (штурмових) дій при виконанні заходів з національної безпеки та оборони, відсічі та стримуванні збройної агресії. Встановлено, що під час виконання бойового завдання, в районі виконання завдань за призначенням, у визначеній смузі відповідальності військової частини А0224, внаслідок необережного поводження зі зброєю отримав поранення військовослужбовець військової частини А0224: Солдат за призовом БУЙНОВ Олександр Олексійович, номер обслуги мінометного відділення взводу вогневої підтримки 1 аеромобільної роти аеромобільного батальйону військової частини А0224, діагноз: “Вогнепальне кульове(15.02.2026) сліпе поранення медіальної поверхні нижньої третини лівої гомілки, проникаюче? в гомілково-стопний суглоб”. Військовослужбовця евакуйовано до ПХГ Петропавлівка. Військовослужбовець перебував у засобах індивідуального захисту та з особистою зброєю. Ознак алкогольного та наркотичного сп’яніння не виявлено. Решта обставин з'ясовується."
+    record = {
+        COLUMN_DESERT_CONDITIONS : processor._extract_desert_conditions(text),
+        COLUMN_RETURN_DATE : processor._extract_return_date(text),
+    }
+
+    assert False == processor.is_desertion_case(record)
+
 def test_ml(processor_factory):
     text = "НЕГОЛЮК Володимир Васильович, старший солдат, військовослужбовець військової служби за призовом, стрілець-помічник гранатометника 2  десантно-штурмового відділення 3 десантно-штурмового взводу 7 десантно-штурмової роти 2 десантно-штурмового батальйону військової частини А0224, 29.10.1981 року народження, українець, освіта вища, Національний транспортний університет м. Київ у 2010 році. Одружений. неодружений. Призваний Салтівським ВТТЦК та СП м. Харків, 25.10.2025 року. РНОКПП відомості не надано"
     log_manager = LoggerManager()
+
 
     parser = MLParser(model_path=config.ML_MODEL_PATH, log_manager=log_manager)
     extracted = parser.parse_text(text)
