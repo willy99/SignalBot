@@ -1,16 +1,16 @@
 import xlwings as xw
 import os
 
-import io
 import warnings
-from copy import copy
-from config import DESERTER_TAB_NAME, EXCEL_CHUNK_SIZE
+from config import DESERTER_TAB_NAME, EXCEL_CHUNK_SIZE, EXCEL_DATE_FORMAT
 from dics.deserter_xls_dic import *
 from dics.deserter_xls_dic import NA
 from typing import List, Dict, Any
-from utils.utils import format_ukr_date, get_typed_value
+from utils.utils import format_ukr_date, get_typed_value, format_to_excel_date
 import traceback
 from storage.LoggerManager import LoggerManager
+import datetime
+import threading
 
 class ExcelProcessor:
     def __init__(self, file_path, log_manager: LoggerManager, batch_processing=False):
@@ -26,6 +26,9 @@ class ExcelProcessor:
         self.abs_path = os.path.abspath(file_path)
         self.app = xw.App(visible=False, add_book=False)
         self._load_workbook(DESERTER_TAB_NAME) #default tab name
+        self.lock = threading.Lock()
+
+        self.column_values: Dict[str, List[str]] = {} # для комбіков
 
     def upsert_record(self, records_list: List[Dict[str, Any]]) -> None:
         if not records_list:
@@ -230,6 +233,54 @@ class ExcelProcessor:
                     self.column_map[clean_name_lower] = idx + 1
                     self.header[clean_name] = idx + 1
 
+    def _build_column_values(self):
+        columns_to_gather = [
+            COLUMN_TZK_REGION,
+            COLUMN_SUBUNIT,
+            COLUMN_SUBUNIT2,
+            COLUMN_SERVICE_TYPE,
+            COLUMN_TITLE,
+            COLUMN_TITLE_2,
+            COLUMN_PLACEMENT,
+            COLUMN_REVIEW_STATUS,
+            COLUMN_DESERTION_PLACE,
+            COLUMN_DESERTION_REGION,
+        ]
+
+        self.column_values = {}
+
+        # 1. Отримуємо заголовки для пошуку індексів
+        headers = self.sheet.range('A1').expand('right').value
+        header_to_idx = {name: i for i, name in enumerate(headers)}
+
+        # 2. Визначаємо межі даних (остання заповнена строка)
+        last_row = self.sheet.range('A' + str(self.sheet.cells.last_cell.row)).end('up').row
+
+        if last_row < 2:
+            return {col: [] for col in columns_to_gather}
+
+        for col_name in columns_to_gather:
+            if col_name in header_to_idx:
+                col_idx = header_to_idx[col_name] + 1  # xlwings індекси з 1
+
+                # Зчитуємо весь стовпець одним махом (від рядка 2 до останнього)
+                column_values = self.sheet.range((2, col_idx), (last_row, col_idx)).value
+
+                # Якщо в колонці лише один рядок, xlwings поверне не list, а одиничне значення
+                if not isinstance(column_values, list):
+                    column_values = [column_values]
+
+                # Очищаємо: прибираємо None, пусті рядки та дублікати
+                unique = sorted(list(set(
+                    str(v).strip() for v in column_values if v is not None and str(v).strip() != ""
+                )))
+                self.column_values[col_name] = unique
+            else:
+                self.column_values[col_name] = []
+
+        # print(str(self.column_values[COLUMN_TZK_REGION]))
+        return self.column_values
+
     def _load_workbook(self, sheet_name) -> None:
         try:
             try:
@@ -253,12 +304,11 @@ class ExcelProcessor:
     def switch_to_sheet(self, sheet_name):
         if not sheet_name:
             raise ValueError(f"Військова частина не визначена!")
-        sheet_name = sheet_name
         self.sheet = self.workbook.sheets[sheet_name]
         self._build_column_map()
+        self._build_column_values()
 
     def save(self) -> None:
-        print('>>> in workbook sqave method')
         if self.workbook is None:
             self.logger.error("⚠️ Спроба зберегти порожній воркбук. Скасовано.")
             return
@@ -287,3 +337,87 @@ class ExcelProcessor:
             self.close()
         except:
             pass
+
+
+    def get_column_options(self) -> Dict[str, List[str]]:
+        return self.column_values
+
+    def search_by_name_rnkopp(self, query) -> List:
+        print('>>> ШУКАЮ:' + str(query))
+        self.switch_to_sheet(DESERTER_TAB_NAME)
+        results = []
+        # Отримуємо всі дані з листа (через ваш кеш або пряме читання)
+        # Припустимо, ми читаємо активну область
+        last_row = self.sheet.range((65536, 1)).end('up').row
+        data = self.sheet.range(f"A2:Z{last_row}").value  # Читаємо все відразу для швидкості пошуку в пам'яті
+
+        # Індекси стовпців
+        pib_idx = self.header.get(COLUMN_NAME) - 1
+        rnokpp_idx = self.header.get(COLUMN_ID_NUMBER) - 1
+
+        if data is None:
+            return results
+
+        for i, row in enumerate(data):
+            if not row[pib_idx]: continue
+
+            pib_val = str(row[pib_idx]).lower()
+            try:
+                rnokpp_val = str(int(float(row[rnokpp_idx]))) if row[rnokpp_idx] else ""
+            except:
+                rnokpp_val = str(row[rnokpp_idx])
+
+            if query.lower() in pib_val or query in rnokpp_val:
+                # Зберігаємо номер рядка (i + 2, бо дані з A2) та словник даних
+
+                serialized_row = []
+                for cell in row:
+                    self._transform_cell(cell, serialized_row)
+                results.append({
+                    'row_idx': i + 2,
+                    'data': dict(zip(self.header, serialized_row))
+                })
+
+        return results
+
+    def _transform_cell(self, cell, serialized_row):
+        if isinstance(cell, (datetime.datetime, datetime.date)):
+            # Перетворюємо дату на рядок відразу
+            serialized_row.append(format_to_excel_date(cell))
+        elif isinstance(cell, float):
+            if cell.is_integer():
+                serialized_row.append(int(cell))
+            else:
+                serialized_row.append(cell)
+        else:
+            if cell is not None:
+                cell = str(cell).strip()
+            serialized_row.append(cell)
+
+    def update_row_by_index(self, row_id: int, updated_data: dict):
+        try:
+            with self.lock:
+                headers = self.sheet.range('A1').expand('right').value
+                header_map = {name: idx for idx, name in enumerate(headers)}
+
+                ids = self.sheet.range('A2').expand('down').value
+                if not isinstance(ids, list):
+                    ids = [ids]
+                try:
+                    target_row_idx = ids.index(row_id) + 2
+                except ValueError:
+                    print(f"❌ ID {row_id} не знайдено в колонці А")
+                    return False
+                last_col_idx = len(headers)
+                row_range = self.sheet.range((target_row_idx, 1), (target_row_idx, last_col_idx))
+                row_values = row_range.value
+                for col_name, new_value in updated_data.items():
+                    if col_name in header_map:
+                        idx = header_map[col_name]
+                        row_values[idx] = new_value
+                row_range.value = row_values
+
+                return True
+        except Exception as e:
+            print(f"❌ Помилка xlwings: {e}")
+            return False

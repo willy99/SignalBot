@@ -35,10 +35,25 @@ COLUMN_PHONE : Final = '№ телефону'
 COLUMN_EXECUTOR : Final = 'Виконавець'
 COLUMN_SERVICE_DAYS : Final = 'термін служби до СЗЧ'
 COLUMN_RETURN_DATE : Final = 'Дата повернення до в/частини'
+
 COLUMN_RETURN_TO_RESERVE_DATE : Final = 'Дата повернення в БРЕЗ' # використовується при пошуці останньої дати
 COLUMN_DESERTION_TERM : Final = 'Кількість діб СЗЧ' # використовується в звітах
 
+COLUMN_PLACEMENT: Final = "Місцезнаходження всл."
 COLUMN_REVIEW_STATUS : Final = 'Стан розслідування'
+COLUMN_ORDER_ASSIGNMENT_NUMBER = "№ наказу (призначення)"
+COLUMN_ORDER_ASSIGNMENT_DATE = "Дата наказу призначення с/р"
+COLUMN_ORDER_RESULT_NUMBER = " № наказу (результати)"
+COLUMN_ORDER_RESULT_DATE = "Дата наказу результу с/р"
+COLUMN_CC_ARTICLE = "Стаття ККУ"
+COLUMN_KPP_NUMBER = "№ повідомлення про КПП"
+COLUMN_KPP_DATE = "Дата відправки повідомлення про КПП"
+COLUMN_DBR_NUMBER = "№ вих на ДБР"
+COLUMN_DBR_DATE = "Дата відправки справи на ДБР"
+COLUMN_ERDR_DATE = "Дата внесення в ЄРДР"
+COLUMN_ERDR_NOTATION = "примітки/ ЄРДР"
+
+
 
 PATTERN_TITLE_MAPPING: Final[Dict[str, str]] = {
     # Складні звання (спочатку перевіряємо їх, щоб не "з'їсти" частину)

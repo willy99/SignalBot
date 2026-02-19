@@ -38,6 +38,7 @@ LOGGER_FILE_NAME = 'bot_log.log'
 PROCESS_DOC : Final = True   # copy doc file from signal to date-folder
 PROCESS_XLS : Final = True # immediate process doc to excel. if false, batch can be applied later on
 DAILY_BACKUPS: Final = True # do daily backups of excel db
+SIGNAL_BOT: Final = False # connect to signal and process attachments
 
 EXCEL_DATE_FORMAT : Final = "%d.%m.%Y"
 EXCEL_DATE_FORMATS_REPORT = ["%m/%d/%y", "%d.%m.%Y", "%-m/%-d/%y", "%#m/%#d/%y", "%Y-%m-%d"]
