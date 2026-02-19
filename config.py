@@ -13,7 +13,7 @@ EXCEL_DIR = 'exchange\\projekt407'
 DOC_DIR : Final = "exchange\\ДД"
 BACKUP_DIR = 'exchange\\projekt407\\backups'
 
-#DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_copy_pasha.xlsx"
+# DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_copy_pasha.xlsx"
 DESERTER_XLSX: Final = "Тестовий Майданчик - не чипати.xlsx"
 
 DESERTER_TAB_NAME : Final = "А0224"
@@ -41,6 +41,8 @@ DAILY_BACKUPS: Final = True # do daily backups of excel db
 SIGNAL_BOT: Final = False # connect to signal and process attachments
 
 EXCEL_DATE_FORMAT : Final = "%d.%m.%Y"
+UI_DATE_FORMAT : Final = "DD.MM.YYYY"
+
 EXCEL_DATE_FORMATS_REPORT = ["%m/%d/%y", "%d.%m.%Y", "%-m/%-d/%y", "%#m/%#d/%y", "%Y-%m-%d"]
 EXCEL_CHUNK_SIZE = 2000 # reading data by chunks for stability
 

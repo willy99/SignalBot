@@ -21,6 +21,12 @@ class Person(BaseModel):
     return_date: Optional[Union[date, str]] = Field(None, alias=COLUMN_RETURN_DATE)
     return_reserve_date: Optional[Union[date, str]] = Field(None, alias=COLUMN_RETURN_TO_RESERVE_DATE)
 
+    o_ass_date: Optional[Union[date, str]] = Field("", alias=COLUMN_ORDER_ASSIGNMENT_DATE)
+    o_res_date: Optional[Union[date, str]] = Field("", alias=COLUMN_ORDER_RESULT_DATE)
+    kpp_date: Optional[Union[date, str]] = Field("", alias=COLUMN_KPP_DATE)
+    dbr_date: Optional[Union[date, str]] = Field("", alias=COLUMN_DBR_DATE)
+    erdr_date: Optional[Union[date, str]] = Field("", alias=COLUMN_ERDR_DATE)
+
     # Текстові поля (Short Input)
     name: str = Field("", alias=COLUMN_NAME)
     mil_unit: Optional[str] = Field("", alias=COLUMN_MIL_UNIT)
@@ -38,25 +44,30 @@ class Person(BaseModel):
     phone: Optional[str] = Field("", alias=COLUMN_PHONE)
     executor: Optional[str] = Field("", alias=COLUMN_EXECUTOR)
     desertion_term: Optional[str] = Field("", alias=COLUMN_DESERTION_TERM)
+    service_days: Optional[Union[str, int]] = Field(None, alias=COLUMN_SERVICE_DAYS)
+
+    placement: Optional[str] = Field(None, alias=COLUMN_PLACEMENT)
     review_status: Optional[str] = Field("", alias=COLUMN_REVIEW_STATUS)
-    service_days: Optional[int] = Field(None, alias=COLUMN_SERVICE_DAYS)
+    o_ass_num: Optional[Union[str, int]] = Field("", alias=COLUMN_ORDER_ASSIGNMENT_NUMBER)
+    o_res_num: Optional[Union[str, int]] = Field("", alias=COLUMN_ORDER_RESULT_NUMBER)
+    cc_article: Optional[Union[str, int]] = Field("", alias=COLUMN_CC_ARTICLE)
+    kpp_num: Optional[Union[str, int]] = Field("", alias=COLUMN_KPP_NUMBER)
+    dbr_num: Optional[Union[str, int]] = Field("", alias=COLUMN_DBR_NUMBER)
+    erdr_notation: Optional[Union[str, int]] = Field("", alias=COLUMN_ERDR_NOTATION)
 
     # Великі текстові поля (Textarea)
     desertion_conditions: Optional[str] = Field("", alias=COLUMN_DESERT_CONDITIONS)
     bio: Optional[str] = Field("", alias=COLUMN_BIO)
 
-    @field_validator('insert_date', 'desertion_date', 'raport_date', 'birthday',
-                     'enlistment_date', 'return_date', 'return_reserve_date', mode='before')
+
+    @field_validator('o_res_num', 'o_ass_num', "kpp_num", "dbr_num", "cc_article", "erdr_notation", mode='before')
     @classmethod
-    def parse_ua_date(cls, value: Any) -> Any:
-        if isinstance(value, str) and value.strip():
-            # Намагаємося розпарсити формат ДД.ММ.РРРР
-            for fmt in ('%d.%m.%Y', '%d.%m.%y'):
-                try:
-                    return datetime.strptime(value, fmt)
-                except ValueError:
-                    continue
-        return value
+    def ensure_string_or_empty(cls, v: Any):
+        if v is None:
+            return ""
+        if isinstance(v, (int, float)):
+            return str(int(v)) if v == int(v) else str(v)
+        return str(v).strip()
 
     @classmethod
     def from_excel_dict(cls, data: dict):

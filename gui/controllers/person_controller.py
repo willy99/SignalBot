@@ -1,14 +1,15 @@
-import config
 from dics.deserter_xls_dic import *
-import datetime
 from gui.model.person import Person
 
 class PersonController:
     def __init__(self, worklow):
         self.processor = worklow.excelProcessor
 
-    def search_people(self, query):
-        return self.search(query)
+    def search_people(self, query, year):
+        return self.search(query, year, None)
+
+    def search_by_erdr(self, o_ass_num, name):
+        return self.search(name, None, o_ass_num)
 
     def save_person(self, person_model):
         try:
@@ -28,8 +29,8 @@ class PersonController:
             print(f"Помилка при збереженні: {e}")
             return False
 
-    def search(self, query) -> List[Person]:
-        results = self.processor.search_by_name_rnkopp(query)
+    def search(self, query:str, year, o_ass_num:str) -> List[Person]:
+        results = self.processor.search_by_name_rnkopp(query, year, o_ass_num)
         return [Person.from_excel_dict(item['data']) for item in results]
 
     def get_column_options(self) -> Dict[str, List[str]]:

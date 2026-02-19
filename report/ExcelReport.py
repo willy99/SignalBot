@@ -1,16 +1,100 @@
 from datetime import datetime
 from typing import Any, Optional
-
+import traceback
 import config
 from dics.deserter_xls_dic import *
 from collections import defaultdict
 from storage.LoggerManager import LoggerManager
+from config import DESERTER_TAB_NAME
 
 class ExcelReporter:
     def __init__(self, excelProcessor, log_manager: LoggerManager):
         # Завантажуємо файл у режимі read_only для швидкості
         self.excelProcessor = excelProcessor
         self.logger = log_manager.get_logger()
+
+
+    def get_subunit_desertion_stats(self, year_filter):
+        """Збирає повну статистику по підрозділах, званнях та термінах СЗЧ."""
+        self.excelProcessor.switch_to_sheet(DESERTER_TAB_NAME)
+        try:
+            # Ініціалізуємо вкладений словник (автоматично створює гілки)
+            stats = defaultdict(lambda: defaultdict(lambda: {
+                'офіцер': {'under_3': 0, 'over_3': 0, 'ret_mu': 0, 'ret_res': 0},
+                'рядовий_сержант': {'under_3': 0, 'over_3': 0, 'ret_mu': 0, 'ret_res': 0}
+            }))
+
+            # Отримуємо індекси стовпців з вашого column_map
+            unit_idx = self.excelProcessor.header.get(COLUMN_SUBUNIT) - 1
+            sub_unit_idx = self.excelProcessor.header.get(COLUMN_SUBUNIT2) - 1
+            rank_idx = self.excelProcessor.header.get(COLUMN_TITLE_2) - 1
+            days_idx = self.excelProcessor.header.get(COLUMN_DESERTION_TERM) - 1
+            des_date_idx = self.excelProcessor.header.get(COLUMN_DESERTION_DATE) - 1
+            # ins_date_idx = self.excelProcessor.header.get(COLUMN_INSERT_DATE) - 1
+            ret_mu_idx = self.excelProcessor.header.get(COLUMN_RETURN_DATE) -1
+            ret_res_idx = self.excelProcessor.header.get(COLUMN_RETURN_TO_RESERVE_DATE) - 1
+
+            # Читаємо весь заповнений діапазон
+
+            last_row = self.excelProcessor.sheet.range((65536, 1)).end('up').row
+            data = self.excelProcessor.sheet.range(f"A2:BB{last_row}").value
+
+            if data is None:
+                return stats
+
+            for i, row in enumerate(data):
+                # filter date
+                des_date = row[des_date_idx] # mandatory field
+                des_date_year = str(des_date.year) if des_date is not None else None
+
+                ret_mu_date = row[ret_mu_idx]
+                ret_mu_date_year = str(ret_mu_date.year) if ret_mu_date is not None else None
+                ret_res_date = row[ret_res_idx]
+                ret_res_date_year = str(ret_res_date.year) if ret_res_date is not None else None
+
+                unit = str(row[unit_idx] or "Не вказано").strip()
+                sub_unit = str(row[sub_unit_idx] or "Не вказано").strip()
+                rank = str(row[rank_idx] or "").lower().strip()
+                officer_keywords = ['офіцер']
+                is_officer = any(word in rank for word in officer_keywords)
+                rank_key = 'офіцер' if is_officer else 'рядовий_сержант'
+
+                # ЛОГІКА ФІЛЬТРАЦІЇ ДЛЯ СЗЧ
+                match_year = (not year_filter or des_date_year in year_filter)
+                if match_year: #desertion case
+                    try:
+                        days = 4 if str(row[days_idx]) == 'більше 3 діб' else 0
+                    except ValueError:
+                        days = 0
+                    period_key = 'under_3' if days <= 3 else 'over_3'
+                    stats[unit][sub_unit][rank_key][period_key] += 1
+
+                # ЛОГІКА ФІЛЬТРАЦІЇ ДЛЯ ПОВЕРНЕННЯ В ВЧ
+                match_year = (not year_filter or ret_mu_date_year in year_filter)
+                if match_year: # return to military unit
+                    stats[unit][sub_unit][rank_key]['ret_mu'] += 1
+
+                # ЛОГІКА ФІЛЬТРАЦІЇ ДЛЯ ПОВЕРНЕННЯ В РЕЗЕРВ
+                match_year = (not year_filter or ret_res_date_year in year_filter)
+                if match_year: # return to military unit
+                    stats[unit][sub_unit][rank_key]['ret_res'] += 1
+
+            # for unit, sub_units in stats.items():
+            #     self.logger.debug(f"### ⚔️ {unit}")
+            #     for sub, roles in sub_units.items():
+            #         over = roles['рядовий_сержант']['over_3'] + roles['офіцер']['over_3']
+            #         under = roles['рядовий_сержант']['under_3'] + roles['офіцер']['under_3']
+            #         if over > 0 or under > 0:
+            #             self.logger.debug(f"* **{sub}:** 🟢 до 3: {under} | 🔴 понад 3: {over}")
+            return stats
+        except Exception as e:
+            traceback.print_exc()
+            return []
+
+
+
+
+
 
     def get_detailed_stats(self):
         """Збирає повну статистику по підрозділах, званнях та термінах СЗЧ."""

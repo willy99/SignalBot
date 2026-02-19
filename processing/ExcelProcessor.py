@@ -245,6 +245,8 @@ class ExcelProcessor:
             COLUMN_REVIEW_STATUS,
             COLUMN_DESERTION_PLACE,
             COLUMN_DESERTION_REGION,
+
+            COLUMN_INSERT_DATE,
         ]
 
         self.column_values = {}
@@ -265,20 +267,24 @@ class ExcelProcessor:
 
                 # Зчитуємо весь стовпець одним махом (від рядка 2 до останнього)
                 column_values = self.sheet.range((2, col_idx), (last_row, col_idx)).value
-
-                # Якщо в колонці лише один рядок, xlwings поверне не list, а одиничне значення
                 if not isinstance(column_values, list):
                     column_values = [column_values]
 
-                # Очищаємо: прибираємо None, пусті рядки та дублікати
-                unique = sorted(list(set(
-                    str(v).strip() for v in column_values if v is not None and str(v).strip() != ""
-                )))
+                processed_values = set()
+                for v in column_values:
+                    if v is None or str(v).strip() == "":
+                        continue
+
+                    if isinstance(v, (datetime.datetime, datetime.date)):
+                        processed_values.add(str(v.year))
+                    else:
+                        processed_values.add(str(v).strip())
+
+                unique = sorted(list(processed_values), key=lambda x: int(x) if x.isdigit() else x)
                 self.column_values[col_name] = unique
             else:
                 self.column_values[col_name] = []
 
-        # print(str(self.column_values[COLUMN_TZK_REGION]))
         return self.column_values
 
     def _load_workbook(self, sheet_name) -> None:
@@ -342,18 +348,18 @@ class ExcelProcessor:
     def get_column_options(self) -> Dict[str, List[str]]:
         return self.column_values
 
-    def search_by_name_rnkopp(self, query) -> List:
-        print('>>> ШУКАЮ:' + str(query))
-        self.switch_to_sheet(DESERTER_TAB_NAME)
+    def search_by_name_rnkopp(self, query:str, query_year, query_o_ass_num:str) -> List:
+        print('>>> ШУКАЮ:' + str(query) + ' в ' + str(query_year) + ' ORDER: ' + str(query_o_ass_num))
+        self.switch_to_sheet(DESERTER_TAB_NAME) # todo performance!
         results = []
-        # Отримуємо всі дані з листа (через ваш кеш або пряме читання)
-        # Припустимо, ми читаємо активну область
         last_row = self.sheet.range((65536, 1)).end('up').row
-        data = self.sheet.range(f"A2:Z{last_row}").value  # Читаємо все відразу для швидкості пошуку в пам'яті
+        data = self.sheet.range(f"A2:BB{last_row}").value
 
         # Індекси стовпців
         pib_idx = self.header.get(COLUMN_NAME) - 1
         rnokpp_idx = self.header.get(COLUMN_ID_NUMBER) - 1
+        ins_date_idx = self.header.get(COLUMN_INSERT_DATE) - 1
+        o_ass_num_idx = self.header.get(COLUMN_ORDER_ASSIGNMENT_NUMBER) - 1
 
         if data is None:
             return results
@@ -367,8 +373,20 @@ class ExcelProcessor:
             except:
                 rnokpp_val = str(row[rnokpp_idx])
 
-            if query.lower() in pib_val or query in rnokpp_val:
-                # Зберігаємо номер рядка (i + 2, бо дані з A2) та словник даних
+            try:
+                o_ass_num_val = str(int(float(row[o_ass_num_idx]))) if row[o_ass_num_idx] else ""
+            except:
+                o_ass_num_val = str(row[o_ass_num_idx]) if row[o_ass_num_idx] else ""
+
+            ins_date = row[ins_date_idx] # mandatory field
+            ins_date_year = str(ins_date.year) if ins_date is not None else None
+
+            # ЛОГІКА ФІЛЬТРАЦІЇ
+            match_text = (query.lower() in pib_val or query.lower() in rnokpp_val)
+            match_year = (not query_year or ins_date_year in query_year)
+            match_order = (not query_o_ass_num or o_ass_num_val == query_o_ass_num)
+
+            if match_text and match_year and match_order:
 
                 serialized_row = []
                 for cell in row:
@@ -382,7 +400,6 @@ class ExcelProcessor:
 
     def _transform_cell(self, cell, serialized_row):
         if isinstance(cell, (datetime.datetime, datetime.date)):
-            # Перетворюємо дату на рядок відразу
             serialized_row.append(format_to_excel_date(cell))
         elif isinstance(cell, float):
             if cell.is_integer():

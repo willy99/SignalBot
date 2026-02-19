@@ -1,8 +1,7 @@
 from nicegui import ui
-from dics.deserter_xls_dic import COLUMN_NAME, COLUMN_ID_NUMBER, COLUMN_SUBUNIT, COLUMN_DESERTION_DATE, \
-    COLUMN_RETURN_DATE, COLUMN_INSERT_DATE
+from dics.deserter_xls_dic import *
 from gui.model.person import Person
-from gui.views.person.person_view import edit_person
+from gui.views.person.person_view import edit_erdr
 from gui.views.components import menu
 
 @ui.refreshable
@@ -13,9 +12,8 @@ def results_ui(data, person_ctrl):
     columns = [
         {'name': 'pib', 'label': COLUMN_NAME, 'field': 'pib', 'align': 'left'},
         {'name': 'rnokpp', 'label': COLUMN_ID_NUMBER, 'field': 'rnokpp'},
-        {'name': 'unit', 'label': COLUMN_SUBUNIT, 'field': 'unit'},
-        {'name': 'desertion_date', 'label': COLUMN_DESERTION_DATE, 'field': 'desertion_date'},
-        {'name': 'return_date', 'label': COLUMN_RETURN_DATE, 'field': 'return_date'},
+        {'name': 'o_ass_num', 'label': COLUMN_ORDER_ASSIGNMENT_NUMBER, 'field': 'o_ass_num'},
+        {'name': 'o_ass_date', 'label': COLUMN_ORDER_ASSIGNMENT_DATE, 'field': 'o_ass_date'},
         {'name': 'action', 'label': 'Дія', 'field': 'action'},
     ]
 
@@ -25,10 +23,9 @@ def results_ui(data, person_ctrl):
         rows.append({
             'pib': person.name,
             'rnokpp': person.rnokpp,
-            'unit': person.subunit,
-            'desertion_date': person.desertion_date,
-            'return_date': person.return_date,
-            'raw_model': person.model_dump()  # Словник для передачі в JS (Socket.io)
+            'o_ass_num': person.o_ass_num,
+            'o_ass_date': person.o_ass_date,
+            'raw_model': person.model_dump()
         })
 
     table = ui.table(columns=columns, rows=rows, row_key='rnokpp').classes('w-full max-w-5xl')
@@ -43,11 +40,11 @@ def results_ui(data, person_ctrl):
     ''')
 
     # Обробка натискання кнопки
-    table.on('edit', lambda msg: edit_person(
+    table.on('edit', lambda msg: edit_erdr(
         Person(**msg.args),
         person_ctrl,
         # Після закриття форми ми просто освіжаємо ЦЮ Ж функцію
-        on_close=lambda: results_ui.refresh(person_ctrl.search_people(last_query['query'], last_query['year']), person_ctrl)
+        on_close=lambda: results_ui.refresh(person_ctrl.search_by_erdr(last_query['o_ass_num'], last_query['name']), person_ctrl)
     ))
 
 
@@ -59,65 +56,57 @@ def search_page(person_ctrl):
     global last_query
     menu()
 
-    year_options = person_ctrl.get_column_options().get(COLUMN_INSERT_DATE, [])
-
     with ui.column().classes('w-full items-center p-4'):
         ui.label('Пошук військовослужбовців').classes('text-h4 mb-4')
 
         with ui.row().classes('w-full max-w-4xl items-center gap-4'):
 
-            year_filter = ui.select(
-                options=year_options,
-                multiple=True,
-                label=COLUMN_INSERT_DATE
-            ).classes('w-64').props('use-chips stack-label').on('update:model-value', lambda: do_search())
+            o_ass_num_search_field = ui.input(label=COLUMN_ORDER_ASSIGNMENT_NUMBER) \
+                .classes('flex-grow') \
+                .props('autofocus')
 
-            search_field = ui.input(label='Введіть дані (ПІБ або РНОКПП)') \
+            name_search_field = ui.input(label='Введіть дані (ПІБ або РНОКПП)') \
                 .classes('flex-grow') \
                 .props('autofocus')
 
             # Додаємо пошук по Enter
-            search_field.on('keydown.enter', lambda: do_search())
+            o_ass_num_search_field.on('keydown.enter', lambda: do_search())
+            name_search_field.on('keydown.enter', lambda: do_search())
             ui.button(icon='search', on_click=lambda: do_search()).props('elevated')
 
         # 2. Контейнер, який буде порожнім до моменту пошуку
         results_container = ui.column().classes('w-full items-center mt-6')
+    o_ass_num_search_field.run_method('focus')
 
     async def do_search():
         global last_query
-        query = search_field.value.strip()
-        selected_year = year_filter.value
-        year_val = None if selected_year == 'Всі роки' or not selected_year else selected_year
+        o_ass_num = o_ass_num_search_field.value.strip()
+        name = name_search_field.value.strip()
 
-        if not query:
+        if not o_ass_num and not name:
             ui.notify('Введіть запит для пошуку', type='warning')
             return
 
-        last_query['query'] = query
-        last_query['year'] = year_val
+        last_query['o_ass_num'] = o_ass_num
+        last_query['name'] = name
 
         with results_container:
-            ui.spinner(size='lg').classes('mt-10')  # Великий спіннер по центру
+            ui.spinner(size='lg').classes('mt-10')
             ui.label('Пошук у базі даних...').classes('text-grey')
 
         try:
-            # 2. Виконуємо важку операцію пошуку
-            # Якщо пошук у Excel займає багато часу, краще обгорнути його в run.io_bound
             from nicegui import run
-            data = await run.io_bound(person_ctrl.search_people, query, year_val)
+            data = await run.io_bound(person_ctrl.search_by_erdr, o_ass_num, name)
 
-            # 3. Очищуємо спіннер після отримання даних
             results_container.clear()
 
             if not data:
                 ui.notify('Нічого не знайдено', type='negative')
                 return
 
-            # Якщо один результат - відкриваємо відразу
             if len(data) == 1:
-                edit_person(data[0], person_ctrl, on_close=lambda: do_search())
+                edit_erdr(data[0], person_ctrl, on_close=lambda: do_search())
 
-            # 4. Малюємо таблицю з результатами
             with results_container:
                 results_ui(data, person_ctrl)
 
