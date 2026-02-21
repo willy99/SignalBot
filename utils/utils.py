@@ -135,3 +135,11 @@ def check_birthday_id_number(birthday: datetime, idn: str)-> bool:
         print('------ ⚠️ В таблиці:' + str(birthday_table) + ' А шо винно бути:' + str(birthday_calculated))
         return False
     return True
+
+
+def get_strint_fromfloat(value, default = None) -> str:
+    try:
+        value = str(int(float(value))).strip() if value else ""
+    except:
+        value = str(value) if value else default
+    return value

@@ -2,7 +2,7 @@ from nicegui import ui
 from dics.deserter_xls_dic import *
 from gui.model.person import Person
 from gui.views.person.person_view import edit_erdr
-from gui.views.components import menu
+from gui.components import menu
 
 @ui.refreshable
 def results_ui(data, person_ctrl):
@@ -19,7 +19,6 @@ def results_ui(data, person_ctrl):
 
     rows = []
     for person in data:
-        # Важливо: використовуємо модель для відображення
         rows.append({
             'pib': person.name,
             'rnokpp': person.rnokpp,
@@ -30,7 +29,6 @@ def results_ui(data, person_ctrl):
 
     table = ui.table(columns=columns, rows=rows, row_key='rnokpp').classes('w-full max-w-5xl')
 
-    # Слот для кнопки "Редагувати"
     table.add_slot('body-cell-action', '''
         <q-td :props="props">
             <q-btn size="sm" color="primary" @click="$parent.$emit('edit', props.row.raw_model)">
@@ -39,16 +37,13 @@ def results_ui(data, person_ctrl):
         </q-td>
     ''')
 
-    # Обробка натискання кнопки
     table.on('edit', lambda msg: edit_erdr(
         Person(**msg.args),
         person_ctrl,
-        # Після закриття форми ми просто освіжаємо ЦЮ Ж функцію
         on_close=lambda: results_ui.refresh(person_ctrl.search_by_erdr(last_query['o_ass_num'], last_query['name']), person_ctrl)
     ))
 
 
-# Глобальна змінна для збереження останнього пошуку (щоб знати, що оновлювати)
 last_query = {}
 
 
@@ -69,16 +64,14 @@ def search_page(person_ctrl):
                 .classes('flex-grow') \
                 .props('autofocus')
 
-            # Додаємо пошук по Enter
             o_ass_num_search_field.on('keydown.enter', lambda: do_search())
             name_search_field.on('keydown.enter', lambda: do_search())
             ui.button(icon='search', on_click=lambda: do_search()).props('elevated')
 
-        # 2. Контейнер, який буде порожнім до моменту пошуку
         results_container = ui.column().classes('w-full items-center mt-6')
     o_ass_num_search_field.run_method('focus')
 
-    async def do_search():
+    def do_search(auto_open=True):
         global last_query
         o_ass_num = o_ass_num_search_field.value.strip()
         name = name_search_field.value.strip()
@@ -96,16 +89,17 @@ def search_page(person_ctrl):
 
         try:
             from nicegui import run
-            data = await run.io_bound(person_ctrl.search_by_erdr, o_ass_num, name)
-
+            # data = run.io_bound(person_ctrl.search_by_erdr, o_ass_num, name)
+            data = person_ctrl.search_by_erdr(o_ass_num, name)
             results_container.clear()
+
 
             if not data:
                 ui.notify('Нічого не знайдено', type='negative')
                 return
 
-            if len(data) == 1:
-                edit_erdr(data[0], person_ctrl, on_close=lambda: do_search())
+            if len(data) == 1 and auto_open:
+                edit_erdr(data[0], person_ctrl, on_close=lambda: do_search(auto_open=False))
 
             with results_container:
                 results_ui(data, person_ctrl)

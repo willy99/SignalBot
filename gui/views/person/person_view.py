@@ -3,7 +3,19 @@ from nicegui import ui, run
 from dics.deserter_xls_dic import *
 from gui.model.person import Person
 import asyncio
-from config import UI_DATE_FORMAT
+from config import UI_DATE_FORMAT, EXCEL_BLUE_COLOR
+from datetime import datetime
+
+def fix_date(e):
+    val = e.sender.value
+    if not val:
+        return
+    parts = val.split('.')
+    # Якщо введено "ДД.ММ" (наприклад, 12.06)
+    if len(parts) == 2:
+        current_year = datetime.now().year
+        # Оновлюємо значення в полі (це автоматично оновить person через біндінг)
+        e.sender.value = f"{val}.{current_year}"
 
 def edit_person(person: Person, person_ctrl, on_close=None):
     ui_options = person_ctrl.get_column_options()
@@ -128,7 +140,7 @@ def edit_person(person: Person, person_ctrl, on_close=None):
         # КНОПКИ ДІЇ
         with ui.row().classes('w-full justify-end mt-4'):
             ui.button('Скасувати', on_click=dialog.close).props('outline')
-            ui.button('💾 ЗБЕРЕГТИ', on_click=lambda: handle_save(person, person_ctrl, dialog, on_close=on_close)) \
+            ui.button('💾 ЗБЕРЕГТИ', on_click=lambda: handle_save(person, person_ctrl, dialog, on_close=on_close, paint_color=None)) \
                 .classes('bg-green-600 text-white')
 
     dialog.open()
@@ -151,6 +163,8 @@ def edit_erdr(person: Person, person_ctrl, on_close=None):
 
         with ui.tab_panels(tabs, value=main_tab).classes('w-full'):
             # ПАНЕЛЬ 1
+            person.review_status = REVIEW_STATUS_WAITING # default value
+
             with ui.tab_panel(main_tab):
                 with ui.row().classes('w-full'):
                     ui.input(COLUMN_NAME).bind_value(person, 'name').classes('flex-grow').props('readonly')
@@ -194,7 +208,7 @@ def edit_erdr(person: Person, person_ctrl, on_close=None):
                 with ui.row().classes('w-full'):
                     ui.input(COLUMN_DBR_NUMBER).bind_value(person, 'dbr_num').classes('w-40')
                     with ui.input(label=COLUMN_DBR_DATE) as date_input:
-                        date_input.bind_value(person, 'dbr_date').classes('w-1/3')
+                        date_input.bind_value(person, 'dbr_date').classes('w-1/3').on('blur', fix_date)
                         with date_input.add_slot('append'):
                             ui.icon('edit_calendar').classes('cursor-pointer')
                         with ui.menu() as menu:
@@ -207,18 +221,18 @@ def edit_erdr(person: Person, person_ctrl, on_close=None):
         # КНОПКИ ДІЇ
         with ui.row().classes('w-full justify-end mt-4'):
             ui.button('Скасувати', on_click=dialog.close).props('outline')
-            ui.button('💾 ЗБЕРЕГТИ', on_click=lambda: handle_save(person, person_ctrl, dialog, on_close=on_close)) \
+            ui.button('💾 ЗБЕРЕГТИ', on_click=lambda: handle_save(person, person_ctrl, dialog, on_close=on_close, paint_color=EXCEL_BLUE_COLOR)) \
                 .classes('bg-green-600 text-white')
 
     dialog.open()
 
 
-async def handle_save(person, person_ctrl, dialog, on_close=None):
+async def handle_save(person, person_ctrl, dialog, on_close=None, paint_color=None):
     # Показуємо індикатор завантаження
     with ui.notification(message='Зберігаю дані...', spinner=True, timeout=0) as n:
         await asyncio.sleep(0.1)
 
-        success = await run.io_bound(person_ctrl.save_person, person)
+        success = await run.io_bound(person_ctrl.save_person, person, paint_color)
 
         if success:
             n.message = 'Успішно збережено!'

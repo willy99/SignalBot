@@ -1,13 +1,16 @@
-from nicegui import ui
+from nicegui import ui, app
 from gui.controllers.person_controller import PersonController
 from gui.controllers.report_controller import ReportController
 
 from gui.views.person import search_view, erdr_search_view
 from gui.views.report import report_view
+from pathlib import Path
 
 
 def init_nicegui(workflow_obj):
-    """Ця функція запускає сервер NiceGUI"""
+    current_dir = Path(__file__).parent.absolute()
+    static_dir = current_dir / 'static'
+    app.add_static_files('/static', str(static_dir))
 
     # Створюємо контролер, передаючи йому робочий workflow
     person_ctrl = PersonController(workflow_obj)
@@ -30,4 +33,5 @@ def init_nicegui(workflow_obj):
     # native=False дозволяє працювати як веб-сервер
     # reload=False обов'язково, бо ми в потоці
     ui.run(port=8080, title='A0224 Корябалка', reload=False, show=False)
+
 

@@ -3,7 +3,7 @@ from dics.deserter_xls_dic import COLUMN_NAME, COLUMN_ID_NUMBER, COLUMN_SUBUNIT,
     COLUMN_RETURN_DATE, COLUMN_INSERT_DATE
 from gui.model.person import Person
 from gui.views.person.person_view import edit_person
-from gui.views.components import menu
+from gui.components import menu
 
 @ui.refreshable
 def results_ui(data, person_ctrl):
@@ -47,7 +47,7 @@ def results_ui(data, person_ctrl):
         Person(**msg.args),
         person_ctrl,
         # Після закриття форми ми просто освіжаємо ЦЮ Ж функцію
-        on_close=lambda: results_ui.refresh(person_ctrl.search_people(last_query['query'], last_query['year']), person_ctrl)
+        on_close=lambda: results_ui.refresh(person_ctrl.search_people(last_query['year'], last_query['query']), person_ctrl)
     ))
 
 
@@ -104,7 +104,7 @@ def search_page(person_ctrl):
             # 2. Виконуємо важку операцію пошуку
             # Якщо пошук у Excel займає багато часу, краще обгорнути його в run.io_bound
             from nicegui import run
-            data = await run.io_bound(person_ctrl.search_people, query, year_val)
+            data = await run.io_bound(person_ctrl.search_people, year_val, query)
 
             # 3. Очищуємо спіннер після отримання даних
             results_container.clear()

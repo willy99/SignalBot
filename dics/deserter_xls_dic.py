@@ -1,57 +1,57 @@
 from typing import Final, Dict, List, Tuple
 
 # EXCEL FILE COLUMNS FOR DESERTERS (А0224 СЗЧ.XLSX)
-NA : Final = '' # порожня ячейка, інформація не додана або не змогли витягнути
-DEFAULT_MIL_UNIT : Final = 'А0224'
+NA : Final[str] = '' # порожня ячейка, інформація не додана або не змогли витягнути
+DEFAULT_MIL_UNIT: Final[str] = 'А0224'
 
-DEFAULT_REVIEW_STATUS = 'не призначено'
-DEFAULT_REVIEW_STATUS_FOR_EDU_CENTER = 'призначено'
-DEFAULT_SERVICE_TYPE = 'призивом'
+DEFAULT_REVIEW_STATUS: Final[str] = 'не призначено'
+DEFAULT_REVIEW_STATUS_FOR_EDU_CENTER: Final[str] = 'призначено'
+DEFAULT_SERVICE_TYPE: Final[str] = 'призивом'
 
 # Відповідність назв колонок в екселі
-COLUMN_INCREMEMTAL : Final = '№'
-COLUMN_INSERT_DATE : Final = 'Дата внесення'
-COLUMN_DESERTION_DATE : Final = 'Дата СЗЧ'
-COLUMN_RAPORT_DATE : Final = 'Дата Рапорт'
-COLUMN_MIL_UNIT : Final = 'Військова частина'
-COLUMN_SERVICE_TYPE : Final = 'Від служби'
-COLUMN_TITLE : Final = 'Військове звання'
-COLUMN_TITLE_2 : Final = 'Військове звання2'
-COLUMN_NAME : Final = 'ПІБ'
-COLUMN_DESERTION_PLACE : Final = 'Звідки СЗЧ'
-COLUMN_DESERTION_TYPE : Final = 'Місцезнаходження всл.' # сзч, зі зброєю, а2900
-COLUMN_SUBUNIT : Final = 'Підрозділ'
-COLUMN_SUBUNIT2 : Final = 'Підрозділ 2'
-COLUMN_DESERTION_REGION : Final = 'Звідки СЗЧ н.п. обл'
-COLUMN_BIRTHDAY : Final = 'Дата народження'
-COLUMN_ID_NUMBER : Final = 'РНОКПП'
-COLUMN_ENLISTMENT_DATE : Final = 'Дата призову на військову службу'
-COLUMN_DESERT_CONDITIONS : Final = 'Дата, час обставини та причини самовільного залишення військової частини або місця служби'
-COLUMN_BIO : Final = 'Біографічні дані, дата призову та яким РТЦК та СП Призваний'
-COLUMN_TZK : Final = 'РТЦК'
-COLUMN_TZK_REGION : Final = 'РТЦК Область'
-COLUMN_ADDRESS : Final = 'Адреса проживання'
-COLUMN_PHONE : Final = '№ телефону'
-COLUMN_EXECUTOR : Final = 'Виконавець'
-COLUMN_SERVICE_DAYS : Final = 'термін служби до СЗЧ'
-COLUMN_RETURN_DATE : Final = 'Дата повернення до в/частини'
+COLUMN_INCREMEMTAL : Final[str] = '№'
+COLUMN_INSERT_DATE : Final[str] = 'Дата внесення'
+COLUMN_DESERTION_DATE : Final[str] = 'Дата СЗЧ'
+COLUMN_RAPORT_DATE : Final[str] = 'Дата Рапорт'
+COLUMN_MIL_UNIT : Final[str] = 'Військова частина'
+COLUMN_SERVICE_TYPE : Final[str] = 'Від служби'
+COLUMN_TITLE : Final[str] = 'Військове звання'
+COLUMN_TITLE_2 : Final[str] = 'Військове звання2'
+COLUMN_NAME : Final[str] = 'ПІБ'
+COLUMN_DESERTION_PLACE : Final[str] = 'Звідки СЗЧ'
+COLUMN_DESERTION_TYPE : Final[str] = 'Місцезнаходження всл.' # сзч, зі зброєю, а2900
+COLUMN_SUBUNIT : Final[str] = 'Підрозділ'
+COLUMN_SUBUNIT2 : Final[str] = 'Підрозділ 2'
+COLUMN_DESERTION_REGION: Final[str] = 'Звідки СЗЧ н.п. обл'
+COLUMN_BIRTHDAY : Final[str] = 'Дата народження'
+COLUMN_ID_NUMBER : Final[str] = 'РНОКПП'
+COLUMN_ENLISTMENT_DATE : Final[str] = 'Дата призову на військову службу'
+COLUMN_DESERT_CONDITIONS : Final[str] = 'Дата, час обставини та причини самовільного залишення військової частини або місця служби'
+COLUMN_BIO : Final[str] = 'Біографічні дані, дата призову та яким РТЦК та СП Призваний'
+COLUMN_TZK : Final[str] = 'РТЦК'
+COLUMN_TZK_REGION : Final[str] = 'РТЦК Область'
+COLUMN_ADDRESS : Final[str] = 'Адреса проживання'
+COLUMN_PHONE : Final[str] = '№ телефону'
+COLUMN_EXECUTOR : Final[str] = 'Виконавець'
+COLUMN_SERVICE_DAYS : Final[str] = 'термін служби до СЗЧ'
+COLUMN_RETURN_DATE : Final[str] = 'Дата повернення до в/частини'
 
-COLUMN_RETURN_TO_RESERVE_DATE : Final = 'Дата повернення в БРЕЗ' # використовується при пошуці останньої дати
-COLUMN_DESERTION_TERM : Final = 'Кількість діб СЗЧ' # використовується в звітах
-
-COLUMN_PLACEMENT: Final = "Місцезнаходження всл."
-COLUMN_REVIEW_STATUS : Final = 'Стан розслідування'
-COLUMN_ORDER_ASSIGNMENT_NUMBER = "№ наказу (призначення)"
-COLUMN_ORDER_ASSIGNMENT_DATE = "Дата наказу призначення с/р"
-COLUMN_ORDER_RESULT_NUMBER = "№ наказу (результати)"
-COLUMN_ORDER_RESULT_DATE = "Дата наказу результу с/р"
-COLUMN_CC_ARTICLE = "Стаття ККУ"
-COLUMN_KPP_NUMBER = "№ повідомлення про КПП"
-COLUMN_KPP_DATE = "Дата відправки повідомлення про КПП"
-COLUMN_DBR_NUMBER = "№ вих на ДБР"
-COLUMN_DBR_DATE = "Дата відправки справи на ДБР"
-COLUMN_ERDR_DATE = "Дата внесення в ЄРДР"
-COLUMN_ERDR_NOTATION = "примітки/ ЄРДР"
+COLUMN_RETURN_TO_RESERVE_DATE: Final[str] = 'Дата повернення в БРЕЗ' # використовується при пошуці останньої дати
+COLUMN_DESERTION_TERM : Final[str] = 'Кількість діб СЗЧ' # використовується в звітах
+COLUMN_SUSPENDED: Final[str] = 'Призупинення військововї служби'
+COLUMN_PLACEMENT: Final[str] = "Місцезнаходження всл."
+COLUMN_REVIEW_STATUS : Final[str] = 'Стан розслідування'
+COLUMN_ORDER_ASSIGNMENT_NUMBER: Final[str] = "№ наказу (призначення)"
+COLUMN_ORDER_ASSIGNMENT_DATE: Final[str] = "Дата наказу призначення с/р"
+COLUMN_ORDER_RESULT_NUMBER: Final[str] = "№ наказу (результати)"
+COLUMN_ORDER_RESULT_DATE: Final[str] = "Дата наказу результу с/р"
+COLUMN_CC_ARTICLE: Final[str] = "Стаття ККУ"
+COLUMN_KPP_NUMBER: Final[str] = "№ повідомлення про КПП"
+COLUMN_KPP_DATE: Final[str] = "Дата відправки повідомлення про КПП"
+COLUMN_DBR_NUMBER: Final[str] = "№ вих на ДБР"
+COLUMN_DBR_DATE: Final[str] = "Дата відправки справи на ДБР"
+COLUMN_ERDR_DATE: Final[str] = "Дата внесення в ЄРДР"
+COLUMN_ERDR_NOTATION: Final[str] = "примітки/ ЄРДР"
 
 
 
@@ -198,7 +198,7 @@ PATTERN_PHONE = r'(?i)(?:номер|(?:ефон(у)?)|тел\.)[\s\w.:+]*?(\+?\s
 # Патерн для пошуку РТЦК
 # PATTERN_RTZK: Final = r'(?i)((?:[А-ЯҐЄІЇ-][^.,!?\s]*\s+){1,5}?(?:[А-ЯҐЄІЇ]{0,2}(?:ТЦК|ЦТК|ВРК))(?:\s*(?:та|&)?\s*СП)?(?:[\s,]+(?:в\s+)?(?:м\.|місто)\s+[\w\-\']+(?:\s+[\w\-\']+)*)?(?:[\s,]+[\w\-\']+\s+(?:області|обл\.?))?)'
 PATTERN_RTZK: Final = (
-    r"(?i)(?:Призваний[:,]?\s*)(?:(?:\d{2}\.\d{2}\.(?:\d{4}|\d{2}))\s*(?:року)?\s*)?((?:\d+\s+відділ(?:ом)?\s+)?[А-ЯҐЄІЇ][а-яґєії\']+(?:[-\s][А-ЯҐЄІЇ][а-яґєії\']+)*\s+(?:[ОРВМТЦК]{3,5}(?:\s+та\s+СП)?)(?:[\s,]+(?:в\s+)?(?:м\.|місто|н\.п\.)?\s*[А-ЯҐЄІЇ][а-яґєії\']+(?:[-\s][А-ЯҐЄІЇ][а-яґєії\']+)*)?(?:[\s,]+[А-ЯҐЄІЇ][а-яґєії\']+(?:[-\s][А-ЯҐЄІЇ][а-яґєії\']+)*\s+(?:області|обл\.?))?)"
+    r"(?i)(?:Призваний[:,]?\s*)(?:(?:\d{2}\.\d{2}\.(?:\d{4}|\d{2}))\s*(?:року|[,.:;\s*])?\s*)?((?:\d+\s+відділ(?:ом)?\s+)?[А-ЯҐЄІЇ][а-яґєії\']+(?:[-\s][А-ЯҐЄІЇ][а-яґєії\']+)*\s+(?:[ОРВМТЦК]{3,5}(?:\s+та\s+СП)?)(?:[\s,]+(?:в\s+)?(?:м\.|місто|н\.п\.)?\s*[А-ЯҐЄІЇ][а-яґєії\']+(?:[-\s][А-ЯҐЄІЇ][а-яґєії\']+)*)?(?:[\s,]+[А-ЯҐЄІЇ][а-яґєії\']+(?:[-\s][А-ЯҐЄІЇ][а-яґєії\']+)*\s+(?:області|обл\.?))?)"
 )
 
 # Список "сміттєвих" патернів для очищення результату
@@ -343,14 +343,35 @@ PATTERN_REGION: Final[List[Tuple[str, str]]] = [
 
 
 #### регулярки для шматків тексту ####
-PATTERN_PIECE_HEADER_START : Final = 'ДОПОВІДЬ'
-PATTERN_PIECE_HEADER_END : Final = r'1\.\s+Дата\s+і\s+час\s+скоєння'
+PATTERN_PIECE_HEADER_START : Final[str] = 'ДОПОВІДЬ'
+PATTERN_PIECE_HEADER_END : Final[str] = r'1\.\s+Дата\s+і\s+час\s+скоєння'
 
-PATTERN_PIECE_1_START : Final = r'матеріальна\s+та\s+моральна\s+шкода\)\.'
-PATTERN_PIECE_1_END : Final = r'2\.\s+Коли,\s+яким\s+органом'
+PATTERN_PIECE_1_START : Final[str] = r'матеріальна\s+та\s+моральна\s+шкода\)\.'
+PATTERN_PIECE_1_END : Final[str] = r'2\.\s+Коли,\s+яким\s+органом'
 
-PATTERN_PIECE_3_START : Final = r'(?:Стислі демографічні дані|Адреса проживання.*?Близькі родичі|Близькі родичі.*?Адреса проживання|призваний на військову службу, освіта, сімейний стан)'
-PATTERN_PIECE_3_END : Final = r'\b4[\.\s\)]+(?:Хто проводить|Службове розслідування)'
+PATTERN_PIECE_3_START : Final[str] = r'(?:Стислі демографічні дані|Адреса проживання.*?Близькі родичі|Близькі родичі.*?Адреса проживання|призваний на військову службу, освіта, сімейний стан)'
+PATTERN_PIECE_3_END : Final[str] = r'\b4[\.\s\)]+(?:Хто проводить|Службове розслідування)'
 
-PATTERN_PIECE_4_START : Final = r'Хто проводить службове розслідування, строки його проведення\.'
-PATTERN_PIECE_4_END : Final = r'5[\.\s\)]+Військове звання'
+PATTERN_PIECE_4_START : Final[str] = r'Хто проводить службове розслідування, строки його проведення\.'
+PATTERN_PIECE_4_END : Final[str] = r'5[\.\s\)]+Військове звання'
+
+
+REVIEW_STATUS_NOT_ASSIGNED: Final[str] = 'не призначено'
+REVIEW_STATUS_EXECUTING: Final[str] = 'проводяться'
+REVIEW_STATUS_CLOSED: Final[str] = 'завершено'
+REVIEW_STATUS_WAITING: Final[str] = 'чекаємо ЄРДР'
+REVIEW_STATUS_NON_ERDR: Final[str] = 'не отримано витяг з ЄРДР'
+REVIEW_STATUS_ERDR: Final[str] = 'отримано витяг з ЄРДР'
+REVIEW_STATUS_NON_EVIL: Final[str] = "не є суб'єктом злочину"
+
+REVIEW_STATUS_MAP: Final[Dict[str, List[str]]] = {
+    REVIEW_STATUS_NOT_ASSIGNED: ['не призначено', 'не направляємо'],
+    REVIEW_STATUS_EXECUTING: ['призначено', 'чекаємо ЄРДР'],
+    REVIEW_STATUS_CLOSED: ['закрито', 'помилково'],
+    REVIEW_STATUS_NON_ERDR: ['призначено', 'не призначено', 'закрито', 'чекаємо ЄРДР'],
+    REVIEW_STATUS_ERDR: ['ЄРДР'],
+    REVIEW_STATUS_NON_EVIL: ['помилково', 'не направляємо']
+}
+
+SUSPENDED_KEYWORD:Final[str] = 'призупинено В/С'
+DESERTION_TYPE_WEAPON_KEYWORD: Final[str] = 'СЗЧ зброя'

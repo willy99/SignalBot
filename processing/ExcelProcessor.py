@@ -2,11 +2,12 @@ import xlwings as xw
 import os
 
 import warnings
+
 from config import DESERTER_TAB_NAME, EXCEL_CHUNK_SIZE, EXCEL_DATE_FORMAT
 from dics.deserter_xls_dic import *
 from dics.deserter_xls_dic import NA
 from typing import List, Dict, Any
-from utils.utils import format_ukr_date, get_typed_value, format_to_excel_date
+from utils.utils import format_ukr_date, get_typed_value, format_to_excel_date, get_strint_fromfloat
 import traceback
 from storage.LoggerManager import LoggerManager
 import datetime
@@ -368,15 +369,8 @@ class ExcelProcessor:
             if not row[pib_idx]: continue
 
             pib_val = str(row[pib_idx]).lower()
-            try:
-                rnokpp_val = str(int(float(row[rnokpp_idx]))) if row[rnokpp_idx] else ""
-            except:
-                rnokpp_val = str(row[rnokpp_idx])
-
-            try:
-                o_ass_num_val = str(int(float(row[o_ass_num_idx]))) if row[o_ass_num_idx] else ""
-            except:
-                o_ass_num_val = str(row[o_ass_num_idx]) if row[o_ass_num_idx] else ""
+            rnokpp_val = get_strint_fromfloat(row[rnokpp_idx])
+            o_ass_num_val = get_strint_fromfloat(row[o_ass_num_idx], "")
 
             ins_date = row[ins_date_idx] # mandatory field
             ins_date_year = str(ins_date.year) if ins_date is not None else None
@@ -411,7 +405,7 @@ class ExcelProcessor:
                 cell = str(cell).strip()
             serialized_row.append(cell)
 
-    def update_row_by_index(self, row_id: int, updated_data: dict):
+    def update_row_by_index(self, row_id: int, updated_data: dict, paint_with_color=None):
         try:
             with self.lock:
                 headers = self.sheet.range('A1').expand('right').value
@@ -427,6 +421,8 @@ class ExcelProcessor:
                     return False
                 last_col_idx = len(headers)
                 row_range = self.sheet.range((target_row_idx, 1), (target_row_idx, last_col_idx))
+                if paint_with_color:
+                    self._color_row(row_range, paint_with_color)
                 row_values = row_range.value
                 for col_name, new_value in updated_data.items():
                     if col_name in header_map:
@@ -438,3 +434,9 @@ class ExcelProcessor:
         except Exception as e:
             print(f"❌ Помилка xlwings: {e}")
             return False
+
+    def _color_row(self, range, hex_color):
+        if not hex_color: return
+        """Зафарбовує весь рядок (від A до BB) вказаним кольором."""
+        range.color = hex_color
+        print('>>> зафарбували ' + str(hex_color) + ' in ' + str(range))

@@ -371,6 +371,10 @@ def test_rtzk_extraction(processor_factory):
     res = processor._extract_rtzk(text)
     assert res == "Вознесенським РТЦК та СП м. Вознесенськ Миколаївської області"
 
+    text = "розлучений. Призваний  20.05.2025, Оболонським РТЦК , 3107111114. Н"
+    res = processor._extract_rtzk(text)
+    assert res == "Оболонським РТЦК"
+
 
 def test_rtzk_region_extraction(processor_factory):
     processor = processor_factory("any.docx")
@@ -426,8 +430,6 @@ def test_rtzk_region_extraction(processor_factory):
     text = "місто Вінниця, вулиця Нагірна 21ж, квартира 21."
     res = processor._extract_rtzk_region(text)
     assert "Вінницька область" in res
-
-
 
 def test_conscription_date(processor_factory):
     processor = processor_factory("any.docx")
