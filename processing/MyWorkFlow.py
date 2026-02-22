@@ -1,9 +1,9 @@
 from connection.SignalClient import SignalClient
-from processing.ExcelProcessor import ExcelProcessor
+from processing.processors.ExcelProcessor import ExcelProcessor
 from processing.AttachmentHandler import AttachmentHandler
 from connection.MyDataBase import MyDataBase
 from processing.Stat import Stat
-from processing.BatchProcessor import BatchProcessor
+from processing.processors.BatchProcessor import BatchProcessor
 import traceback
 from storage.LoggerManager import LoggerManager
 from report.ExcelReport import ExcelReporter

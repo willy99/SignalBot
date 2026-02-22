@@ -35,11 +35,13 @@ FOLDER_DAY_FORMAT : Final = "%d.%m.%Y"    # Наприклад: 2026.01.28
 DAY_ROLLOVER_HOUR : Final = 16
 BACKUP_KEEP_DAYS = 30 # тримати бекапи не старіше ніж N діб
 LOGGER_FILE_NAME = 'bot_log.log'
+LOG_MONITORING_MAX_LINES = 1000 # tail -f
 
 PROCESS_DOC : Final = True   # copy doc file from signal to date-folder
 PROCESS_XLS : Final = True # immediate process doc to excel. if false, batch can be applied later on
 DAILY_BACKUPS: Final = True # do daily backups of excel db
 SIGNAL_BOT: Final = True # connect to signal and process attachments
+SAVE_EXCEL_AT_CLOSE = False
 
 EXCEL_DATE_FORMAT : Final = "%d.%m.%Y"
 UI_DATE_FORMAT : Final = "DD.MM.YYYY"

@@ -1,6 +1,5 @@
-import logging
 from pathlib import Path
-from .parsers.ParserFactory import ParserFactory
+from processing.parsers.ParserFactory import ParserFactory
 import config
 from utils.utils import format_to_excel_date, get_file_name, clean_text, check_birthday_id_number
 import dics.deserter_xls_dic as col
@@ -301,7 +300,7 @@ class DocProcessor:
 
     @staticmethod
     def _extract_rtzk(text: str) -> str:
-        match = re.search(PATTERN_RTZK, text, re.IGNORECASE)
+        match = re.search(PATTERN_RTZK, text)
         if not match:
             return NA
 

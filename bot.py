@@ -3,12 +3,9 @@ import sys
 import config
 from config import DESERTER_TAB_NAME
 from processing.MyWorkFlow import MyWorkFlow
-
 import threading
 from pynput import keyboard
 import webbrowser
-
-# Імпортуємо налаштування сторінок та запуск NiceGUI
 from gui.navigation import init_nicegui
 
 def open_browser():
@@ -52,7 +49,7 @@ def main():
         workflow.excelProcessor.switch_to_sheet(DESERTER_TAB_NAME)
 
         # 1. Хоткеї у фоні
-        threading.Thread(target=listen_hotkeys, daemon=True).start()
+        # threading.Thread(target=listen_hotkeys, daemon=True).start()
 
         # 2. Бот у фоні (якщо увімкнений)
         if config.SIGNAL_BOT:
@@ -76,54 +73,11 @@ def main():
             workflow.client.close()
 
         if hasattr(workflow, 'excelProcessor'):
-            # Спробуємо зберегти перед виходом
-            try:
-                workflow.excelProcessor.save()
-            except:
-                pass
-            # Закриваємо книгу та сам додаток Excel
-            workflow.excelProcessor.close()
-
-        print("✅ Програма завершена.")
-        sys.exit(0)
-
-
-def main():
-    workflow = MyWorkFlow()
-    try:
-        # Ініціалізація Excel
-        workflow.initExcelProcessor(config.DESERTER_XLSX_FILE_PATH)
-        workflow.excelProcessor.switch_to_sheet(DESERTER_TAB_NAME)
-
-        # 1. Хоткеї у фоні
-        threading.Thread(target=listen_hotkeys, daemon=True).start()
-
-        # 2. Бот у фоні (якщо увімкнений)
-        if config.SIGNAL_BOT:
-            threading.Thread(target=bot_worker, args=(workflow,), daemon=True).start()
-        else:
-            print("🤖 Signal Bot вимкнено.")
-
-        # 3. NiceGUI в ОСНОВНОМУ потоці (це тримає програму живою)
-        print("🌐 Запуск NiceGUI сервера...")
-        init_nicegui(workflow)
-
-    except KeyboardInterrupt:
-        print("\n🛑 Програма зупиняється користувачем...")
-    except Exception as e:
-        print(f"❌ Критична помилка: {e}")
-    finally:
-        print("🧹 Очищення ресурсів...")
-        if hasattr(workflow, 'client'):
-            workflow.client.close()
-
-        if hasattr(workflow, 'excelProcessor'):
-            # Спробуємо зберегти перед виходом
-            #try:
-            #    workflow.excelProcessor.save()
-            #except:
-            #    pass
-            # Закриваємо книгу та сам додаток Excel
+            if config.SAVE_EXCEL_AT_CLOSE:
+                try:
+                    workflow.excelProcessor.save()
+                except:
+                    pass
             workflow.excelProcessor.close()
 
         print("✅ Програма завершена.")

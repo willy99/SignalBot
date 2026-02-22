@@ -1,6 +1,6 @@
 import os
 import config
-from processing.DocProcessor import DocProcessor
+from processing.processors.DocProcessor import DocProcessor
 from utils.utils import get_effective_date
 import json
 from storage.StorageFactory import StorageFactory

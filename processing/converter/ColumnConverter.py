@@ -1,7 +1,7 @@
 import xlwings as xw
 import traceback
 from dics.deserter_xls_dic import *
-from processing.DocProcessor import DocProcessor
+from processing.processors.DocProcessor import DocProcessor
 from utils.utils import format_ukr_date
 from datetime import datetime, timedelta
 

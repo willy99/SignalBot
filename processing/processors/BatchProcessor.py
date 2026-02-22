@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 
 import config
 from storage.StorageFactory import StorageFactory
-from processing.ExcelProcessor import ExcelProcessor
-from processing.DocProcessor import DocProcessor
+from processing.processors.ExcelProcessor import ExcelProcessor
+from processing.processors.DocProcessor import DocProcessor
 import traceback
 
 class BatchProcessor:
