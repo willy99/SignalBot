@@ -11,6 +11,7 @@ from gui.views.report.logs_view import render_logs_page
 from pathlib import Path
 from processing.processors.DocTemplator import DocTemplator
 from config import LOGGER_FILE_NAME
+from gui.services.inbox_monitor import InboxMonitor
 import os
 
 def init_nicegui(workflow_obj):
@@ -25,6 +26,9 @@ def init_nicegui(workflow_obj):
     support_ctrl = SupportController(doc_processor, workflow_obj)
     person_ctrl = PersonController(workflow_obj)
     report_ctrl = ReportController(workflow_obj)
+
+    inbox_monitor_service = InboxMonitor(workflow_obj)
+
 
     @ui.page('/')
     def index():

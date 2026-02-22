@@ -62,7 +62,7 @@ def search_page(person_ctrl):
     year_options = person_ctrl.get_column_options().get(COLUMN_INSERT_DATE, [])
 
     with ui.column().classes('w-full items-center p-4'):
-        ui.label('Пошук військовослужбовців').classes('text-h4 mb-4')
+        ui.label('Пошук і редагування військовослужбовців').classes('text-h4 mb-4')
 
         with ui.row().classes('w-full max-w-4xl items-center gap-4'):
 

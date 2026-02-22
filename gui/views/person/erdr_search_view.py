@@ -52,7 +52,7 @@ def search_page(person_ctrl):
     menu()
 
     with ui.column().classes('w-full items-center p-4'):
-        ui.label('Пошук військовослужбовців').classes('text-h4 mb-4')
+        ui.label('Пошук військовослужбовців за номером призначення, ЄРДР форма').classes('text-h4 mb-4')
 
         with ui.row().classes('w-full max-w-4xl items-center gap-4'):
 
