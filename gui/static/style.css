@@ -5,7 +5,17 @@
     border: 1px solid #9e9e9e !important;
 }
 
-/* Робимо лінії між комірками чіткими та темними */
+/* ОБОВ'ЯЗКОВО для таблиці: обмежуємо висоту, щоб з'явився внутрішній скрол */
+.report-table .q-table__middle {
+    max-height: 75vh !important; /* Таблиця займатиме 75% висоти екрану */
+}
+
+/* ОБОВ'ЯЗКОВО для sticky: рамки працюють правильно тільки при border-collapse: separate */
+.report-table table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+}
+
 .report-table.q-table--bordered {
     border: 1px solid #9e9e9e !important;
 }
@@ -14,8 +24,106 @@
 .report-table tbody tr td {
     border-right: 1px solid #9e9e9e !important;
     border-bottom: 1px solid #9e9e9e !important;
-    padding: 8px 4px !important; /* Трішки компактніше */
+    padding: 8px 4px !important;
+    background-color: white; /* Фон обов'язковий, щоб текст не просвічувався при скролі */
 }
+
+
+/* =======================================================
+   2. ЗАКРІПЛЕННЯ РЯДКІВ (Верхні 3 рядки)
+   ======================================================= */
+
+/* Задаємо фіксовану висоту для шапки, щоб точно знати відступи (top) */
+.report-table thead tr {
+    height: 50px !important;
+}
+
+/* Всі клітинки шапки прилипають до верху */
+.report-table thead tr th {
+    position: sticky !important;
+    z-index: 10 !important;
+    background-color: #eeeeee !important; /* Ваш bg-grey-3 */
+}
+
+/* 1-й рядок: "Підрозділи", "Випадки СЗЧ" і т.д. */
+.report-table thead tr:nth-child(1) th {
+    top: 0 !important;
+}
+
+/* 2-й рядок: Назви колонок (відступає на 50px зверху) */
+.report-table thead tr:nth-child(2) th {
+    top: 50px !important;
+}
+
+/* 3-й рядок: Глобальний підсумок "Разом по частині" (це 1-й рядок тіла таблиці) */
+.report-table tbody tr:first-child td {
+    position: sticky !important;
+    top: 100px !important; /* Відступає на висоту двох рядків шапки (50+50) */
+    z-index: 9 !important; /* Вище звичайних рядків, але нижче шапки */
+    background-color: inherit !important; /* Наслідує ваш помаранчевий колір з Python-коду */
+    border-bottom: 2px solid #616161 !important; /* Жирніша лінія знизу для візуального відділення */
+}
+
+
+/* =======================================================
+   3. ЗАКРІПЛЕННЯ СТОВПЦІВ (Ліворуч)
+   ======================================================= */
+
+/* Перший стовпець: "Підрозділ" */
+.report-table tbody tr td:nth-child(1) {
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 5 !important;
+    min-width: 140px !important;
+    max-width: 140px !important;
+    background-color: inherit !important;
+}
+
+/* Другий стовпець: "Саб-підрозділ" */
+.report-table tbody tr td:nth-child(2) {
+    position: sticky !important;
+    left: 140px !important; /* Точно дорівнює ширині першої колонки */
+    z-index: 5 !important;
+    min-width: 160px !important;
+    max-width: 160px !important;
+    background-color: inherit !important;
+    border-right: 2px solid #616161 !important; /* Жирніша вертикальна лінія-розділювач */
+}
+
+
+/* =======================================================
+   4. ПЕРЕТИН (Лівий верхній кут) - Найвищий пріоритет (z-index)
+   ======================================================= */
+
+/* Група "Підрозділи" (colspan=2) у 1-му рядку */
+.report-table thead tr:first-child th:first-child {
+    left: 0 !important;
+    z-index: 15 !important;
+    border-right: 2px solid #616161 !important;
+}
+
+/* Колонки "Підрозділ" та "Саб-підрозділ" у 2-му рядку */
+.report-table thead tr:nth-child(2) th:nth-child(1) {
+    left: 0 !important;
+    z-index: 15 !important;
+    min-width: 140px !important;
+    max-width: 140px !important;
+}
+
+.report-table thead tr:nth-child(2) th:nth-child(2) {
+    left: 140px !important;
+    z-index: 15 !important;
+    min-width: 160px !important;
+    max-width: 160px !important;
+    border-right: 2px solid #616161 !important;
+}
+
+/* Куточок для "Разом по частині" (щоб він не "протікав" під час прокрутки вправо) */
+.report-table tbody tr:first-child td:nth-child(1),
+.report-table tbody tr:first-child td:nth-child(2) {
+    z-index: 14 !important; /* Трохи нижче шапки, але вище за інші клітинки */
+}
+
 
 /* Прибираємо дублювання ліній з країв */
 .report-table thead tr th:last-child,
@@ -53,4 +161,22 @@
 .bg-column-total {
     background-color: #f5f5f5 !important; /* Світло-сірий для стовпців "Всього" */
 }
+
+
+/* # TABS  */
+
+.q-tabs .q-tab--active {
+    background-color: #e0f2fe !important; /* М'який пастельно-блакитний колір (Tailwind blue-100) */
+    color: #000000 !important;            /* Чорний колір тексту та іконки */
+    border-radius: 12px 12px 0 0 !important; /* Закруглені верхні кути (радіус 12px) */
+    transition: background-color 0.3s ease;  /* Плавний перехід при перемиканні */
+}
+
+/* Опціонально: трохи закруглимо кути при наведенні мишкою на неактивні вкладки */
+.q-tabs .q-tab:hover:not(.q-tab--active) {
+    background-color: #f3f4f6 !important; /* Дуже світлий сірий при наведенні */
+    border-radius: 12px 12px 0 0 !important;
+}
+
+
 

@@ -34,7 +34,7 @@ class Person(BaseModel):
     title: Optional[str] = Field("", alias=COLUMN_TITLE)
     title2: Optional[str] = Field("", alias=COLUMN_TITLE_2)
     desertion_place: Optional[str] = Field("", alias=COLUMN_DESERTION_PLACE)
-    desertion_type: Optional[str] = Field("", alias=COLUMN_DESERTION_TYPE)
+    desertion_type: Optional[Union[str, int]] = Field("", alias=COLUMN_DESERTION_TYPE)
     subunit: Optional[str] = Field("", alias=COLUMN_SUBUNIT)
     subunit2: Optional[str] = Field("", alias=COLUMN_SUBUNIT2)
     desertion_region: Optional[str] = Field("", alias=COLUMN_DESERTION_REGION)
@@ -46,7 +46,6 @@ class Person(BaseModel):
     desertion_term: Optional[str] = Field("", alias=COLUMN_DESERTION_TERM)
     service_days: Optional[Union[str, int]] = Field(None, alias=COLUMN_SERVICE_DAYS)
 
-    placement: Optional[str] = Field(None, alias=COLUMN_PLACEMENT)
     review_status: Optional[str] = Field("", alias=COLUMN_REVIEW_STATUS)
     o_ass_num: Optional[Union[str, int]] = Field("", alias=COLUMN_ORDER_ASSIGNMENT_NUMBER)
     o_res_num: Optional[Union[str, int]] = Field("", alias=COLUMN_ORDER_RESULT_NUMBER)
@@ -76,6 +75,6 @@ class Person(BaseModel):
     def to_excel_dict(self):
         data = self.model_dump(by_alias=True)
         for key, val in data.items():
-            if isinstance(val, datetime):
+            if isinstance(val, (datetime, date)):
                 data[key] = format_to_excel_date(val)
         return data

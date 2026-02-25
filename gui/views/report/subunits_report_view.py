@@ -1,31 +1,33 @@
 from nicegui import ui, run
 from dics.deserter_xls_dic import *
-from gui.components import menu
-import xlwings as xw
+from gui.services.request_context import RequestContext
+
+import io
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 
 last_query = {}
 
-def search_page(report_ctrl, person_ctrl):
+def search_page(report_ctrl, person_ctrl, ctx: RequestContext):
     global last_query
-    menu()
     state = {'rows': [], 'columns': []}
 
     year_options = person_ctrl.get_column_options().get(COLUMN_INSERT_DATE, [])
 
     with ui.column().classes('w-full items-center p-4'):
-        ui.label('Звіт Додаток №2').classes('text-h4 mb-4')
+        ui.label('Звіт Додаток №2, по підрозділам').classes('text-h4 mb-4')
 
         with ui.row().classes('w-full max-w-4xl items-center gap-4'):
             year_filter = ui.select(
                 options=year_options,
-                multiple=True,
-                label=COLUMN_INSERT_DATE
+                label=COLUMN_INSERT_DATE,
+                clearable = True
             ).classes('w-64').props('use-chips stack-label').on('update:model-value', lambda: do_report())
 
             # Додаємо пошук по Enter
-            ui.button('Пошук', icon='search', on_click=lambda: do_report()).props('elevated')
+            search_btn = ui.button('Пошук', icon='search', on_click=lambda: do_report()).props('elevated')
 
-            export_btn =ui.button('Експорт', icon='download', color='green',
+            export_btn = export_btn =ui.button('Експорт', icon='download', color='green',
                                    on_click=lambda: export_to_excel(state['rows'], state['columns']))
 
         results_container = ui.column().classes('w-full items-center mt-6')
@@ -42,12 +44,16 @@ def search_page(report_ctrl, person_ctrl):
 
         last_query['year'] = year_val
 
+        year_filter.disable()
+        search_btn.disable()
+        export_btn.disable()
+
         with results_container:
             ui.spinner(size='lg').classes('mt-10')
             ui.label('Компайлінг звіту...').classes('text-grey')
 
         try:
-            data = await run.io_bound(report_ctrl.do_subunit_desertion_report,year_val)
+            data = await run.io_bound(report_ctrl.do_subunit_desertion_report,ctx, [year_val])
 
             # 3. Очищуємо спіннер після отримання даних
             results_container.clear()
@@ -65,7 +71,10 @@ def search_page(report_ctrl, person_ctrl):
         except Exception as e:
             results_container.clear()
             ui.notify(f'Помилка пошуку: {e}', type='negative')
-
+        finally:
+            year_filter.enable()
+            search_btn.enable()
+            export_btn.enable()
 
 def results_ui(data, report_ctrl):
     if not data:
@@ -174,14 +183,14 @@ def results_ui(data, report_ctrl):
 
         temp_sub_rows = []
         for sub_unit, stats in sub_units_data.items():
-            s_under = stats['рядовий_сержант']['under_3']
-            s_over = stats['рядовий_сержант']['over_3']
+            s_under = stats['рядовий_сержант']['under_3'] + stats['офіцер']['under_3'] # all
+            s_over = stats['рядовий_сержант']['over_3'] + stats['офіцер']['over_3'] # all
             o_under = stats['офіцер']['under_3']
             o_over = stats['офіцер']['over_3']
             s_ret_mu = stats['рядовий_сержант']['ret_mu']
             s_ret_res = stats['рядовий_сержант']['ret_res']
             o_ret_mu = stats['офіцер']['ret_mu']
-            s_dupl = stats['рядовий_сержант']['dupl'] + stats['офіцер']['dupl'] # документація каже, що треба всіх сюди
+            s_dupl = stats['рядовий']['dupl'] + stats['сержант']['dupl'] + stats['офіцер']['dupl'] # документація каже, що треба всіх сюди
             o_dupl = stats['офіцер']['dupl']
 
             un_sold_des = stats['рядовий']['un_des'] if stats['рядовий']['un_des'] else 0
@@ -400,17 +409,17 @@ def results_ui(data, report_ctrl):
     columns = [
         {'name': 'main', 'label': 'Підрозділ', 'field': 'main', 'align': 'left'},
         {'name': 'sub', 'label': 'Саб-підрозділ', 'field': 'sub', 'align': 'left'},
-        {'name': 's_under', 'label': '< 3 (С/С)', 'field': 's_under'},
+        {'name': 's_under', 'label': '< 3 (Всього)', 'field': 's_under'},
         {'name': 'o_under', 'label': '< 3 (Офіц.)', 'field': 'o_under'},
-        {'name': 's_over', 'label': '>= 3 (С/С)', 'field': 's_over'},
+        {'name': 's_over', 'label': '>= 3 (Всього)', 'field': 's_over'},
         {'name': 'o_over', 'label': '>= 3 (Офіц.)', 'field': 'o_over'},
 
-        {'name': 's_total', 'label': 'Всього (С/С)', 'field': 's_total', 'headerClasses': 'bg-blue-100'},
+        {'name': 's_total', 'label': 'Всього', 'field': 's_total', 'headerClasses': 'bg-blue-100'},
         {'name': 'o_total', 'label': 'Всього (Офіц.)', 'field': 'o_total', 'headerClasses': 'bg-blue-100'},
-        {'name': 's_ret_mu', 'label': 'У В/Ч (С/С)', 'field': 's_ret_mu'},
-        {'name': 's_ret_res', 'label': 'У Рез (С/С)', 'field': 's_ret_res'},
+        {'name': 's_ret_mu', 'label': 'У В/Ч (С/С)', 'field': 's_ret_mu', 'headerClasses': 'bg-unit-return'},
+        {'name': 's_ret_res', 'label': 'В БРез (С/С)', 'field': 's_ret_res', 'headerClasses': 'bg-unit-return'},
         {'name': 's_total_ret', 'label': 'Всього (С/С)', 'field': 's_total_ret', 'headerClasses': 'bg-blue-100'},
-        {'name': 'o_ret', 'label': 'У В/Ч (Офіц.)', 'field': 'o_ret'},
+        {'name': 'o_ret', 'label': 'В т.ч. Офіц.', 'field': 'o_ret', 'headerClasses': 'bg-unit-return'},
 
         {'name': 's_diff', 'label': 'Кільість СЗЧ (С/С)', 'field': 's_diff', 'headerClasses': 'bg-blue-100'},
         {'name': 'o_diff', 'label': 'Кількість СЗЧ (Офіц.)', 'field': 'o_diff', 'headerClasses': 'bg-blue-100'},
@@ -498,9 +507,8 @@ def results_ui(data, report_ctrl):
                 <q-td v-for="col in props.cols" :key="col.name" :props="props" 
                     :class="[
                         (col.name === 's_total' || col.name === 'o_total' || col.name === 's_total_ret' || col.name === 's_diff' || col.name === 'o_diff') ? 'bg-unit-total' : '',
-                        (['un_sold_ret', 'un_serg_ret', 'un_offc_ret'].includes(col.name)) ? 'bg-unit-return' : ''
+                        (['s_ret_mu', 's_ret_res', 'o_ret', 'un_sold_ret', 'un_serg_ret', 'un_offc_ret'].includes(col.name)) ? 'bg-unit-return' : ''
                     ]">
-
                     <template v-if="col.name === 'sub' && props.row.is_total">
                         <q-badge color="primary">Підсумок</q-badge>
                     </template>
@@ -517,32 +525,48 @@ def results_ui(data, report_ctrl):
     return rows, columns
 
 
+import xlwings as xw
+from nicegui import ui
+
+
 def export_to_excel(rows, columns):
     if not rows:
         ui.notify('Немає даних для експорту', type='warning')
         return
 
     try:
-        wb = xw.Book()
-        sheet = wb.sheets[0]
-        sheet.name = "Додаток №2"
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Додаток №2"
 
-        # 1. ВИЗНАЧЕННЯ ДІАПАЗОНУ
-        num_cols = len(columns)
-        # Отримуємо літеру останньої колонки (наприклад, 'AX')
-        last_col_letter = sheet.range((1, num_cols)).address.split('$')[1]
+        # Налаштування стилів (openpyxl використовує HEX без решітки)
+        thin_border = Border(
+            left=Side(style='thin'), right=Side(style='thin'),
+            top=Side(style='thin'), bottom=Side(style='thin')
+        )
+        center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        bold_font = Font(bold=True)
 
-        # 2. СКЛАДНИЙ ЗАГОЛОВОК (МЕРДЖІНГ)
-        def set_header(range_str, text, color='#eeeeee'):
-            rng = sheet.range(range_str)
-            rng.merge()
-            rng.value = text
-            rng.color = color
-            rng.api.HorizontalAlignment = -4108  # Центрування
-            try:
-                rng.api.Font.Bold = True
-            except:
-                pass
+        # Кольори
+        header_fill = PatternFill("solid", fgColor="EEEEEE")
+        header_row2_fill = PatternFill("solid", fgColor="E0E0E0")
+        grand_total_fill = PatternFill("solid", fgColor="FFE0B2")  # Помаранчевий
+        unit_total_fill = PatternFill("solid", fgColor="E3F2FD")  # Блакитний (Всього)
+        blue_col_fill = PatternFill("solid", fgColor="BBDEFB")  # Блакитні стовпці
+        green_col_fill = PatternFill("solid", fgColor="C1F5DD")  # Зелені стовпці
+
+        # 1. СТВОРЕННЯ ШАПКИ З МЕРДЖІНГОМ
+        def set_header(range_str, text):
+            ws.merge_cells(range_str)
+            top_left_cell = range_str.split(':')[0]
+            ws[top_left_cell].value = text
+            # В openpyxl треба застосовувати стиль до кожної клітинки в об'єднаному діапазоні
+            for row in ws[range_str]:
+                for cell in row:
+                    cell.fill = header_fill
+                    cell.font = bold_font
+                    cell.alignment = center_align
+                    cell.border = thin_border
 
         set_header('A1:B1', 'Підрозділи')
         set_header('C1:H1', 'Випадки СЗЧ')
@@ -553,9 +577,7 @@ def export_to_excel(rows, columns):
         set_header('T1:Y1', 'Унікальні випадки СЗЧ та повернення')
         set_header('Z1:AB1', 'Вид служби')
         set_header('AC1:AE1', 'Місце скоєння')
-
-        # --- Нові колонки ---
-        set_header('AF1:AF1', 'Зі зброєю')  # Одна колонка
+        set_header('AF1:AF1', 'Зі зброєю')
         set_header('AG1:AH1', 'Виведено у розпорядження')
         set_header('AI1:AJ1', 'Повідомлень про КП до ВСП, ДБР')
         set_header('AK1:AL1', 'Матеріалів с/р до ВСП, ДБР')
@@ -566,63 +588,70 @@ def export_to_excel(rows, columns):
         set_header('AU1:AV1', 'Відбувають покарання')
         set_header('AW1:AX1', "Не є суб'єктом злочину")
 
-        # 3. ДРУГИЙ РЯДОК ЗАГОЛОВКІВ
-        col_fields = [col['field'] for col in columns]
-        col_labels = [col['label'] for col in columns]
-        sheet.range('A2').value = col_labels
+        # 2. ДРУГИЙ РЯДОК ЗАГОЛОВКІВ
+        blue_cols = ['s_total', 'o_total', 's_total_ret', 's_diff', 'o_diff']
 
-        header_row_2 = sheet.range(f'A2:{last_col_letter}2')
-        header_row_2.color = '#e0e0e0'
-        try:
-            header_row_2.api.Font.Bold = True
-        except:
-            pass
+        for col_num, col in enumerate(columns, start=1):
+            cell = ws.cell(row=2, column=col_num, value=col['label'])
+            cell.fill = header_row2_fill
+            cell.font = bold_font
+            cell.alignment = center_align
+            cell.border = thin_border
 
-        # 4. ЗАПИС ДАНИХ
-        excel_data = [[r.get(f, '') for f in col_fields] for r in rows]
-        sheet.range('A3').value = excel_data
+        # 3. ЗАПИС ДАНИХ ТА РОЗФАРБОВКА
+        for row_idx, r in enumerate(rows, start=3):
+            is_grand_total = r.get('is_grand_total')
+            is_total = r.get('is_total')
 
-        # 5. СТИЛІЗАЦІЯ РЯДКІВ ТА КОЛОНОК
-        for i, r in enumerate(rows):
-            idx = i + 3
-            # Базовий діапазон рядка
-            row_range = sheet.range(f'A{idx}:{last_col_letter}{idx}')
+            for col_idx, col in enumerate(columns, start=1):
+                # Безпечне отримання значення
+                val = r.get(col['field'])
+                if val is None:
+                    val = ''
+                elif not isinstance(val, (int, float)):
+                    val = str(val)
 
-            # Фарбуємо РЯДКИ
-            if r.get('is_grand_total'):
-                row_range.color = '#ffe0b2'  # Помаранчевий (Разом по частині)
-                try:
-                    row_range.api.Font.Bold = True
-                except:
-                    pass
-            elif r.get('is_total'):
-                row_range.color = '#e3f2fd'  # Блакитний (Всього по підрозділу)
+                cell = ws.cell(row=row_idx, column=col_idx, value=val)
+                cell.border = thin_border
 
-            # Фарбуємо КОМІРКИ (вертикальні акценти)
-            for col_idx, col in enumerate(columns):
-                cell = sheet.range(idx, col_idx + 1)
+                # Базовий колір рядка
+                if is_grand_total:
+                    cell.fill = grand_total_fill
+                    cell.font = bold_font
+                elif is_total:
+                    cell.fill = unit_total_fill
+                    cell.font = bold_font
+                else:
+                    # Вертикальні акценти для звичайних рядків
+                    if col['name'] in blue_cols:
+                        cell.fill = blue_col_fill
+                    elif 'bg-unit-return' in str(col.get('headerClasses', '')):
+                        cell.fill = green_col_fill
 
-                # Колонки підсумків (Блакитні)
-                blue_cols = ['s_total', 'o_total', 's_total_ret', 's_diff', 'o_diff']
-                if col['name'] in blue_cols:
-                    cell.color = '#bbdefb'
+        # 4. ЗАКРІПЛЕННЯ ОБЛАСТЕЙ (Freeze Panes)
+        # 'C3' означає, що закріплено 2 верхні рядки та 2 ліві колонки
+        ws.freeze_panes = 'C3'
 
-                # Колонки повернень (Зелені)
-                if 'bg-unit-return' in str(col.get('headerClasses', '')):  # Виправлено на headerClasses
-                    cell.color = '#c1f5dd'
+        # 5. АВТОПІДБІР ШИРИНИ
+        ws.column_dimensions['A'].width = 18
+        ws.column_dimensions['B'].width = 25
+        for col_idx in range(3, len(columns) + 1):
+            # Перетворюємо номер колонки на літеру (3 -> 'C')
+            from openpyxl.utils import get_column_letter
+            col_letter = get_column_letter(col_idx)
+            ws.column_dimensions[col_letter].width = 12
 
-        # 6. СІТКА ТА АВТОПІДБІР
-        full_range = sheet.range(f'A1:{last_col_letter}{len(rows) + 2}')
-        try:
-            # Малюємо внутрішні та зовнішні межі
-            for border_id in [7, 8, 9, 10, 11, 12]:
-                full_range.api.Borders(border_id).Weight = 2
-        except:
-            pass  # Якщо не Windows, межі можуть не підтримуватися через .api
+        # 6. ЗБЕРЕЖЕННЯ В ПАМ'ЯТЬ ТА ВІДПРАВКА БРАУЗЕРУ
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
 
-        sheet.autofit()
-        ui.notify('Excel звіт успішно створено!')
+        # ui.download відправляє файл у браузер користувача, який натиснув кнопку
+        ui.download(buffer.getvalue(), filename='Додаток_2_Звіт.xlsx')
+        ui.notify('Файл завантажується...', type='positive')
 
     except Exception as e:
         print(f"Excel Error Trace: {e}")
-        ui.notify(f'Помилка Excel: {e}', type='negative')
+        import traceback
+        traceback.print_exc()
+        ui.notify(f'Помилка генерації файлу: {e}', type='negative')

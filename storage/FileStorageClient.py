@@ -5,12 +5,25 @@ import config
 import os
 
 class FileStorageClient(ABC):
+
+    @abstractmethod
+    def get_separator(self):
+        pass
+
     @abstractmethod
     def get_file_buffer(self, path: str) -> io.BytesIO:
         pass
 
     @abstractmethod
     def save_file_from_buffer(self, path: str, buffer: io.BytesIO):
+        pass
+
+    @abstractmethod
+    def save_json(self, path: str, data: list):
+        pass
+
+    @abstractmethod
+    def load_json(self, path: str) -> list:
         pass
 
     @abstractmethod
@@ -31,6 +44,10 @@ class FileStorageClient(ABC):
 
     @abstractmethod
     def remove_dir(self, path: str, recursive: bool = True):
+        pass
+
+    @abstractmethod
+    def walk(self, path: str):
         pass
 
     def __enter__(self):

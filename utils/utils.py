@@ -141,5 +141,5 @@ def get_strint_fromfloat(value, default = None) -> str:
     try:
         value = str(int(float(value))).strip() if value else ""
     except:
-        value = str(value) if value else default
+        value = str(value).strip() if value else default
     return value

@@ -18,7 +18,29 @@ class MyDataBase:
                     phone_number TEXT PRIMARY KEY,
                     current_state TEXT DEFAULT 'START',
                     last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
+                );
+            ''')
+            cursor.execute('''
+                -- Таблиця користувачів
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    full_name TEXT,
+                    is_active INTEGER DEFAULT 1
+                );
+            ''')
+            cursor.execute('''
+                -- Таблиця прав доступу для ролей
+                CREATE TABLE IF NOT EXISTS role_permissions (
+                    role TEXT NOT NULL,
+                    module_name TEXT NOT NULL,
+                    can_read INTEGER DEFAULT 0,
+                    can_write INTEGER DEFAULT 0,  -- Додавання / Редагування
+                    can_delete INTEGER DEFAULT 0, -- Видалення
+                    PRIMARY KEY (role, module_name)
+                );                
             ''')
             conn.commit()
 
@@ -45,6 +67,17 @@ class MyDataBase:
         except sqlite3.Error as e:
             print(f"❌ Помилка читання БД: {e}")
             return None
+
+    def __execute_fetchall__(self, query, params=None):
+        """Універсальний метод для отримання списку даних (SELECT багато рядків)."""
+        conn = self.connect()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(query, params or ())
+            return cursor.fetchall()
+        except sqlite3.Error as e:
+            print(f"❌ Помилка читання БД (fetchall): {e}")
+            return []
 
     def __execute_insert__(self, query, params=None):
         """Універсальний метод для запису даних (INSERT/UPDATE)."""

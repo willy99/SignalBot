@@ -7,6 +7,7 @@ load_dotenv()
 NET_SERVER_IP = os.getenv("NET_SERVER_IP", "127.0.0.1")
 NET_USERNAME = os.getenv("NET_USERNAME")
 NET_PASSWORD = os.getenv("NET_PASSWORD")
+UI_SECRET_KEY = os.getenv("UI_SECRET_KEY")
 
 # Основна функціональність
 PROCESS_DOC : Final = True   # copy doc file from signal to date-folder
@@ -21,9 +22,9 @@ EXCEL_DIR: Final[str] = 'exchange\\projekt407'
 DOC_DIR : Final[str] = "exchange\\ДД"
 BACKUP_DIR: Final[str] = 'exchange\\projekt407\\backups'
 
-#DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_copy_pasha.xlsx"
+DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_copy_pasha.xlsx"
 #DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_1.xlsx"
-DESERTER_XLSX: Final = "Тестовий Майданчик - не чипати.xlsx"
+#DESERTER_XLSX: Final = "Тестовий Майданчик - не чипати.xlsx"
 
 DESERTER_TAB_NAME : Final = "А0224"
 DESERTER_RESERVE_TAB_NAME : Final = "А7018"
@@ -34,7 +35,10 @@ DESERTER_RESERVE_TAB_NAME : Final = "А7018"
 DESERTER_XLSX_FILE_PATH:Final = f"/Volumes/exchange/projekt407/{DESERTER_XLSX}" # if using xlwings, actual one
 DOCUMENT_STORAGE_PATH: Final = f"\\\\{NET_SERVER_IP}\\{DOC_DIR}"
 BACKUP_STORAGE_PATH: Final = f"\\\\{NET_SERVER_IP}\\{BACKUP_DIR}"
-INBOX_DIR: Final[str] = f"\\\\{NET_SERVER_IP}\\{DOC_DIR}\\inbox"
+INBOX_DIR_PATH: Final[str] = f"\\\\{NET_SERVER_IP}\\{DOC_DIR}\\inbox"
+OUTBOX_DIR_PATH: Final[str] = f"\\\\{NET_SERVER_IP}\\{DOC_DIR}\\outbox"
+CACHE_FILE_PATH: Final = f"\\\\{NET_SERVER_IP}\\{DOC_DIR}\\file_cache.json"
+CACHE_FOLDER_PATH: Final = f"\\\\{NET_SERVER_IP}\\{DOC_DIR}"
 
 # Налаштування структури папок
 FOLDER_YEAR_FORMAT : Final = "%Y"         # Наприклад: 2026
@@ -65,6 +69,7 @@ TCP_PORT : Final = 1234
 
 # Налаштування бази даних
 DB_NAME = os.path.join(os.path.expanduser("~/work/signalBot/signal-data"), "bot_data.db")
+MAX_QUERY_RESULTS = 50
 
 # ML
 ML_MODEL_JSON = os.path.join(os.path.expanduser("~/work/signalBot/signal-data"), "training_data.jsonl")

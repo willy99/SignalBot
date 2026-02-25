@@ -26,9 +26,9 @@ class InboxMonitor:
 
     def _fetch_inbox_count(self) -> (int, List[str]):
         try:
-            client = StorageFactory.create_client(config.INBOX_DIR, self.log_manager)
+            client = StorageFactory.create_client(config.INBOX_DIR_PATH, self.log_manager)
             with client:
-                files = client.list_files(config.INBOX_DIR, silent=True)
+                files = client.list_files(config.INBOX_DIR_PATH, silent=True)
                 valid_files = [f for f in files if not f.startswith('.')]
                 return len(valid_files), valid_files
         except Exception as e:

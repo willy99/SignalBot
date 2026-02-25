@@ -5,6 +5,7 @@ from smbclient import register_session, delete_session, open_file, makedirs
 from config import NET_SERVER_IP, NET_USERNAME, NET_PASSWORD
 from storage.FileStorageClient import FileStorageClient
 from storage.LoggerManager import LoggerManager
+import json
 
 class SMBFileClient(FileStorageClient):
     """
@@ -19,6 +20,9 @@ class SMBFileClient(FileStorageClient):
         self.is_connected = False
         self.logger = log_manager.get_logger()
         self.separator = "\\" if path.startswith("\\\\") else os.sep
+
+    def get_separator(self):
+        return self.separator
 
     def __enter__(self):
         """Реалізація контекстного менеджера для автоматичного підключення."""
@@ -73,20 +77,54 @@ class SMBFileClient(FileStorageClient):
             self.logger.error(f"❌ Помилка збереження файлу на SMB: {e}")
             raise
 
-    def copy_file(self, local_source_path: str, remote_dest_path: str):
+    def save_json(self, path: str, data: list):
+        """Зберігає об'єкт Python у JSON файл на мережевому диску."""
         try:
-            with open(local_source_path, 'rb') as local_f:
-                with open_file(remote_dest_path, mode='wb') as smb_f:
-                    # Читаємо та пишемо шматками, щоб не перевантажувати RAM
-                    while True:
-                        chunk = local_f.read(64 * 1024)  # 64KB
-                        if not chunk:
-                            break
-                        smb_f.write(chunk)
-            self.logger.debug(f"📡 Файл успішно скопійовано: {remote_dest_path}")
+            # open_file беремо з smbclient
+            with open_file(path, mode='w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False)
+            self.logger.debug(f"💾 JSON успішно збережено: {path}")
         except Exception as e:
-            self.logger.error(f"❌ Помилка копіювання файлу на сервер: {e}")
+            self.logger.error(f"❌ Помилка збереження JSON у {path}: {e}")
             raise
+
+    def load_json(self, path: str) -> list:
+        """Читає JSON файл з мережевого диска."""
+        try:
+            with open_file(path, mode='r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            self.logger.error(f"❌ Помилка читання JSON з {path}: {e}")
+            raise
+
+    def copy_file(self, source_path: str, dest_path: str):
+        """Копіює файл з однієї SMB-папки в іншу SMB-папку."""
+        try:
+            smbclient.copyfile(source_path, dest_path)
+            self.logger.debug(f"📁 Файл успішно скопійовано на сервері в Outbox: {dest_path}")
+        except Exception as e:
+            self.logger.error(f"❌ Помилка копіювання на сервері ({source_path} -> {dest_path}): {e}")
+            raise
+
+    def copy_file(self, source_path: str, dest_path: str):
+        """Копіює (завантажує) файл з локального диска на SMB-сервер."""
+        try:
+            if source_path.startswith("\\\\"):
+                smbclient.copyfile(source_path, dest_path)
+                self.logger.debug(f"📁 Файл успішно скопійовано на сервері в: {dest_path}")
+            else:
+                with open(source_path, 'rb') as local_f:
+                    with open_file(dest_path, mode='wb') as smb_f:
+                        while True:
+                            chunk = local_f.read(64 * 1024)
+                            if not chunk:
+                                break
+                            smb_f.write(chunk)
+                self.logger.debug(f"📡 Вкладення успішно скопійовано на сервер: {dest_path}")
+        except Exception as e:
+            self.logger.error(f"❌ Помилка копіювання файлу на сервер ({source_path} -> {dest_path}): {e}")
+            raise
+
 
     def list_files(self, path: str, silent: bool = False) -> list:
         try:
@@ -96,12 +134,20 @@ class SMBFileClient(FileStorageClient):
                 self.logger.error(f"❌ Помилка отримання списку файлів з SMB ({path}): {e}")
             return []
 
+    def walk(self, path: str):
+        """Реалізує обхід директорій через SMB (аналог os.walk)."""
+        try:
+            return smbclient.walk(path)
+        except Exception as e:
+            self.logger.error(f"❌ Помилка сканування папки {path}: {e}")
+            return []
+
     def remove_file(self, path: str):
         smbclient.remove(path)
 
-    def remove_dir(self, path: str):
+    def remove_dir(self, path: str, recursive: bool = True):
         # rmdir працює тільки для порожніх папок
-        smbclient.rmdir(path)
+        smbclient.rmdir(path, recursive=recursive)
 
     def close(self):
         """Явне закриття сесії (якщо не використовується 'with')."""

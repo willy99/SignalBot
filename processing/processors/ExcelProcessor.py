@@ -1,5 +1,6 @@
 import xlwings as xw
 import os
+import sys
 
 import warnings
 
@@ -10,8 +11,9 @@ from typing import List, Dict, Any
 from utils.utils import format_ukr_date, get_typed_value, format_to_excel_date, get_strint_fromfloat
 import traceback
 from storage.LoggerManager import LoggerManager
-import datetime
+from datetime import date, datetime
 import threading
+from domain.person_filter import PersonSearchFilter
 
 class ExcelProcessor:
     def __init__(self, file_path, log_manager: LoggerManager, batch_processing=False):
@@ -111,8 +113,14 @@ class ExcelProcessor:
                 new_row_range.row_height = 15
                 # На Маці api.VerticalAlignment для центру (Excel constant: -4108)
                 try:
-                    new_row_range.api.vertical_alignment = -4108
-                    new_row_range.api.wrap_text = False
+                    if sys.platform == "win32":
+                        # Код для Windows (pywin32)
+                        new_row_range.api.VerticalAlignment = -4108
+                        new_row_range.api.WrapText = False
+                    else:
+                        # Код для Mac (appscript)
+                        new_row_range.api.vertical_alignment = -4108
+                        new_row_range.api.wrap_text = False
                 except:
                     pass
 
@@ -242,12 +250,13 @@ class ExcelProcessor:
             COLUMN_SERVICE_TYPE,
             COLUMN_TITLE,
             COLUMN_TITLE_2,
-            COLUMN_PLACEMENT,
+            COLUMN_DESERTION_TYPE,
             COLUMN_REVIEW_STATUS,
             COLUMN_DESERTION_PLACE,
             COLUMN_DESERTION_REGION,
 
             COLUMN_INSERT_DATE,
+            COLUMN_DESERTION_DATE,
         ]
 
         self.column_values = {}
@@ -276,7 +285,7 @@ class ExcelProcessor:
                     if v is None or str(v).strip() == "":
                         continue
 
-                    if isinstance(v, (datetime.datetime, datetime.date)):
+                    if isinstance(v, (datetime, date)):
                         processed_values.add(str(v.year))
                     else:
                         processed_values.add(str(v).strip())
@@ -308,12 +317,13 @@ class ExcelProcessor:
             traceback.print_exc()
             raise BaseException(f"⚠️ Помилка ініціалізації Excel: {e}")
 
-    def switch_to_sheet(self, sheet_name):
+    def switch_to_sheet(self, sheet_name, silent=False):
         if not sheet_name:
             raise ValueError(f"Військова частина не визначена!")
         self.sheet = self.workbook.sheets[sheet_name]
-        self._build_column_map()
-        self._build_column_values()
+        if not silent:
+            self._build_column_map()
+            self._build_column_values()
 
     def save(self) -> None:
         if self.workbook is None:
@@ -349,21 +359,35 @@ class ExcelProcessor:
     def get_column_options(self) -> Dict[str, List[str]]:
         return self.column_values
 
-    def search_by_name_rnkopp(self, query:str, query_year, query_o_ass_num:str) -> List:
-        print('>>> ШУКАЮ:' + str(query) + ' в ' + str(query_year) + ' ORDER: ' + str(query_o_ass_num))
-        self.switch_to_sheet(DESERTER_TAB_NAME) # todo performance!
+    def search_people(self, filter_obj: PersonSearchFilter) -> list:
+        self.switch_to_sheet(DESERTER_TAB_NAME, silent=True)
+
         results = []
-        last_row = self.sheet.range((65536, 1)).end('up').row
+        last_row = self.sheet.range((1048576, 1)).end('up').row
+
         data = self.sheet.range(f"A2:BB{last_row}").value
-
-        # Індекси стовпців
-        pib_idx = self.header.get(COLUMN_NAME) - 1
-        rnokpp_idx = self.header.get(COLUMN_ID_NUMBER) - 1
-        ins_date_idx = self.header.get(COLUMN_INSERT_DATE) - 1
-        o_ass_num_idx = self.header.get(COLUMN_ORDER_ASSIGNMENT_NUMBER) - 1
-
         if data is None:
             return results
+
+        # Зручні змінні для фільтрів
+        q_text = (filter_obj.query or "").lower().strip()
+        q_des_year = filter_obj.des_year
+        q_des_date_from = date.fromisoformat(filter_obj.des_date_from) if filter_obj.des_date_from else None
+        q_des_date_to = date.fromisoformat(filter_obj.des_date_to) if filter_obj.des_date_to else None
+
+        q_order = filter_obj.o_ass_num
+        q_title2 = filter_obj.title2
+        q_service = filter_obj.service_type
+
+        # Індекси стовпців (з перевіркою, щоб не впало, якщо колонки немає)
+        pib_idx = self.header.get(COLUMN_NAME, 1) - 1
+        rnokpp_idx = self.header.get(COLUMN_ID_NUMBER, 1) - 1
+        des_date_idx = self.header.get(COLUMN_DESERTION_DATE, 1) - 1
+        o_ass_num_idx = self.header.get(COLUMN_ORDER_ASSIGNMENT_NUMBER, 1) - 1
+
+        # Додані індекси для нових фільтрів
+        title2_idx = self.header.get(COLUMN_TITLE_2, 1) - 1
+        service_idx = self.header.get(COLUMN_SERVICE_TYPE, 1) - 1
 
         for i, row in enumerate(data):
             if not row[pib_idx]: continue
@@ -372,19 +396,79 @@ class ExcelProcessor:
             rnokpp_val = get_strint_fromfloat(row[rnokpp_idx])
             o_ass_num_val = get_strint_fromfloat(row[o_ass_num_idx], "")
 
-            ins_date = row[ins_date_idx] # mandatory field
-            ins_date_year = str(ins_date.year) if ins_date is not None else None
+            des_date = row[des_date_idx]  # mandatory field
 
-            # ЛОГІКА ФІЛЬТРАЦІЇ
-            match_text = (query.lower() in pib_val or query.lower() in rnokpp_val)
-            match_year = (not query_year or ins_date_year in query_year)
-            match_order = (not query_o_ass_num or o_ass_num_val == query_o_ass_num)
+            # БЕЗПЕЧНЕ ОТРИМАННЯ РОКУ (захист від тексту в комірці з датою)
+            des_date_year = None
+            if isinstance(des_date, (datetime, date)):
+                des_date_year = str(des_date.year)
 
-            if match_text and match_year and match_order:
+            # === ЛОГІКА ФІЛЬТРАЦІЇ ===
 
+            # 1. Текстовий пошук (ПІБ або РНОКПП)
+            match_text = True
+            if q_text:
+                match_text = (q_text in pib_val or q_text in rnokpp_val)
+
+            # 2. Рік
+            match_des_year = True
+            if q_des_year:
+                if isinstance(q_des_year, list):
+                    match_des_year = (des_date_year in q_des_year)
+                else:
+                    match_des_year = (des_date_year == str(q_des_year))
+
+            # --- ФІЛЬТРАЦІЯ ПО ДАТАХ СЗЧ (З / ДО) ---
+            match_des_year_from = True
+            match_des_year_to = True
+
+            if q_des_date_from or q_des_date_to:
+                if des_date:
+                    if isinstance(des_date, datetime):
+                        row_des_date = des_date.date()
+                    elif isinstance(des_date, date):
+                        row_des_date = des_date
+                    else:
+                        row_des_date = None
+
+                    if row_des_date:
+                        if q_des_date_from:
+                            match_des_year_from = (row_des_date >= q_des_date_from)
+                        if q_des_date_to:
+                            match_des_year_to = (row_des_date <= q_des_date_to)
+                    else:
+                        match_des_year_from = False
+                        match_des_year_to = False  # Додано скидання для дати "До"
+                else:
+                    match_des_year_from = False
+                    match_des_year_to = False
+
+            # === ВИПРАВЛЕНО ВІДСТУПИ ===
+            # Ці перевірки тепер на одному рівні з `match_text = True`, а не всередині `if q_des_date_from...`
+
+            # 3. Номер наказу
+            match_order = True
+            if q_order:
+                match_order = (o_ass_num_val == str(q_order))
+
+            # 4. Звання
+            match_title2 = True
+            if q_title2:
+                row_title = str(row[title2_idx]) if row[title2_idx] else ""
+                match_title2 = (row_title == q_title2)
+
+            # 5. Вид служби
+            match_service = True
+            if q_service:
+                row_service = str(row[service_idx]) if row[service_idx] else ""
+                match_service = (row_service == q_service)
+
+            # Якщо всі активні фільтри збіглися — додаємо в результати
+            if match_text and match_des_year and match_des_year_from and match_des_year_to and match_order and match_title2 and match_service:
                 serialized_row = []
                 for cell in row:
                     self._transform_cell(cell, serialized_row)
+
                 results.append({
                     'row_idx': i + 2,
                     'data': dict(zip(self.header, serialized_row))
@@ -393,7 +477,7 @@ class ExcelProcessor:
         return results
 
     def _transform_cell(self, cell, serialized_row):
-        if isinstance(cell, (datetime.datetime, datetime.date)):
+        if isinstance(cell, (datetime, date)):
             serialized_row.append(format_to_excel_date(cell))
         elif isinstance(cell, float):
             if cell.is_integer():
@@ -417,7 +501,7 @@ class ExcelProcessor:
                 try:
                     target_row_idx = ids.index(row_id) + 2
                 except ValueError:
-                    print(f"❌ ID {row_id} не знайдено в колонці А")
+                    self.logger.debug(f"❌ EXCEL, update_row_by_index, ID {row_id} не знайдено в колонці А")
                     return False
                 last_col_idx = len(headers)
                 row_range = self.sheet.range((target_row_idx, 1), (target_row_idx, last_col_idx))
@@ -432,11 +516,10 @@ class ExcelProcessor:
 
                 return True
         except Exception as e:
-            print(f"❌ Помилка xlwings: {e}")
+            self.logger.debug(f"❌ EXCEL, Помилка xlwings: {e}")
             return False
 
     def _color_row(self, range, hex_color):
         if not hex_color: return
         """Зафарбовує весь рядок (від A до BB) вказаним кольором."""
         range.color = hex_color
-        print('>>> зафарбували ' + str(hex_color) + ' in ' + str(range))

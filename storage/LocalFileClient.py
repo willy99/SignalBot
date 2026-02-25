@@ -3,13 +3,17 @@ import shutil
 import io
 from storage.FileStorageClient import FileStorageClient
 from storage.LoggerManager import LoggerManager
+import json
 
 class LocalFileClient(FileStorageClient):
 
     def __init__(self, path, log_manager: LoggerManager):
-        self.separator = '/'
+        self.separator = os.sep
         self.logger = log_manager.get_logger()
         pass
+
+    def get_separator(self):
+        return self.separator
 
     def __enter__(self):
         return self
@@ -81,6 +85,30 @@ class LocalFileClient(FileStorageClient):
                 # self.logger.debug(f"🗑️ Папку видалено: {path}")
         except Exception as e:
             self.logger.error(f"❌ Помилка видалення локальної папки: {e}")
+            raise
+
+    def walk(self, path: str):
+        try:
+            return os.walk(path)
+        except Exception as e:
+            self.logger.error(f"❌ Помилка сканування локальної папки {path}: {e}")
+            return []
+
+    def save_json(self, path: str, data: list):
+        try:
+            with open(path, mode='w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False)
+            self.logger.debug(f"💾 JSON успішно збережено локально: {path}")
+        except Exception as e:
+            self.logger.error(f"❌ Помилка збереження JSON локально у {path}: {e}")
+            raise
+
+    def load_json(self, path: str) -> list:
+        try:
+            with open(path, mode='r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            self.logger.error(f"❌ Помилка читання JSON локально з {path}: {e}")
             raise
 
     def close(self):

@@ -2,7 +2,6 @@ import os
 import re
 from nicegui import ui
 from config import LOG_MONITORING_MAX_LINES
-from gui.components import menu
 
 # Регулярний вираз для парсингу логу: Дата/Час - РІВЕНЬ - Повідомлення
 LOG_PATTERN = re.compile(r"^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2},\d{3})\s-\s([A-Z]+)\s-\s(.*)$")
@@ -40,7 +39,6 @@ def format_log_line(line: str) -> str:
 
 
 def render_logs_page(log_file_path: str):
-    menu()
     ui.label('Моніторинг системи (Logs)').classes('text-2xl font-bold mb-4')
 
     # Контейнер для логів: темний фон, моноширинний шрифт, скрол

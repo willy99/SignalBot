@@ -1,17 +1,16 @@
 from dics.deserter_xls_dic import *
-from gui.model.person import Person
+from domain.person import Person
+from domain.person_filter import PersonSearchFilter
+from gui.services.request_context import RequestContext
 
 class PersonController:
-    def __init__(self, worklow):
+    def __init__(self, worklow, auth_manager):
         self.processor = worklow.excelProcessor
+        self.auth_manager = auth_manager
+        self.logger = worklow.log_manager.get_logger()
 
-    def search_people(self, year, name):
-        return self.search(year, name, None)
-
-    def search_by_erdr(self, o_ass_num, name):
-        return self.search(None, name, o_ass_num)
-
-    def save_person(self, person_model, paint_color=None):
+    def save_person(self, ctx: RequestContext, person_model, paint_color=None):
+        self.logger.debug('UI:' + ctx.user_name + ': Зберігаємо персону ' + str(person_model))
         try:
             row_idx = person_model.id
 
@@ -29,8 +28,9 @@ class PersonController:
             print(f"Помилка при збереженні: {e}")
             return False
 
-    def search(self, year, query:str, o_ass_num:str) -> List[Person]:
-        results = self.processor.search_by_name_rnkopp(query, year, o_ass_num)
+    def search(self, ctx: RequestContext, filter_obj: PersonSearchFilter) -> List[Person]:
+        self.logger.debug('UI:' + ctx.user_name + ': Шукаємо: ' + str(filter_obj))
+        results = self.processor.search_people(filter_obj)
         return [Person.from_excel_dict(item['data']) for item in results]
 
     def get_column_options(self) -> Dict[str, List[str]]:

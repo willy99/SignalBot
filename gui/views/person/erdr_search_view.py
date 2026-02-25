@@ -1,11 +1,13 @@
 from nicegui import ui
 from dics.deserter_xls_dic import *
-from gui.model.person import Person
+from domain.person import Person
 from gui.views.person.person_view import edit_erdr
-from gui.components import menu
+from domain.person_filter import PersonSearchFilter
+from gui.services.request_context import RequestContext
+from config import MAX_QUERY_RESULTS
 
 @ui.refreshable
-def results_ui(data, person_ctrl):
+def results_ui(data, person_ctrl, ctx, refresh_callback):
     if not data:
         return
 
@@ -40,19 +42,18 @@ def results_ui(data, person_ctrl):
     table.on('edit', lambda msg: edit_erdr(
         Person(**msg.args),
         person_ctrl,
-        on_close=lambda: results_ui.refresh(person_ctrl.search_by_erdr(last_query['o_ass_num'], last_query['name']), person_ctrl)
+        ctx=ctx,
+        on_close=refresh_callback
     ))
 
 
-last_query = {}
-
-
-def search_page(person_ctrl):
-    global last_query
-    menu()
+def search_page(person_ctrl, ctx: RequestContext):
+    state = {
+        'last_query': None, 'o_ass_num': None
+    }
 
     with ui.column().classes('w-full items-center p-4'):
-        ui.label('Пошук військовослужбовців за номером призначення, ЄРДР форма').classes('text-h4 mb-4')
+        ui.label('Пошук військовослужбовців, Відправка справи на ДБР').classes('text-h4 mb-4')
 
         with ui.row().classes('w-full max-w-4xl items-center gap-4'):
 
@@ -72,7 +73,6 @@ def search_page(person_ctrl):
     o_ass_num_search_field.run_method('focus')
 
     def do_search(auto_open=True):
-        global last_query
         o_ass_num = o_ass_num_search_field.value.strip()
         name = name_search_field.value.strip()
 
@@ -80,17 +80,23 @@ def search_page(person_ctrl):
             ui.notify('Введіть запит для пошуку', type='warning')
             return
 
-        last_query['o_ass_num'] = o_ass_num
-        last_query['name'] = name
-
         with results_container:
             ui.spinner(size='lg').classes('mt-10')
             ui.label('Пошук у базі даних...').classes('text-grey')
 
         try:
-            from nicegui import run
-            # data = run.io_bound(person_ctrl.search_by_erdr, o_ass_num, name)
-            data = person_ctrl.search_by_erdr(o_ass_num, name)
+            state.update({
+                'last_query': query, 'last_des_year': des_year_val, 'last_ins_year': ins_year_val,
+                'last_des_from': date_from_val, 'last_des_to': date_to_val, 'last_title2': title2_val,
+                'last_service': service_val
+            })
+
+            search_filter = PersonSearchFilter(
+                query=name,
+                o_ass_num=o_ass_num,
+            )
+
+            data = person_ctrl.search(ctx, search_filter)
             results_container.clear()
 
 
@@ -98,11 +104,21 @@ def search_page(person_ctrl):
                 ui.notify('Нічого не знайдено', type='negative')
                 return
 
+            refresh_cb = lambda: ui.timer(0, lambda: do_search(auto_open=False), once=True)
             if len(data) == 1 and auto_open:
-                edit_erdr(data[0], person_ctrl, on_close=lambda: do_search(auto_open=False))
+                edit_erdr(data[0], person_ctrl, ctx=ctx, on_close=lambda: do_search(auto_open=False))
+            if len(data) > MAX_QUERY_RESULTS:
+                ui.notify(
+                    f'⚠️ Знайдено занадто багато результатів ({len(data)}). Показано перші {MAX_QUERY_RESULTS}. Будь ласка, уточніть параметри пошуку',
+                    type='warning',
+                    timeout=8000
+                )
+                data = data[:MAX_QUERY_RESULTS]  # Відсікаємо все зайве
+            with results_container:
+                results_ui(data, person_ctrl, ctx, refresh_callback=refresh_cb)
 
             with results_container:
-                results_ui(data, person_ctrl)
+                results_ui(data, person_ctrl, ctx)
 
         except Exception as e:
             results_container.clear()

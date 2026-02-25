@@ -1,27 +1,25 @@
+from gui.services.request_context import RequestContext
+
 class SupportController:
-    def __init__(self, processor, worklow):
+    def __init__(self, processor, worklow, auth_manager):
         self.processor = processor
-        self.buffer = []
         self.workflow = worklow
+        self.auth_manager = auth_manager
+        self.logger = worklow.log_manager.get_logger()
 
-    def add_to_buffer(self, raw_data: dict):
-        self.buffer.append(raw_data)
+    def generate_support_document(self, ctx: RequestContext, city: str, supp_number: str, buffer_data: list) -> tuple[bytes, str]:
+        self.logger.debug('UI:' + ctx.user_name + ': Генеруємо супровід: ' + str(city) + ', number:' + supp_number + ':' + str(buffer_data))
 
-    def remove_from_buffer(self, index: int):
-        if 0 <= index < len(self.buffer):
-            self.buffer.pop(index)
-
-    def get_buffer(self) -> list:
-        return self.buffer
-
-    def clear_buffer(self):
-        self.buffer.clear()
-
-    def generate_support_document(self, city: str, supp_number: str) -> tuple[bytes, str]:
-        if not self.buffer:
+        if not buffer_data:
             raise ValueError("Буфер порожній. Додайте хоча б один запис.")
         if not supp_number:
             raise ValueError("Будь ласка, введіть загальний номер супроводу.")
 
         # Викликаємо процесор для генерації
-        return self.processor.generate_support_batch(city, supp_number, self.buffer)
+        return self.processor.generate_support_batch(city, supp_number, buffer_data)
+
+    def search_persons(self, ctx, query: str):
+        return [
+            {'name': 'Петренко Петро Петрович', 'id_number': '1234567890'},
+            {'name': 'Петренко Іван Іванович', 'id_number': '0987654321'},
+        ]

@@ -121,7 +121,7 @@ class MyWorkFlow:
         self.logger.debug(f"DEBUG: User={user_id}, State={current_state}, Text='{text}'")
         main_menu = "Ви у Головному меню:\n1. Різна обробка\n2. Статистика\n3. Вихід"
         process_menu = "ОБРОБКА MENU:\n1. Batch обробка файлів\n2. Конвертація полів\n3. Вихід"
-        stat_menu = ":\n1. Статистика і звіти \n2. Звіт по СЗЧ - по підрозділам\n3. Звіт по СЗЧ - monthly\n4. Призвіща\n5. СЗЧ по підрозділам\n0. Вихід"
+        stat_menu = ":\n1. Статистика і звіти \n2. Звіт по СЗЧ - monthly\n3. Призвіща\n0. Вихід"
         menu_prompt = "Напишіть 'меню' для початку роботи."
 
         if text == "меню" or text == "start" or text == "menu":
@@ -164,11 +164,7 @@ class MyWorkFlow:
             if text == "2":
                 return self.reporter.get_summary_report()
             if text == "3":
-                return self.reporter.get_montly_report()
-            if text == "4":
                 return self.reporter.get_all_names_report()
-            if text == "5":
-                return self.reporter.get_detailed_stats()
             else:
                 return "Фігня-цифра"
 

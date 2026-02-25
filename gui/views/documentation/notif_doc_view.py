@@ -2,7 +2,6 @@ from nicegui import ui
 from gui.components import menu
 
 def notif_view_doc():
-    menu()
     # Робимо контейнер на всю висоту екрана (h-screen) і центруємо вміст
     with ui.column().classes('w-full h-[80vh] items-center justify-center bg-gray-50'):
         # Картка для красивого оформлення
