@@ -1,9 +1,13 @@
 from gui.services.request_context import RequestContext
+from domain.person_filter import PersonSearchFilter
+from domain.person import Person
+from typing import List
 
 class SupportController:
-    def __init__(self, processor, worklow, auth_manager):
-        self.processor = processor
+    def __init__(self, doc_processor, worklow, auth_manager):
+        self.doc_processor = doc_processor
         self.workflow = worklow
+        self.excel_processor = worklow.excelProcessor
         self.auth_manager = auth_manager
         self.logger = worklow.log_manager.get_logger()
 
@@ -16,10 +20,11 @@ class SupportController:
             raise ValueError("Будь ласка, введіть загальний номер супроводу.")
 
         # Викликаємо процесор для генерації
-        return self.processor.generate_support_batch(city, supp_number, buffer_data)
+        return self.doc_processor.generate_support_batch(city, supp_number, buffer_data)
 
-    def search_persons(self, ctx, query: str):
-        return [
-            {'name': 'Петренко Петро Петрович', 'id_number': '1234567890'},
-            {'name': 'Петренко Іван Іванович', 'id_number': '0987654321'},
-        ]
+    def search_persons(self, ctx, query: str) -> List[Person]:
+        search_filter = PersonSearchFilter(
+            query=query
+        )
+        results = self.excel_processor.search_people(search_filter)
+        return [Person.from_excel_dict(item['data']) for item in results]

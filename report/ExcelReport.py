@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from typing import Any, Optional
 import traceback
 import config
@@ -7,6 +7,7 @@ from collections import defaultdict
 from storage.LoggerManager import LoggerManager
 from config import DESERTER_TAB_NAME
 from utils.utils import get_strint_fromfloat
+from domain.person_filter import PersonSearchFilter
 
 class ExcelReporter:
     def __init__(self, excelProcessor, log_manager: LoggerManager):
@@ -15,7 +16,7 @@ class ExcelReporter:
         self.logger = log_manager.get_logger()
 
 
-    def get_subunit_desertion_stats(self, year_filter):
+    def get_subunit_desertion_stats(self, search_filter: PersonSearchFilter):
         """Збирає повну статистику по підрозділах, званнях та термінах СЗЧ."""
         self.excelProcessor.switch_to_sheet(DESERTER_TAB_NAME)
         try:
@@ -54,6 +55,10 @@ class ExcelReporter:
                 'рядовий': get_stats_template(),
                 'all': get_stats_template(),
             }))
+
+            q_des_year = search_filter.des_year
+            q_des_date_from = date.fromisoformat(search_filter.des_date_from) if search_filter.des_date_from else None
+            q_des_date_to = date.fromisoformat(search_filter.des_date_to) if search_filter.des_date_to else None
 
             # Отримуємо індекси стовпців з вашого column_map
             name_idx: Final[int] = self.excelProcessor.header.get(COLUMN_NAME) - 1
@@ -119,7 +124,39 @@ class ExcelReporter:
 
                 suspended = str(row[suspended_idx]).strip()
                 # ЛОГІКА ФІЛЬТРАЦІЇ ДЛЯ СЗЧ
-                match_des_year = (not year_filter or des_date_year in year_filter)
+
+                match_des_year = True
+                if q_des_year:
+                    if isinstance(q_des_year, list):
+                        match_des_year = (des_date_year in q_des_year)
+                    else:
+                        match_des_year = (des_date_year == str(q_des_year))
+
+                match_des_year_from = True
+                match_des_year_to = True
+
+                if q_des_date_from or q_des_date_to:
+                    if des_date:
+                        if isinstance(des_date, datetime):
+                            row_des_date = des_date.date()
+                        elif isinstance(des_date, date):
+                            row_des_date = des_date
+                        else:
+                            row_des_date = None
+
+                        if row_des_date:
+                            if q_des_date_from:
+                                match_des_year_from = (row_des_date >= q_des_date_from)
+                            if q_des_date_to:
+                                match_des_year_to = (row_des_date <= q_des_date_to)
+                        else:
+                            match_des_year_from = False
+                            match_des_year_to = False  # Додано скидання для дати "До"
+                    else:
+                        match_des_year_from = False
+                        match_des_year_to = False
+
+                match_period = match_des_year and match_des_year_from and match_des_year_to
 
                 # duplicates for subunits
                 mil_unit_key = f"{unit}_{sub_unit}"
@@ -139,7 +176,7 @@ class ExcelReporter:
                     'service_type': service_type
                 })
 
-                if match_des_year:
+                if match_period:
 
                     try:
                         if ret_mu_date:
@@ -170,11 +207,12 @@ class ExcelReporter:
                     stats[unit][sub_unit]['all']['rev_specified'] = 0 # const
                     stats[unit][sub_unit]['офіцер']['rev_specified'] = 0 # const
 
-                    if kpp_date_year in year_filter and kpp_num is not None:
+                    if (not q_des_year or kpp_date_year in q_des_year) and kpp_num is not None:
                         stats[unit][sub_unit]['all']['rev_dbr_notif'] += 1
                         if is_officer:
                             stats[unit][sub_unit]['офіцер']['rev_dbr_notif'] += 1
-                    if dbr_date_year in year_filter and dbr_num is not None:
+
+                    if (not q_des_year or dbr_date_year in q_des_year) and dbr_num is not None:
                         stats[unit][sub_unit]['all']['rev_dbr_mater'] += 1
                         if is_officer:
                             stats[unit][sub_unit]['офіцер']['rev_dbr_mater'] += 1
@@ -205,14 +243,33 @@ class ExcelReporter:
                             stats[unit][sub_unit]['офіцер']['rev_nonevil'] += 1
 
                 # ЛОГІКА ФІЛЬТРАЦІЇ ДЛЯ ПОВЕРНЕННЯ В ВЧ
-                match_year = (not year_filter or ret_mu_date_year in year_filter)
-                if match_year and match_des_year: # return to military unit
-                    stats[unit][sub_unit][rank_key]['ret_mu'] += 1
+                row_ret_mu_date = None
+                if ret_mu_date:
+                    row_ret_mu_date = ret_mu_date.date() if isinstance(ret_mu_date, datetime) else ret_mu_date
+
+                if row_ret_mu_date and match_period:
+                    # Перевіряємо, чи вписується дата повернення у фільтри
+                    match_ret_mu_year = (not q_des_year) or (ret_mu_date_year in q_des_year)
+                    match_ret_mu_from = (not q_des_date_from) or (row_ret_mu_date >= q_des_date_from)
+                    match_ret_mu_to = (not q_des_date_to) or (row_ret_mu_date <= q_des_date_to)
+
+                    if match_ret_mu_year and match_ret_mu_from and match_ret_mu_to:
+                        stats[unit][sub_unit][rank_key]['ret_mu'] += 1
 
                 # ЛОГІКА ФІЛЬТРАЦІЇ ДЛЯ ПОВЕРНЕННЯ В РЕЗЕРВ
-                match_year = (not year_filter or ret_res_date_year in year_filter)
-                if match_year and match_des_year: # return to military unit
-                    stats[unit][sub_unit][rank_key]['ret_res'] += 1
+                row_ret_res_date = None
+                if ret_res_date:
+                    row_ret_res_date = ret_res_date.date() if isinstance(ret_res_date, datetime) else ret_res_date
+
+                if row_ret_res_date and match_period:
+                    # Перевіряємо, чи вписується дата повернення в резерв у фільтри
+                    match_ret_res_year = (not q_des_year) or (ret_res_date_year in q_des_year)
+                    match_ret_res_from = (not q_des_date_from) or (row_ret_res_date >= q_des_date_from)
+                    match_ret_res_to = (not q_des_date_to) or (row_ret_res_date <= q_des_date_to)
+
+                    if match_ret_res_year and match_ret_res_from and match_ret_res_to:
+                        stats[unit][sub_unit][rank_key]['ret_res'] += 1
+
                 processed+=1
 
             # unique calculation for filtered year
@@ -221,7 +278,15 @@ class ExcelReporter:
                 cases.sort(key=lambda x: x['des_date'])
                 last_case = cases[-1]
 
-                if str(last_case['des_date'].year) in year_filter:
+                last_des_date = last_case['des_date']
+                if isinstance(last_des_date, datetime):
+                    last_des_date = last_des_date.date()
+
+                match_year = (not q_des_year) or (str(last_des_date.year) in q_des_year)
+                match_from = (not q_des_date_from) or (last_des_date >= q_des_date_from)
+                match_to = (not q_des_date_to) or (last_des_date <= q_des_date_to)
+
+                if match_year and match_from and match_to:
 
                     unit = last_case['unit']
                     sub_unit = last_case['sub_unit']
@@ -229,14 +294,10 @@ class ExcelReporter:
                     service_type = last_case['service_type']
 
                     if last_case['ret_mu_date'] is None or last_case['ret_res_date'] == "":
-                        # Випадок СЗЧ (не повернувся)
-                        # Тут додаєте логіку підрахунку (under_3 / over_3 і т.д.)
                         stats[unit][sub_unit][rank]['un_des'] += 1
                     else:
-                        # Випадок Повернення (останній запис має дату повернення)
                         stats[unit][sub_unit][rank]['un_ret'] += 1
 
-                    # duplicates:: case > 1
                     if len(cases) > 1:
                         stats[unit][sub_unit][rank]['dupl'] += 1
                     else:

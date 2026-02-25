@@ -369,7 +369,6 @@ class ExcelProcessor:
         if data is None:
             return results
 
-        # Зручні змінні для фільтрів
         q_text = (filter_obj.query or "").lower().strip()
         q_des_year = filter_obj.des_year
         q_des_date_from = date.fromisoformat(filter_obj.des_date_from) if filter_obj.des_date_from else None
@@ -378,14 +377,10 @@ class ExcelProcessor:
         q_order = filter_obj.o_ass_num
         q_title2 = filter_obj.title2
         q_service = filter_obj.service_type
-
-        # Індекси стовпців (з перевіркою, щоб не впало, якщо колонки немає)
         pib_idx = self.header.get(COLUMN_NAME, 1) - 1
         rnokpp_idx = self.header.get(COLUMN_ID_NUMBER, 1) - 1
         des_date_idx = self.header.get(COLUMN_DESERTION_DATE, 1) - 1
         o_ass_num_idx = self.header.get(COLUMN_ORDER_ASSIGNMENT_NUMBER, 1) - 1
-
-        # Додані індекси для нових фільтрів
         title2_idx = self.header.get(COLUMN_TITLE_2, 1) - 1
         service_idx = self.header.get(COLUMN_SERVICE_TYPE, 1) - 1
 
@@ -398,19 +393,16 @@ class ExcelProcessor:
 
             des_date = row[des_date_idx]  # mandatory field
 
-            # БЕЗПЕЧНЕ ОТРИМАННЯ РОКУ (захист від тексту в комірці з датою)
             des_date_year = None
             if isinstance(des_date, (datetime, date)):
                 des_date_year = str(des_date.year)
 
             # === ЛОГІКА ФІЛЬТРАЦІЇ ===
 
-            # 1. Текстовий пошук (ПІБ або РНОКПП)
             match_text = True
             if q_text:
                 match_text = (q_text in pib_val or q_text in rnokpp_val)
 
-            # 2. Рік
             match_des_year = True
             if q_des_year:
                 if isinstance(q_des_year, list):
@@ -418,7 +410,6 @@ class ExcelProcessor:
                 else:
                     match_des_year = (des_date_year == str(q_des_year))
 
-            # --- ФІЛЬТРАЦІЯ ПО ДАТАХ СЗЧ (З / ДО) ---
             match_des_year_from = True
             match_des_year_to = True
 
@@ -443,27 +434,20 @@ class ExcelProcessor:
                     match_des_year_from = False
                     match_des_year_to = False
 
-            # === ВИПРАВЛЕНО ВІДСТУПИ ===
-            # Ці перевірки тепер на одному рівні з `match_text = True`, а не всередині `if q_des_date_from...`
-
-            # 3. Номер наказу
             match_order = True
             if q_order:
                 match_order = (o_ass_num_val == str(q_order))
 
-            # 4. Звання
             match_title2 = True
             if q_title2:
                 row_title = str(row[title2_idx]) if row[title2_idx] else ""
                 match_title2 = (row_title == q_title2)
 
-            # 5. Вид служби
             match_service = True
             if q_service:
                 row_service = str(row[service_idx]) if row[service_idx] else ""
                 match_service = (row_service == q_service)
 
-            # Якщо всі активні фільтри збіглися — додаємо в результати
             if match_text and match_des_year and match_des_year_from and match_des_year_to and match_order and match_title2 and match_service:
                 serialized_row = []
                 for cell in row:

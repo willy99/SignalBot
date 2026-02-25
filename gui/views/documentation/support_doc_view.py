@@ -1,5 +1,4 @@
 from nicegui import ui, run
-from gui.components import menu
 from gui.services.request_context import RequestContext
 
 # --- КОНСТАНТИ ДЕФОЛТНИХ ЗНАЧЕНЬ СТОРІНОК ---
@@ -28,9 +27,6 @@ def render_document_page(controller, ctx: RequestContext):
 
     with ui.grid(columns=12).classes('w-full gap-6 items-start'):
 
-        # ==========================================
-        # ЛІВА ЧАСТИНА: ФОРМА ТА ПОШУК
-        # ==========================================
         with ui.card().classes('col-span-12 md:col-span-8 w-full'):
             with ui.row().classes('w-full items-center gap-4 mb-4'):
                 city = ui.radio(['Миколаїв', 'Дніпро', 'Донецьк'], value='Миколаїв').props('inline')
@@ -38,12 +34,10 @@ def render_document_page(controller, ctx: RequestContext):
 
             ui.label('Пошук військовослужбовця').classes('text-lg font-bold text-gray-700')
 
-            # --- НОВИЙ БЛОК ПОШУКУ ---
             with ui.row().classes('w-full gap-2 items-center'):
                 search_input = ui.input('Введіть прізвище...').classes('flex-grow').props('clearable autofocus')
                 search_btn = ui.button('Шукати', icon='search').props('elevated color="primary"')
 
-            # Випадушка для результатів (спочатку прихована)
             person_select = ui.select(
                 options={},
                 label='Оберіть особу зі знайдених'
@@ -58,18 +52,19 @@ def render_document_page(controller, ctx: RequestContext):
 
                 search_btn.disable()
                 try:
-                    # ТУТ ВИКЛИКАЄМО БЕКЕНД (Метод треба буде додати в контролер)
-                    # Очікуємо список словників: [{'name': 'ПІБ', 'id_number': '123...'}, ...]
                     results = await run.io_bound(controller.search_persons, ctx, query)
 
                     state['current_search_results'].clear()
                     options = {}
 
-                    for r in results:
-                        # Захист від відсутності ІПН
-                        id_num = str(r.get('id_number') or f"NO_ID_{r.get('name')}")
-                        state['current_search_results'][id_num] = r
-                        options[id_num] = f"{r.get('name')} (РНОКПП: {id_num})"
+                    for person in results:
+                        id_num = f"{person.rnokpp}_{person.name}_{person.desertion_date}"
+                        state['current_search_results'][id_num] = {
+                            'name': person.name,
+                            'rnokpp': person.rnokpp,
+                            'id_number': id_num  # Зберігаємо ключ
+                        }
+                        options[id_num] = f"{person.name} (РНОКПП: {person.rnokpp} СЗЧ: {person.desertion_date})"
 
                     person_select.options = options
                     person_select.visible = True
@@ -88,7 +83,6 @@ def render_document_page(controller, ctx: RequestContext):
 
             search_input.on('keydown.enter', perform_search)
             search_btn.on('click', perform_search)
-            # --------------------------
 
             with ui.row().classes('w-full gap-4 mt-6'):
                 total_input = ui.number('Загалом сторінок', value=0, format='%.0f').classes('w-1/3')
@@ -156,7 +150,14 @@ def render_document_page(controller, ctx: RequestContext):
                     ui.notify('Будь ласка, знайдіть та оберіть військовослужбовця!', type='negative')
                     return
 
-                # Дістаємо реальне ПІБ зі збережених результатів пошуку
+                buffer_data = state['buffer']
+                edit_idx = state['edit_idx']
+
+                existing_ids = [doc['id_number'] for i, doc in enumerate(buffer_data) if i != edit_idx]
+                if selected_id in existing_ids:
+                    ui.notify(f'Ця особа вже є у списку пакету!', type='warning')
+                    return
+
                 selected_person = state['current_search_results'].get(selected_id, {})
                 name_val = selected_person.get('name', 'Невідоме ПІБ')
 
@@ -168,18 +169,8 @@ def render_document_page(controller, ctx: RequestContext):
                     ui.notify(f'Помилка! Загальна ({total_val}) != Сумі ({calculated_sum})', type='negative')
                     return
 
-                buffer_data = state['buffer']
-                edit_idx = state['edit_idx']
-
-                # ПЕРЕВІРКА НА ДУБЛІКАТИ ПО ІПН (а не по імені)
-                existing_ids = [doc['id_number'] for i, doc in enumerate(buffer_data) if i != edit_idx]
-                if selected_id in existing_ids:
-                    ui.notify(f'Ця особа вже є у списку пакету!', type='warning')
-                    return
-
-                # ТЕПЕР МИ ЗБЕРІГАЄМО id_number!
                 raw_data = {
-                    'id_number': selected_id,
+                    'id_number': selected_id,  # Наш комбінований ключ
                     'name': name_val,
                     'total': total_val,
                     'notif': int(notif.value or DEF_NOTIF),
@@ -232,7 +223,6 @@ def render_document_page(controller, ctx: RequestContext):
                 state['edit_idx'] = idx
                 doc = state['buffer'][idx]
 
-                # Штучно заповнюємо пошук та випадушку для редагування
                 id_num = doc['id_number']
                 search_input.value = doc['name']
 
@@ -276,13 +266,10 @@ def render_document_page(controller, ctx: RequestContext):
                                     ui.button(icon='delete', color='red',
                                               on_click=lambda idx=i: on_remove_click(idx)).props('flat dense size=sm')
 
-                # Показуємо кнопки генерації тільки якщо є дані
                 generate_docs_btn.set_visibility(len(buffer_data) > 0)
                 save_draft_btn.set_visibility(len(buffer_data) > 0)
 
-            # --- ФУНКЦІЇ ДЛЯ DRAFT ТА EXCEL ---
             async def on_generate_docs_click():
-                # Ваш існуючий код генерації Word
                 try:
                     file_bytes, file_name = controller.generate_support_document(
                         ctx, city.value, supp_number_input.value, state['buffer']
@@ -293,7 +280,6 @@ def render_document_page(controller, ctx: RequestContext):
                     ui.notify(f'Помилка генерації: {e}', type='negative')
 
             async def on_save_draft_click():
-                # ЗАДІЛ НА НАСТУПНИЙ КРОК (Збереження в БД)
                 ui.notify('Функція збереження чернетки (Draft) в розробці...', type='info')
 
             generate_docs_btn = ui.button('ЗГЕНЕРУВАТИ WORD', on_click=on_generate_docs_click,

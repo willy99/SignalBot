@@ -5,24 +5,46 @@ from gui.services.request_context import RequestContext
 import io
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
-
-last_query = {}
+from domain.person_filter import PersonSearchFilter
 
 def search_page(report_ctrl, person_ctrl, ctx: RequestContext):
-    global last_query
     state = {'rows': [], 'columns': []}
 
     year_options = person_ctrl.get_column_options().get(COLUMN_INSERT_DATE, [])
+
+    async def on_year_change(e):
+        if e.value:
+            des_date_from.set_value(None)
+            des_date_to.set_value(None)
+            des_date_from.disable()
+            des_date_to.disable()
+        else:
+            des_date_from.enable()
+            des_date_to.enable()
+        # await do_report()
+
+    async def on_date_change(e):
+        if des_date_from.value or des_date_to.value:
+            des_year_filter.set_value(None)
+            des_year_filter.disable()
+        else:
+            des_year_filter.enable()
+        # await do_report()
 
     with ui.column().classes('w-full items-center p-4'):
         ui.label('Звіт Додаток №2, по підрозділам').classes('text-h4 mb-4')
 
         with ui.row().classes('w-full max-w-4xl items-center gap-4'):
-            year_filter = ui.select(
+            des_year_filter = ui.select(
                 options=year_options,
                 label=COLUMN_INSERT_DATE,
                 clearable = True
             ).classes('w-64').props('use-chips stack-label').on('update:model-value', lambda: do_report())
+
+            des_date_from = ui.input('СЗЧ з (дата)', on_change=on_date_change).props('type=date clearable').classes(
+                'w-40')
+            des_date_to = ui.input('СЗЧ до (дата)', on_change=on_date_change).props('type=date clearable').classes(
+                'w-40')
 
             # Додаємо пошук по Enter
             search_btn = ui.button('Пошук', icon='search', on_click=lambda: do_report()).props('elevated')
@@ -34,17 +56,23 @@ def search_page(report_ctrl, person_ctrl, ctx: RequestContext):
         export_btn.bind_visibility_from(results_container, 'visible')
 
     async def do_report():
-        global last_query
-        selected_year = year_filter.value
-        year_val = None if selected_year == 'Всі роки' or not selected_year else selected_year
 
-        if not year_val:
-            ui.notify('Введіть рік для репорту', type='warning')
+        des_year_val = des_year_filter.value if des_year_filter.value else None
+        date_from_val = des_date_from.value if des_date_from.value else None
+        date_to_val = des_date_to.value if des_date_to.value else None
+
+        if not des_year_val and not date_from_val and not date_to_val:
+            ui.notify('Введіть хоч якусь дату/рік для репорту', type='warning')
             return
 
-        last_query['year'] = year_val
+        search_filter = PersonSearchFilter(
+            des_year=[des_year_val] if des_year_val else [],
+            des_date_from=date_from_val, des_date_to=date_to_val
+        )
 
-        year_filter.disable()
+        des_year_filter.disable()
+        des_date_from.disable()
+        des_date_to.disable()
         search_btn.disable()
         export_btn.disable()
 
@@ -53,7 +81,7 @@ def search_page(report_ctrl, person_ctrl, ctx: RequestContext):
             ui.label('Компайлінг звіту...').classes('text-grey')
 
         try:
-            data = await run.io_bound(report_ctrl.do_subunit_desertion_report,ctx, [year_val])
+            data = await run.io_bound(report_ctrl.do_subunit_desertion_report,ctx, search_filter)
 
             # 3. Очищуємо спіннер після отримання даних
             results_container.clear()
@@ -72,7 +100,9 @@ def search_page(report_ctrl, person_ctrl, ctx: RequestContext):
             results_container.clear()
             ui.notify(f'Помилка пошуку: {e}', type='negative')
         finally:
-            year_filter.enable()
+            des_year_filter.enable()
+            des_date_from.enable()
+            des_date_to.enable()
             search_btn.enable()
             export_btn.enable()
 

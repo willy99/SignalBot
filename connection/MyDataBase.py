@@ -42,6 +42,18 @@ class MyDataBase:
                     PRIMARY KEY (role, module_name)
                 );                
             ''')
+
+            cursor.execute('''
+                            CREATE TABLE IF NOT EXISTS support_drafts (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                created_by INTEGER NOT NULL,
+                                created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                status TEXT DEFAULT 'DRAFT',
+                                city TEXT,
+                                support_number TEXT,
+                                payload TEXT
+                            );
+                        ''')
             conn.commit()
 
     def connect(self):
@@ -92,8 +104,6 @@ class MyDataBase:
             conn.rollback()
             return None
 
-    # --- Публічні методи для логіки бота ---
-
     def get_user_state(self, phone_number):
         """Отримує стан користувача (повертає 'START', якщо не знайдено)."""
         query = "SELECT current_state FROM user_states WHERE phone_number = ?"
@@ -114,3 +124,35 @@ class MyDataBase:
     def reset_user(self, phone_number):
         """Скидає стан користувача до початкового."""
         return self.set_user_state(phone_number, "START")
+
+
+
+
+    def insert_record(self, table: str, data: dict) -> int:
+        """
+        Універсальний метод вставки словника в таблицю.
+        Приклад: db.insert_record('users', {'username': 'admin', 'role': 'admin'})
+        """
+        columns = ', '.join(data.keys())
+        placeholders = ', '.join(['?'] * len(data))
+        query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
+
+        # __execute_insert__ повертає lastrowid, що нам і треба
+        return self.__execute_insert__(query, tuple(data.values()))
+
+    def update_record(self, table: str, record_id: int, data: dict):
+        """
+        Універсальний метод оновлення запису за його ID.
+        """
+        set_clause = ', '.join([f"{k} = ?" for k in data.keys()])
+        query = f"UPDATE {table} SET {set_clause} WHERE id = ?"
+
+        values = tuple(data.values()) + (record_id,)
+        self.__execute_insert__(query, values)
+        return record_id
+
+    def delete_record(self, table: str, record_id: int):
+        """Універсальне видалення за ID."""
+        query = f"DELETE FROM {table} WHERE id = ?"
+        self.__execute_insert__(query, (record_id,))
+        return True
