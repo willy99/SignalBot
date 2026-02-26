@@ -1,6 +1,9 @@
 import sqlite3
+from typing import Final
+
 import config
 
+DB_TABLE_SUPPORT_DOC: Final[str] = 'support_docs'
 
 class MyDataBase:
     def __init__(self):
@@ -44,7 +47,7 @@ class MyDataBase:
             ''')
 
             cursor.execute('''
-                            CREATE TABLE IF NOT EXISTS support_drafts (
+                            CREATE TABLE IF NOT EXISTS ''' + DB_TABLE_SUPPORT_DOC  + ''' (
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 created_by INTEGER NOT NULL,
                                 created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

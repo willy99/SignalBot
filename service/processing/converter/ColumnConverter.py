@@ -1,7 +1,7 @@
 import xlwings as xw
 import traceback
 from dics.deserter_xls_dic import *
-from processing.processors.DocProcessor import DocProcessor
+from service.processing.processors.DocProcessor import DocProcessor
 from utils.utils import format_ukr_date
 from datetime import datetime, timedelta
 
@@ -26,7 +26,7 @@ class ColumnConverter:
 
     def convert(self):
         # Тут можна викликати всі методи конвертації
-        self._check_birthday_by_id()
+        self._convert_region()
 
     def _convert_region(self):
         print("--- Початок конвертації ---")
@@ -38,11 +38,11 @@ class ColumnConverter:
             sheet = self.wb.sheets[0]  # Беремо перший лист
 
             # Отримуємо індекси колонок
-            rtzk_col = self._get_column_index(sheet, COLUMN_TZK)
-            address_col = self._get_column_index(sheet, COLUMN_ADDRESS)
-            rtzk_region_col = self._get_column_index(sheet, COLUMN_TZK_REGION)
+            condition_col = self._get_column_index(sheet, COLUMN_DESERT_CONDITIONS)
+            des_region_col = self._get_column_index(sheet, COLUMN_DESERTION_REGION)
 
-            if not all([rtzk_region_col, rtzk_col, address_col]):
+
+            if not all([condition_col, des_region_col]):
                 print("!!! Необхідні колонки для мапінгу відсутні!")
                 return
 
@@ -52,42 +52,43 @@ class ColumnConverter:
 
             # Для швидкості зчитуємо цілі діапазони в пам'ять (list of lists)
 
-            rtzk_values = sheet.range((2, rtzk_col), (last_row, rtzk_col)).value
-            rtzk_region_values = sheet.range((2, rtzk_region_col), (last_row, rtzk_region_col)).value
-            address_values = sheet.range((2, address_col), (last_row, address_col)).value
+            condition_values = sheet.range((2, condition_col), (last_row, condition_col)).value
+            des_region_values = sheet.range((2, des_region_col), (last_row, des_region_col)).value
+
+            print('>>> condition_values ' + str(len(condition_values)))
+            print('>>> des_region_values ' + str(len(des_region_values)))
 
             # Список для результатів, які ми запишемо одним махом
             results = []
 
-            for i in range(len(rtzk_values)):
+            for i in range(len(condition_values)):
                 row_idx = i + 2  # для логування або стилізації
-                rtzk = str(rtzk_values[i] or "").strip()
-                address = str(address_values[i] or "").strip()
-                rtzk_region = str(rtzk_region_values[i] or "").strip()
+                condition = str(condition_values[i] or "").strip()
+                des_region = str(des_region_values[i] or "").strip()
 
                 # Логіка підсвічування порожніх даних
-                if not rtzk and not address:
+                if not condition:
                     results.append([''])
                     continue
                     # У xlwings колір задається через RGB кортеж
                     # sheet.range((row_idx, subunit_col)).color = (255, 199, 206)  # Pale Red
 
                 # Екстракція підрозділу
-                region_my = self.docProcessor._extract_rtzk_region(rtzk)
-                if region_my == NA:
-                    region_my = self.docProcessor._extract_rtzk_region(address)
+                region_my = self.docProcessor._extract_desertion_region(condition)
                 # print(str(i) + ': ' + region_my + ' vs ' + rtzk_region + " ( " + rtzk + ' || ' + address + ')')
-                if rtzk_region and region_my != rtzk_region:
-                    print('>>> Incorrect: ' + region_my + ' vs ' + rtzk_region + " (" + rtzk + '||' + address + ')')
-                if region_my == NA and rtzk_region:
-                    region_my = rtzk_region
-                    # print('>>> MISSING: ' + region_my + ' vs ' + rtzk_region + " (" + rtzk + '||' + address + ')')
+                #if des_region and region_my != des_region:
+                #    print('>>> Incorrect: ' + region_my + ' vs ' + des_region + " (" + condition + ')')
+                #if region_my == NA and des_region:
+                #    region_my = des_region
+                #    # print('>>> MISSING: ' + region_my + ' vs ' + rtzk_region + " (" + rtzk + '||' + address + ')')
+                if region_my == NA:
+                    print('EMPTY FOR  ' + str(condition))
 
                 results.append([region_my])
 
             # Записуємо всі результати в колонку одним зверненням (це набагато швидше)
-            print('processed: ' + str(len(results)) + " vs values " + str(len(rtzk_values)))
-            sheet.range((2, rtzk_region_col)).value = results
+            print('processed: ' + str(len(results)) + " vs values " + str(len(condition_values)))
+            # sheet.range((2, rtzk_region_col)).value = results
 
             self.wb.save()
             print("✅ Конвертацію Subunit2 завершено успішно.")

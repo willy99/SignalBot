@@ -4,7 +4,7 @@ import traceback
 import config
 from dics.deserter_xls_dic import *
 from collections import defaultdict
-from storage.LoggerManager import LoggerManager
+from service.storage.LoggerManager import LoggerManager
 from config import DESERTER_TAB_NAME
 from utils.utils import get_strint_fromfloat
 from domain.person_filter import PersonSearchFilter

@@ -1,7 +1,7 @@
-from storage.FileStorageClient import FileStorageClient
-from storage.LocalFileClient import LocalFileClient
-from storage.SMBFileClient import SMBFileClient
-from storage.LoggerManager import LoggerManager
+from service.storage.FileStorageClient import FileStorageClient
+from service.storage.LocalFileClient import LocalFileClient
+from service.storage.SMBFileClient import SMBFileClient
+from service.storage.LoggerManager import LoggerManager
 
 class StorageFactory:
     @staticmethod

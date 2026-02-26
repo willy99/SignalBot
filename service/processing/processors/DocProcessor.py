@@ -1,5 +1,5 @@
 from pathlib import Path
-from processing.parsers.ParserFactory import ParserFactory
+from service.processing.parsers.ParserFactory import ParserFactory
 import config
 from utils.utils import format_to_excel_date, get_file_name, clean_text, check_birthday_id_number
 import dics.deserter_xls_dic as col
@@ -7,7 +7,7 @@ from dics.deserter_xls_dic import *
 from datetime import datetime
 import re
 from typing import Final
-from processing.parsers.MLParser import MLParser
+from service.processing.parsers.MLParser import MLParser
 
 class DocProcessor:
 
@@ -112,9 +112,9 @@ class DocProcessor:
             fields[col.COLUMN_TITLE_2] = self._extract_title_2(fields[col.COLUMN_TITLE])
             fields[col.COLUMN_SERVICE_TYPE] = self.get_best_match(ml_extracted.get(col.COLUMN_SERVICE_TYPE), self._extract_service_type(text))
             fields[col.COLUMN_ADDRESS] = self.get_best_match(ml_extracted.get(col.COLUMN_ADDRESS), self._extract_address(clean_text(text)))
-            fields[col.COLUMN_TZK_REGION] = self._extract_rtzk_region(fields[col.COLUMN_TZK])
+            fields[col.COLUMN_TZK_REGION] = self._extract_region(fields[col.COLUMN_TZK])
             if fields[col.COLUMN_TZK_REGION] == NA:
-                fields[col.COLUMN_TZK_REGION] = self._extract_rtzk_region(fields[col.COLUMN_ADDRESS])
+                fields[col.COLUMN_TZK_REGION] = self._extract_region(fields[col.COLUMN_ADDRESS])
             fields[col.COLUMN_BIO] = self.get_best_match(ml_extracted.get(col.COLUMN_BIO), self._extract_bio(clean_text(text), fields[col.COLUMN_NAME]))
             fields[col.COLUMN_ENLISTMENT_DATE] = self.get_best_match(ml_extracted.get(col.COLUMN_ENLISTMENT_DATE), self._extract_conscription_date(text))
             fields[col.COLUMN_SUBUNIT] = self.get_best_match(ml_extracted.get(col.COLUMN_SUBUNIT), self.extract_military_subunit(text, get_file_name(self.original_filename)))
@@ -184,6 +184,16 @@ class DocProcessor:
                 self.logger.debug('... 🏃‍♂️ПЕРСОНА: ' + self._extract_name(person_data))
 
         return persons
+
+
+    @staticmethod
+    def _extract_region(tck_text: str) -> str:
+        if not tck_text or tck_text == NA:
+            return NA
+        for pattern, region_name in PATTERN_REGION:
+            if re.search(pattern, tck_text):
+                return region_name
+        return NA
 
     @staticmethod
     def _extract_mil_unit(text):
@@ -317,15 +327,6 @@ class DocProcessor:
         return res
 
     @staticmethod
-    def _extract_rtzk_region(tck_text: str) -> str:
-        if not tck_text or tck_text == NA:
-            return NA
-        for pattern, region_name in PATTERN_REGION:
-            if re.search(pattern, tck_text):
-                return region_name
-        return NA
-
-    @staticmethod
     def _extract_desertion_date(text):
         match = re.search(PATTERN_DESERTION_DATE, text, re.IGNORECASE)
 
@@ -372,17 +373,20 @@ class DocProcessor:
 
         return None
 
-    @staticmethod
-    def _extract_desertion_region(text):
+    def _extract_desertion_region(self, text):
         match = re.search(PATTERN_DESERTION_REGION_MAIN, text, re.DOTALL)
+        desertion_place = None
         if match:
             full_address = " ".join(match.group(1).split())
-            return full_address.strip().rstrip('.')
+            desertion_place = full_address.strip().rstrip('.')
 
-        backup_match = re.search(PATTERN_DESERTION_REGION_BACKUP, text)
-        if backup_match:
-            return " ".join(backup_match.group(1).split())
+        if not desertion_place:
+            backup_match = re.search(PATTERN_DESERTION_REGION_BACKUP, text)
+            if backup_match:
+                desertion_place = " ".join(backup_match.group(1).split())
 
+        if desertion_place:
+            return self._extract_region(desertion_place)
         return NA
 
     def _calculate_service_days(self, conscription_date_str, desertion_date_str):

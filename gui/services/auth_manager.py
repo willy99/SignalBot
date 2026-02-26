@@ -133,6 +133,7 @@ class AuthManager:
         user_info = app.storage.user.get('user_info', {})
         ctx = RequestContext(
             user_name = user_info.get('full_name') or user_info.get('username') or 'Гість',
-            user_role = user_info.get('role')
+            user_role = user_info.get('role'),
+            user_id = user_info.get('id')
         )
         return ctx

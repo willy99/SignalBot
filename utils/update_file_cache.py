@@ -8,9 +8,9 @@ root_dir = Path(__file__).parent.parent.absolute()
 sys.path.append(str(root_dir))
 
 import config
-from storage.FileCacher import FileCacheManager
-from storage.StorageFactory import StorageFactory
-from storage.LoggerManager import LoggerManager
+from service.storage.FileCacher import FileCacheManager
+from service.storage.StorageFactory import StorageFactory
+from service.storage.LoggerManager import LoggerManager
 
 if __name__ == '__main__':
     log_manager = LoggerManager()

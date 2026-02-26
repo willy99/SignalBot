@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from storage.LoggerManager import LoggerManager
+from service.storage.LoggerManager import LoggerManager
 from .DocxParser import DocxParser
 from .DocOldParser import DocOldParser
 from .PdfParser import PdfParser

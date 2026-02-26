@@ -2,27 +2,20 @@ from nicegui import ui, run
 from gui.services.request_context import RequestContext
 
 # --- КОНСТАНТИ ДЕФОЛТНИХ ЗНАЧЕНЬ СТОРІНОК ---
-DEF_NOTIF = 1
-DEF_ASSIGN = 3
-DEF_RESULT = 3
-DEF_ACT = 4
-DEF_EXPL = 4
-DEF_CHAR = 2
-DEF_MED = 1
-DEF_CARD = 2
-DEF_SET_DOCS = 2
-DEF_MOVE = 1
-DEF_OTHER = 0
+# Константи залишаються без змін...
+DEF_NOTIF, DEF_ASSIGN, DEF_RESULT = 1, 3, 3
+DEF_ACT, DEF_EXPL, DEF_CHAR = 4, 4, 2
+DEF_MED, DEF_CARD, DEF_SET_DOCS, DEF_MOVE, DEF_OTHER = 1, 2, 2, 1, 0
 
 
-def render_document_page(controller, ctx: RequestContext):
+def render_document_page(controller, ctx: RequestContext, draft_id: int = None):
     ui.label('Масове створення супровідних листів').classes('w-full text-center text-3xl font-bold mb-8')
 
-    # Стан сторінки
     state = {
         'edit_idx': None,
         'buffer': [],
-        'current_search_results': {}  # Зберігаємо сирі дані знайдених персон
+        'current_search_results': {},
+        'current_support_doc_id': draft_id
     }
 
     with ui.grid(columns=12).classes('w-full gap-6 items-start'):
@@ -280,11 +273,36 @@ def render_document_page(controller, ctx: RequestContext):
                     ui.notify(f'Помилка генерації: {e}', type='negative')
 
             async def on_save_draft_click():
-                ui.notify('Функція збереження чернетки (Draft) в розробці...', type='info')
+                if not state['buffer']:
+                    ui.notify('Неможливо зберегти: пакет порожній!', type='warning')
+                    return
+
+                save_draft_btn.disable()
+                try:
+                    # Отримуємо логін/ПІБ поточного користувача з контексту
+
+                    # Викликаємо наш новий сервіс (який ви передасте ззовні, або ініціалізуєте)
+                    draft_id = await run.io_bound(
+                        controller.save_support_doc,
+                        ctx,
+                        city.value,
+                        supp_number_input.value,
+                        state['buffer'],
+                        state.get('current_support_doc_id')  # Якщо ми редагуємо стару чернетку, передаємо її ID
+                    )
+
+                    # Зберігаємо ID поточної чернетки, щоб наступне збереження оновило її, а не створило нову
+                    state['current_support_doc_id'] = draft_id
+
+                    ui.notify(f'Чернетку №{draft_id} збережено!', type='positive', icon='cloud_done')
+                except Exception as e:
+                    ui.notify(f'Помилка БД: {e}', type='negative')
+                finally:
+                    save_draft_btn.enable()
 
             generate_docs_btn = ui.button('ЗГЕНЕРУВАТИ WORD', on_click=on_generate_docs_click,
                                           icon='description').classes('w-full mt-4 h-12').props('color="green"')
-            save_draft_btn = ui.button('ЗБЕРЕГТИ ЯК ЧЕРНЕТКУ (БД)', on_click=on_save_draft_click,
+            save_draft_btn = ui.button('ЗБЕРЕГТИ ЯК ЧЕРНЕТКУ', on_click=on_save_draft_click,
                                        icon='save_as').classes('w-full mt-2 h-10').props('outline color="primary"')
 
             refresh_buffer_ui()

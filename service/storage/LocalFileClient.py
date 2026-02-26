@@ -1,8 +1,8 @@
 import os
 import shutil
 import io
-from storage.FileStorageClient import FileStorageClient
-from storage.LoggerManager import LoggerManager
+from service.storage.FileStorageClient import FileStorageClient
+from service.storage.LoggerManager import LoggerManager
 import json
 
 class LocalFileClient(FileStorageClient):

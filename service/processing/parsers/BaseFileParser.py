@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import re
-from storage.LoggerManager import LoggerManager
+from service.storage.LoggerManager import LoggerManager
 
 class BaseFileParser(ABC):
     def __init__(self, file_path, log_manager: LoggerManager):

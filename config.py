@@ -74,7 +74,7 @@ MAX_QUERY_RESULTS = 50
 # ML
 ML_MODEL_JSON = os.path.join(os.path.expanduser("~/work/signalBot/signal-data"), "training_data.jsonl")
 ML_LOCAL_DESERTER_XLSX : Final =  "~/work/SignalBot/signal-data/А0224 СЗЧ 2022-2025_copy_pasha.xlsx"
-ML_MODEL_PATH = os.path.join(os.path.expanduser("~/work/signalBot/ml/output_model"), "model-best")
+ML_MODEL_PATH = os.path.join(os.path.expanduser("~/work/signalBot/service/ml/output_model"), "model-best")
 
 # Шлях до системної папки signal-cli (де лежать вхідні файли)
 SIGNAL_ATTACHMENTS_DIR : Final = os.path.expanduser("~/.local/share/signal-cli/attachments/")

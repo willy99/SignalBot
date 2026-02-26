@@ -4,13 +4,13 @@ import sys
 
 import warnings
 
-from config import DESERTER_TAB_NAME, EXCEL_CHUNK_SIZE, EXCEL_DATE_FORMAT
+from config import DESERTER_TAB_NAME, EXCEL_CHUNK_SIZE
 from dics.deserter_xls_dic import *
 from dics.deserter_xls_dic import NA
 from typing import List, Dict, Any
 from utils.utils import format_ukr_date, get_typed_value, format_to_excel_date, get_strint_fromfloat
 import traceback
-from storage.LoggerManager import LoggerManager
+from service.storage.LoggerManager import LoggerManager
 from datetime import date, datetime
 import threading
 from domain.person_filter import PersonSearchFilter
@@ -68,8 +68,12 @@ class ExcelProcessor:
             else:
                 current_id = 0
         except (ValueError, TypeError):
-            self.logger.warning(f'--- ⚠️ Помилка отримання поточного ID. Останнє значення: {last_val}')
-            current_id = 0
+            # self.logger.warning(f'--- ⚠️ Помилка отримання поточного ID. Останнє значення: {last_val}')
+            print('>>>> target row: ' + str(target_insert_row))
+            print('>>>> last_val: ' + str(last_val))
+            print('>>>> last_used_row: ' + str(last_used_row))
+            print('>>>> last_row_with_data: ' + str(last_row_with_data))
+            raise ValueError(f'--- ⚠️ Помилка отримання поточного ID. Останнє значення: {last_val}')
 
         self.logger.debug(f'--- Визначено останній ID: {current_id} (з рядка {last_row_with_data})')
 

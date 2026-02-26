@@ -22,7 +22,7 @@ COLUMN_DESERTION_PLACE : Final[str] = 'Звідки СЗЧ'
 COLUMN_DESERTION_TYPE : Final[str] = 'Місцезнаходження всл.' # сзч, зі зброєю, а2900
 COLUMN_SUBUNIT : Final[str] = 'Підрозділ'
 COLUMN_SUBUNIT2 : Final[str] = 'Підрозділ 2'
-COLUMN_DESERTION_REGION: Final[str] = 'Звідки СЗЧ н.п. обл'
+COLUMN_DESERTION_REGION: Final[str] = 'Звідки СЗЧ обл'
 COLUMN_BIRTHDAY : Final[str] = 'Дата народження'
 COLUMN_ID_NUMBER : Final[str] = 'РНОКПП'
 COLUMN_ENLISTMENT_DATE : Final[str] = 'Дата призову на військову службу'
@@ -51,7 +51,6 @@ COLUMN_DBR_NUMBER: Final[str] = "№ вих на ДБР"
 COLUMN_DBR_DATE: Final[str] = "Дата відправки справи на ДБР"
 COLUMN_ERDR_DATE: Final[str] = "Дата внесення в ЄРДР"
 COLUMN_ERDR_NOTATION: Final[str] = "примітки/ ЄРДР"
-
 
 
 PATTERN_TITLE_MAPPING: Final[Dict[str, str]] = {
@@ -214,7 +213,7 @@ PATTERN_RTZK_TRASH: Final[List[str]] = [
     r'(?i)^(на військову службу|призваний)\s+' # Патерн для очищення на початку рядка
 ]
 
-PATTERN_RTZK_CALLED: Final =r'(?i)(ТЦК та СП|на військову службу|призваний[,:]?)\s+'
+PATTERN_RTZK_CALLED: Final =r'(?i)(ТЦК та СП|на військову службу|призваний)[,:]?\s+'
 
 PATTERN_DATE: Final = r"(\d{2}\.\d{2}\.(?:\d{4}|\d{2}))"
 

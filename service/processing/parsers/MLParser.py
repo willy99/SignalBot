@@ -1,6 +1,6 @@
 import spacy
 import re
-from storage.LoggerManager import LoggerManager
+from service.storage.LoggerManager import LoggerManager
 
 class MLParser:
     def __init__(self, model_path, log_manager: LoggerManager):

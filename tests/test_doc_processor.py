@@ -1,10 +1,10 @@
 import pytest
 from pathlib import Path
-from processing.processors.DocProcessor import DocProcessor
+from service.processing.processors.DocProcessor import DocProcessor
 from dics.deserter_xls_dic import *
-from processing.parsers.MLParser import MLParser
+from service.processing.parsers.MLParser import MLParser
 import config
-from storage.LoggerManager import LoggerManager
+from service.storage.LoggerManager import LoggerManager
 
 class MockWorkflow:
     """Заглушка для workflow, щоб збирати статистику без бота"""
@@ -55,7 +55,7 @@ def test_process_doc_fedorov_simple(processor_factory):
     assert fields[COLUMN_SERVICE_DAYS] == 64
     assert fields[COLUMN_DESERTION_DATE] == "25.01.2026"
     assert fields[COLUMN_DESERTION_PLACE] == "РВБЗ"
-    assert fields[COLUMN_DESERTION_REGION] == "Шахтарське Дніпропетровської області"
+    assert fields[COLUMN_DESERTION_REGION] == "Дніпропетровська область"
     assert "ФЕДОРОВ Олександр Вікторович" in fields[COLUMN_DESERT_CONDITIONS]
     assert "самовільно залишив" in fields[COLUMN_DESERT_CONDITIONS]
     assert fields[COLUMN_PHONE] == "0687775544"
@@ -90,7 +90,7 @@ def test_process_doc_maly_simple(processor_factory):
     assert fields[COLUMN_SERVICE_DAYS] == 1865
     assert fields[COLUMN_DESERTION_DATE] == "01.01.2026"
     assert fields[COLUMN_DESERTION_PLACE] == "РВБЗ"
-    assert fields[COLUMN_DESERTION_REGION] == "Тернівка Дніпропетровської області"
+    assert fields[COLUMN_DESERTION_REGION] == "Дніпропетровська область"
     assert "МАЛИЙ Дмитро Вадимович" in fields[COLUMN_DESERT_CONDITIONS]
     assert fields[COLUMN_PHONE] == "0969111111"
     assert "Дніпропетровська обл., м. Кривий Ріг, вул. Ф. Караманиця, буд. 11А, кв 12" in fields[COLUMN_ADDRESS]
@@ -152,7 +152,7 @@ def test_process_doc_two_persons(processor_factory):
     for field in result:
         assert field[COLUMN_MIL_UNIT] == 'А0224'
         assert field[COLUMN_DESERTION_DATE] == '31.01.2026'
-        assert field[COLUMN_DESERTION_REGION] == 'Привовчанське Дніпропетровської області'
+        assert field[COLUMN_DESERTION_REGION] == 'Дніпропетровська область'
         assert "ІВОНЧАК" in field[COLUMN_DESERT_CONDITIONS]
         assert "НЕГОЛЮК" in field[COLUMN_DESERT_CONDITIONS]
         assert field[COLUMN_EXECUTOR] == 'БЕЗКРОВНИЙ Володимир Володимирович'
@@ -191,7 +191,7 @@ def test_process_docx_simple(processor_factory):
     assert person[COLUMN_ENLISTMENT_DATE] == '24.02.2022'
     assert person[COLUMN_SERVICE_DAYS] == 1408
     assert person[COLUMN_DESERTION_DATE] == '02.01.2026'
-    assert person[COLUMN_DESERTION_REGION] == 'Вознесенське, Миколаївської області'
+    assert person[COLUMN_DESERTION_REGION] == 'Миколаївська область'
     assert "З 01.08.2025 по 17.10.2025 був на стаціонарному лікуванні в КНП “Хмільницька центральна лікарня”. 30.12.2025 прибув до пункту постійної дислокації військової частини А0224 (н.п. Вознесенське, Миколаївської області" in person[
         COLUMN_DESERT_CONDITIONS]
     assert "З 18.10.2025 по 29.12.2025 солдат ГАВНОВ Віктор Євгенович був відсутній на військовій службі, підтверджуючих документів не надав (відсутній на військовій службі 73 доби)" in person[
@@ -384,55 +384,55 @@ def test_rtzk_region_extraction(processor_factory):
     processor = processor_factory("any.docx")
 
     text = "Призваний Центральним РТЦК та СП м. Київ 06.12.2024 року. "
-    res = processor._extract_rtzk_region(text)
+    res = processor._extract_region(text)
     assert "Київська область" in res
 
     text = "Призваний Київським РТЦК та СП"
-    res = processor._extract_rtzk_region(text)
+    res = processor._extract_region(text)
     assert "Київська область" in res
 
     text = "Призваний Центральним РТЦК та СП м. Обухів, Київська обл."
-    res = processor._extract_rtzk_region(text)
+    res = processor._extract_region(text)
     assert "Київська область" in res
 
     text = "Призваний Новокодацьким РТЦК та СП м. Дніпра 06.12.2024 року. "
-    res = processor._extract_rtzk_region(text)
+    res = processor._extract_region(text)
     assert "Дніпропетровська область" in res
 
     text = "Кіровоградська обл., м. Олександрія, вул. Перспективна, буд. 16 кв. 52"
-    res = processor._extract_rtzk_region(text)
+    res = processor._extract_region(text)
     assert "Кіровоградська область" in res
 
     text = "Чернівецька обл., м. Олександрія, вул. Сумська, буд. 16 кв. 52"
-    res = processor._extract_rtzk_region(text)
+    res = processor._extract_region(text)
     assert "Чернівецька область" in res
 
     text = "Кропивницьким РТЦК та СП, м. Кропивницький"
-    res = processor._extract_rtzk_region(text)
+    res = processor._extract_region(text)
     assert "Кіровоградська область" in res
 
     text = "Кропивницький МТЦК та СП."
-    res = processor._extract_rtzk_region(text)
+    res = processor._extract_region(text)
     assert "Кіровоградська область" in res
 
     text = "Кам’янський РТЦК та СП м. Кам’янка Дніпропетровської області"
-    res = processor._extract_rtzk_region(text)
+    res = processor._extract_region(text)
     assert "Дніпропетровська область" in res
 
     text = "Київський РТЦК та СП м. Одеса"
-    res = processor._extract_rtzk_region(text)
+    res = processor._extract_region(text)
     assert "Одеська область" in res
 
     text = "Дубинським РТЦК та СП Рівненської обл."
-    res = processor._extract_rtzk_region(text)
+    res = processor._extract_region(text)
     assert "Рівненська область" in res
 
     text = "Миколаївський РТЦК та СП"
-    res = processor._extract_rtzk_region(text)
+    res = processor._extract_region(text)
     assert "Миколаївська область" in res
 
     text = "місто Вінниця, вулиця Нагірна 21ж, квартира 21."
-    res = processor._extract_rtzk_region(text)
+    res = processor._extract_region(text)
     assert "Вінницька область" in res
 
 def test_conscription_date(processor_factory):

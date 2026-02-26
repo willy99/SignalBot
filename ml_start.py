@@ -1,8 +1,3 @@
-from processing.MyWorkFlow import MyWorkFlow
-from dics.deserter_xls_dic import *
-from ml.TrainingDataExporter import TrainingDataExporter
-from ml.ModelTrainer import ModelTrainer
-
 # Report creation
 # workflow = MyWorkFlow()
 # workflow.initExcelProcessor(config.DESERTER_XLSX_FILE_PATH) # one-time init

@@ -1,14 +1,14 @@
-from connection.SignalClient import SignalClient
-from processing.processors.ExcelProcessor import ExcelProcessor
-from processing.AttachmentHandler import AttachmentHandler
-from connection.MyDataBase import MyDataBase
-from processing.Stat import Stat
-from processing.processors.BatchProcessor import BatchProcessor
+from service.connection.SignalClient import SignalClient
+from service.processing.processors.ExcelProcessor import ExcelProcessor
+from service.processing.AttachmentHandler import AttachmentHandler
+from service.connection.MyDataBase import MyDataBase
+from service.processing.Stat import Stat
+from service.processing.processors.BatchProcessor import BatchProcessor
 import traceback
-from storage.LoggerManager import LoggerManager
-from report.ExcelReport import ExcelReporter
-from processing.converter.ColumnConverter import ColumnConverter
-from storage.BackupData import BackupData
+from service.storage.LoggerManager import LoggerManager
+from service.processing.processors.ExcelReport import ExcelReporter
+from service.processing.converter.ColumnConverter import ColumnConverter
+from service.storage.BackupData import BackupData
 
 class MyWorkFlow:
 

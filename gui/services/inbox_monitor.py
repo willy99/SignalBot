@@ -1,5 +1,5 @@
-from nicegui import ui, run, app
-from storage.StorageFactory import StorageFactory
+from nicegui import run, app
+from service.storage.StorageFactory import StorageFactory
 import config
 import asyncio
 from typing import List

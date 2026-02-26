@@ -6,4 +6,4 @@ bot_data.db
 .env
 __pycache__/
 .DS_Store
-/ml/output_model/
+/service/ml/output_model/

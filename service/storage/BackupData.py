@@ -1,10 +1,10 @@
 import os
 import io
 import config
-from storage.StorageFactory import StorageFactory
+from service.storage.StorageFactory import StorageFactory
 from datetime import datetime, timedelta
 import zipfile
-from storage.LoggerManager import LoggerManager
+from service.storage.LoggerManager import LoggerManager
 
 class BackupData:
     def __init__(self, log_manager: LoggerManager):

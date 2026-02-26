@@ -1,9 +1,9 @@
 import os
 import config
-from processing.processors.DocProcessor import DocProcessor
+from service.processing.processors.DocProcessor import DocProcessor
 from utils.utils import get_effective_date
 import json
-from storage.StorageFactory import StorageFactory
+from service.storage.StorageFactory import StorageFactory
 import unicodedata
 import traceback
 

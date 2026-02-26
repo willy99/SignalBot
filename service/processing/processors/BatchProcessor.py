@@ -2,9 +2,9 @@ import os
 from datetime import datetime, timedelta
 
 import config
-from storage.StorageFactory import StorageFactory
-from processing.processors.ExcelProcessor import ExcelProcessor
-from processing.processors.DocProcessor import DocProcessor
+from service.storage.StorageFactory import StorageFactory
+from service.processing.processors.ExcelProcessor import ExcelProcessor
+from service.processing.processors.DocProcessor import DocProcessor
 import traceback
 
 class BatchProcessor:

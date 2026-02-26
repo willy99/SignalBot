@@ -3,8 +3,8 @@ import os
 import smbclient
 from smbclient import register_session, delete_session, open_file, makedirs
 from config import NET_SERVER_IP, NET_USERNAME, NET_PASSWORD
-from storage.FileStorageClient import FileStorageClient
-from storage.LoggerManager import LoggerManager
+from service.storage.FileStorageClient import FileStorageClient
+from service.storage.LoggerManager import LoggerManager
 import json
 
 class SMBFileClient(FileStorageClient):

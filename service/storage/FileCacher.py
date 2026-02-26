@@ -1,6 +1,6 @@
 import re
 from typing import List, Dict
-from storage.StorageFactory import StorageFactory
+from service.storage.StorageFactory import StorageFactory
 
 
 class FileCacheManager:

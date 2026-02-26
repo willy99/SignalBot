@@ -2,7 +2,7 @@ import json
 import sys
 import config
 from config import DESERTER_TAB_NAME
-from processing.MyWorkFlow import MyWorkFlow
+from service.processing.MyWorkFlow import MyWorkFlow
 import threading
 from pynput import keyboard
 import webbrowser
