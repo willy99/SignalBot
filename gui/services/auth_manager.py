@@ -134,6 +134,7 @@ class AuthManager:
         ctx = RequestContext(
             user_name = user_info.get('full_name') or user_info.get('username') or 'Гість',
             user_role = user_info.get('role'),
-            user_id = user_info.get('id')
+            user_id = user_info.get('id'),
+            user_login = user_info.get('username')
         )
         return ctx

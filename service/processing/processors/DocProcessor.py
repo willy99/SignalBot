@@ -374,6 +374,10 @@ class DocProcessor:
         return None
 
     def _extract_desertion_region(self, text):
+        # Навчальний центр - одразу житомір!
+        if re.search("з НЦ", text, re.IGNORECASE) and len(text) < 100:
+            return "Житомирська область"
+
         match = re.search(PATTERN_DESERTION_REGION_MAIN, text, re.DOTALL)
         desertion_place = None
         if match:
@@ -384,6 +388,8 @@ class DocProcessor:
             backup_match = re.search(PATTERN_DESERTION_REGION_BACKUP, text)
             if backup_match:
                 desertion_place = " ".join(backup_match.group(1).split())
+        if not desertion_place: # fallback for the whole string
+            desertion_place = text
 
         if desertion_place:
             return self._extract_region(desertion_place)

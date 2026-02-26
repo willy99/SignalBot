@@ -138,7 +138,7 @@ def init_nicegui(workflow_obj):
     def file_search_route():
         ctx = auth_manager.get_current_context()
         menu(auth_manager)
-        render_file_search_page(file_manager)
+        render_file_search_page(file_manager, ctx)
 
 
     # native=False дозволяє працювати як веб-сервер

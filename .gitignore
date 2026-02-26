@@ -7,3 +7,4 @@ bot_data.db
 __pycache__/
 .DS_Store
 /service/ml/output_model/
+/.nicegui/

@@ -78,17 +78,18 @@ class ColumnConverter:
                 # print(str(i) + ': ' + region_my + ' vs ' + rtzk_region + " ( " + rtzk + ' || ' + address + ')')
                 #if des_region and region_my != des_region:
                 #    print('>>> Incorrect: ' + region_my + ' vs ' + des_region + " (" + condition + ')')
+
                 #if region_my == NA and des_region:
                 #    region_my = des_region
                 #    # print('>>> MISSING: ' + region_my + ' vs ' + rtzk_region + " (" + rtzk + '||' + address + ')')
-                if region_my == NA:
-                    print('EMPTY FOR  ' + str(condition))
+                #if region_my == NA:
+                #    print('EMPTY FOR  ' + str(condition))
 
                 results.append([region_my])
 
             # Записуємо всі результати в колонку одним зверненням (це набагато швидше)
             print('processed: ' + str(len(results)) + " vs values " + str(len(condition_values)))
-            # sheet.range((2, rtzk_region_col)).value = results
+            sheet.range((2, des_region_col)).value = results
 
             self.wb.save()
             print("✅ Конвертацію Subunit2 завершено успішно.")

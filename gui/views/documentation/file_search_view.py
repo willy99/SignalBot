@@ -1,7 +1,8 @@
 from nicegui import ui, run
 import config
+from gui.services.request_context import RequestContext
 
-def render_file_search_page(file_cache_manager):
+def render_file_search_page(file_cache_manager, ctx: RequestContext):
     # Замість p-4 (відступи) можна зробити px-8 для країв
     file_cache_manager.load_cache()
     with ui.column().classes('w-full items-center px-8 py-4'):
@@ -52,17 +53,7 @@ def render_file_search_page(file_cache_manager):
                 table = ui.table(columns=columns, rows=display_data, row_key='full_path').classes('w-full')
 
                 table.add_slot('body-cell-action', '''
-                    <q-td :props="props" class="gap-2">
-                        <q-btn size="sm" color="blue-8" icon="content_copy" label="Win"
-                               @click="$parent.$emit('copyPath', {path: props.row.path_win, os: 'Windows'})">
-                            <q-tooltip>Копіювати шлях для Windows</q-tooltip>
-                        </q-btn>
-
-                        <q-btn size="sm" color="grey-8" icon="content_copy" label="Mac" style="margin-left: 8px;" class="gap-2"
-                               @click="$parent.$emit('copyPath', {path: props.row.path_mac, os: 'Mac'})">
-                            <q-tooltip>Копіювати шлях для Mac (Cmd+K)</q-tooltip>
-                        </q-btn>
-                        
+                    <q-td :props="props" class="gap-2">                        
                         <q-btn size="sm" color="green-7" icon="forward_to_inbox" label="Outbox"
                                @click="$parent.$emit('copyToOutbox', props.row)">
                             <q-tooltip>Копіювати файл в Outbox</q-tooltip>
@@ -93,7 +84,7 @@ def render_file_search_page(file_cache_manager):
         row_data = e.args
         source_path = row_data['path_win']
         filename = row_data['name']
-        destination_path = config.OUTBOX_DIR_PATH + file_cache_manager.get_file_separator() + filename
+        destination_path = config.OUTBOX_DIR_PATH + file_cache_manager.get_file_separator() + ctx.user_login + file_cache_manager.get_file_separator() + filename
 
         with ui.notification(message=f'Копіювання {filename}...', spinner=True, timeout=0) as n:
             try:
