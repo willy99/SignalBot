@@ -64,7 +64,7 @@ def render_duplicates_report_page(report_ctrl, ctx: RequestContext):
                     {'name': 'des_date', 'label': 'Дата СЗЧ', 'field': 'des_date', 'align': 'center'},
                 ]
 
-                table = ui.table(columns=columns, rows=rows, row_key='id_number').classes('w-full max-w-5xl')
+                table = ui.table(columns=columns, rows=rows, row_key='id_number').classes('w-full max-w-5xl general-table')
                 table.props('bordered flat separator=cell')
 
                 table.add_slot('body', '''

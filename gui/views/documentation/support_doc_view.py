@@ -1,17 +1,26 @@
 from nicegui import ui, run
 from gui.services.request_context import RequestContext
+from utils.utils import to_genitive_case
+from service.docworkflow.DocSupportService import SUPPORT_DOC_STATUS_DRAFT, SUPPORT_DOC_STATUS_COMPLETED
+from config import UI_DATE_FORMAT, OUTBOX_DIR_PATH
+from datetime import datetime
+from service.storage.FileCacher import FileCacheManager
+import io
+from gui.controllers.person_controller import PersonController
+from gui.controllers.support_controller import SupportController
 
 # --- КОНСТАНТИ ДЕФОЛТНИХ ЗНАЧЕНЬ СТОРІНОК ---
-# Константи залишаються без змін...
 DEF_NOTIF, DEF_ASSIGN, DEF_RESULT = 1, 3, 3
 DEF_ACT, DEF_EXPL, DEF_CHAR = 4, 4, 2
 DEF_MED, DEF_CARD, DEF_SET_DOCS, DEF_MOVE, DEF_OTHER = 1, 2, 2, 1, 0
 
 
-def render_document_page(controller, ctx: RequestContext, draft_id: int = None):
-    ui.label('Масове створення супровідних листів').classes('w-full text-center text-3xl font-bold mb-8')
+def render_document_page(controller: SupportController, person_controller: PersonController, file_cache_manager:FileCacheManager, ctx: RequestContext, draft_id: int = None):
+    ui.label('Масове створення супровідних листів').classes('w-full text-center text-2xl font-bold mb-8')
 
     state = {
+        'status': SUPPORT_DOC_STATUS_DRAFT,
+        'support_date': None,
         'edit_idx': None,
         'buffer': [],
         'current_search_results': {},
@@ -21,21 +30,40 @@ def render_document_page(controller, ctx: RequestContext, draft_id: int = None):
     with ui.grid(columns=12).classes('w-full gap-6 items-start'):
 
         with ui.card().classes('col-span-12 md:col-span-8 w-full'):
-            with ui.row().classes('w-full items-center gap-4 mb-4'):
+            status_text = state.get('status', 'Draft')
+            badge_color = 'green' if status_text == 'Completed' else 'grey'
+            with ui.row().classes('w-full items-center gap-5 mb-5'):
+                with ui.row().classes('items-center gap-2'):
+                    ui.label('Статус:').classes('text-gray-500 font-medium')
+                    status_badge = ui.badge(status_text, color=badge_color).classes('text-sm px-2 py-1')
                 city = ui.radio(['Миколаїв', 'Дніпро', 'Донецьк'], value='Миколаїв').props('inline')
-                supp_number_input = ui.input('Загальний номер супроводу').classes('w-1/3')
+                supp_number_input = ui.input('Загальний номер супроводу').classes('flex-1')
+                supp_date_input = date_input('Дата формування', state, 'support_date', blur_handler=fix_date).classes(
+                    'flex-1')
 
-            ui.label('Пошук військовослужбовця').classes('text-lg font-bold text-gray-700')
-
+            #with ui.row().classes('w-full items-center gap-4 mb-4'):
+                #ui.label('Пошук військовослужбовця').classes('text-lg font-bold text-gray-700')
             with ui.row().classes('w-full gap-2 items-center'):
-                search_input = ui.input('Введіть прізвище...').classes('flex-grow').props('clearable autofocus')
+                search_input = ui.input('Пошук військовослужбовця. Введіть прізвище...').classes('flex-grow').props('clearable autofocus')
                 search_btn = ui.button('Шукати', icon='search').props('elevated color="primary"')
 
-            person_select = ui.select(
-                options={},
-                label='Оберіть особу зі знайдених'
-            ).classes('w-full mt-2')
-            person_select.visible = False
+            def on_person_change(e):
+                # Коли користувач обирає іншу людину зі списку, автоматично оновлюємо родовий відмінок
+                selected_id = e.value
+                if selected_id and selected_id in state['current_search_results']:
+                    real_name = state['current_search_results'][selected_id]['name']
+                    name_gen_input.value = to_genitive_case(real_name)
+
+            with ui.row().classes('w-full items-center gap-4 mb-4'):
+                person_select = ui.select(
+                    options={},
+                    label='Оберіть особу зі знайдених',
+                    on_change=on_person_change
+                ).classes('flex-1')
+                person_select.visible = False
+
+                name_gen_input = ui.input('ПІБ (Родовий відмінок)').classes('flex-1 text-blue-800 font-bold')  # Займе 50% ширини
+                name_gen_input.visible = False
 
             async def perform_search(e=None):
                 query = search_input.value
@@ -61,9 +89,11 @@ def render_document_page(controller, ctx: RequestContext, draft_id: int = None):
 
                     person_select.options = options
                     person_select.visible = True
+                    name_gen_input.visible = True
 
                     if options:
-                        person_select.value = list(options.keys())[0]  # Автовибір першого
+                        first_id = list(options.keys())[0]
+                        person_select.value = first_id  # Автовибір першого (викличе on_person_change автоматично)
                         ui.notify(f'Знайдено збігів: {len(options)}', type='info')
                     else:
                         ui.notify('За цим запитом нікого не знайдено', type='warning')
@@ -121,6 +151,9 @@ def render_document_page(controller, ctx: RequestContext, draft_id: int = None):
                 search_input.value = ''
                 person_select.value = None
                 person_select.visible = False
+                name_gen_input.value = ''
+                name_gen_input.visible = False
+                total_input.value = 0
                 total_input.value = 0
 
                 notif.value = DEF_NOTIF
@@ -165,6 +198,7 @@ def render_document_page(controller, ctx: RequestContext, draft_id: int = None):
                 raw_data = {
                     'id_number': selected_id,  # Наш комбінований ключ
                     'name': name_val,
+                    'name_gen': name_gen_input.value.strip(),
                     'total': total_val,
                     'notif': int(notif.value or DEF_NOTIF),
                     'assign': int(assign.value or DEF_ASSIGN),
@@ -200,7 +234,7 @@ def render_document_page(controller, ctx: RequestContext, draft_id: int = None):
         # ПРАВА ЧАСТИНА: БУФЕР (DRAFT)
         # ==========================================
         with ui.column().classes('col-span-12 md:col-span-4 w-full'):
-            ui.label('Поточний пакет (Чернетка):').classes('text-xl font-bold')
+            ui.label('Поточний пакет:').classes('text-xl font-bold')
             buffer_container = ui.column().classes('w-full gap-2 p-4 border rounded bg-gray-50 min-h-[200px]')
 
             def on_remove_click(idx):
@@ -223,6 +257,8 @@ def render_document_page(controller, ctx: RequestContext, draft_id: int = None):
                 person_select.options = {id_num: f"{doc['name']} (РНОКПП: {id_num})"}
                 person_select.value = id_num
                 person_select.visible = True
+                name_gen_input.value = doc.get('name_gen', to_genitive_case(doc['name']))
+                name_gen_input.visible = True
 
                 total_input.value = doc['total']
                 notif.value = doc['notif']
@@ -254,23 +290,55 @@ def render_document_page(controller, ctx: RequestContext, draft_id: int = None):
                                 ui.label(f"{i + 1}. {doc['name']} ({doc['total']} стор.)").classes(
                                     'font-medium text-sm truncate w-2/3')
                                 with ui.row().classes('gap-1'):
-                                    ui.button(icon='edit', color='blue',
+                                    edit_button = ui.button(icon='edit', color='blue',
                                               on_click=lambda idx=i: on_edit_click(idx)).props('flat dense size=sm')
-                                    ui.button(icon='delete', color='red',
+                                    delete_button = ui.button(icon='delete', color='red',
                                               on_click=lambda idx=i: on_remove_click(idx)).props('flat dense size=sm')
+                                    if state['status'] == SUPPORT_DOC_STATUS_COMPLETED:
+                                        edit_button.disable()
+                                        delete_button.disable()
 
                 generate_docs_btn.set_visibility(len(buffer_data) > 0)
                 save_draft_btn.set_visibility(len(buffer_data) > 0)
 
             async def on_generate_docs_click():
                 try:
+                    if not supp_number_input.value or not supp_date_input.value:
+                        ui.notify('Непогано б заповнити дату та номер супроводу!', type='warning')
+                        return
+
                     file_bytes, file_name = controller.generate_support_document(
-                        ctx, city.value, supp_number_input.value, state['buffer']
+                        ctx, city.value, supp_number_input.value, supp_date_input.value, state['buffer']
                     )
                     ui.download(file_bytes, file_name)
                     ui.notify('Пакет успішно згенеровано!', type='positive')
                 except Exception as e:
                     ui.notify(f'Помилка генерації: {e}', type='negative')
+
+            async def on_generate_logs_click():
+                log_text = controller.generate_logs(
+                    ctx, city.value, supp_number_input.value, supp_date_input.value, state['buffer']
+                )
+                file_name = f"Пакет_Супроводів_{supp_number_input.value}_{supp_date_input.value}.txt"
+                destination_path = OUTBOX_DIR_PATH + file_cache_manager.get_file_separator() + ctx.user_login + file_cache_manager.get_file_separator() + file_name
+                log_buffer = io.BytesIO(log_text.encode('utf-8'))
+                client = file_cache_manager.client
+                with client:
+                    client.save_file_from_buffer(destination_path, log_buffer)
+
+            async def on_send_dbr_click():
+                # validate
+                if not supp_number_input.value or not supp_date_input.value:
+                    ui.notify('Непогано б заповнити дату та номер супроводу!', type='warning')
+                    return
+
+                complete = controller.mark_as_completed(ctx,person_controller, draft_id)
+                if complete:
+                    state['status'] = SUPPORT_DOC_STATUS_COMPLETED
+                    refresh_status_ui()
+                    ui.notify(f'Документи відправлені, дати та номери проставлені!', type='positive')
+                else:
+                    ui.notify(f'Документи не відправлені, щось не той!', type='negative')
 
             async def on_save_draft_click():
                 if not state['buffer']:
@@ -279,19 +347,16 @@ def render_document_page(controller, ctx: RequestContext, draft_id: int = None):
 
                 save_draft_btn.disable()
                 try:
-                    # Отримуємо логін/ПІБ поточного користувача з контексту
-
-                    # Викликаємо наш новий сервіс (який ви передасте ззовні, або ініціалізуєте)
                     draft_id = await run.io_bound(
                         controller.save_support_doc,
                         ctx,
                         city.value,
                         supp_number_input.value,
+                        supp_date_input.value,
                         state['buffer'],
-                        state.get('current_support_doc_id')  # Якщо ми редагуємо стару чернетку, передаємо її ID
+                        state.get('current_support_doc_id')
                     )
 
-                    # Зберігаємо ID поточної чернетки, щоб наступне збереження оновило її, а не створило нову
                     state['current_support_doc_id'] = draft_id
 
                     ui.notify(f'Чернетку №{draft_id} збережено!', type='positive', icon='cloud_done')
@@ -300,9 +365,88 @@ def render_document_page(controller, ctx: RequestContext, draft_id: int = None):
                 finally:
                     save_draft_btn.enable()
 
-            generate_docs_btn = ui.button('ЗГЕНЕРУВАТИ WORD', on_click=on_generate_docs_click,
-                                          icon='description').classes('w-full mt-4 h-12').props('color="green"')
-            save_draft_btn = ui.button('ЗБЕРЕГТИ ЯК ЧЕРНЕТКУ', on_click=on_save_draft_click,
+            save_draft_btn = ui.button('ЗБЕРЕГТИ', on_click=on_save_draft_click,
                                        icon='save_as').classes('w-full mt-2 h-10').props('outline color="primary"')
 
+            generate_docs_btn = ui.button('ЗГЕНЕРУВАТИ WORD', on_click=on_generate_docs_click,
+                                          icon='print').classes('w-full mt-4 h-12').props('color="green"')
+
+            complete_btn = ui.button('ВІДПРАВКА НА ДБР', on_click=on_send_dbr_click,
+                                     icon='exit_to_app').classes('w-full mt-2 h-10').props('color="primary"')
+
+            generate_logs_btn = ui.button('ЗГЕНЕРУВАТИ INFO ДЛЯ СЄДО', on_click=on_generate_logs_click,
+                                          icon='description').classes('w-full mt-4 h-12').props('color="primary"')
+
+            def refresh_status_ui():
+                current_status = state.get('status', SUPPORT_DOC_STATUS_DRAFT)
+
+                status_badge.set_text(current_status)
+                if current_status == SUPPORT_DOC_STATUS_COMPLETED:
+                    status_badge.props('color="green"')
+                else:
+                    status_badge.props('color="grey"')
+
+                if current_status == SUPPORT_DOC_STATUS_COMPLETED:
+                    generate_docs_btn.disable()
+                    complete_btn.disable()
+                    save_draft_btn.disable()
+                    generate_logs_btn.enable()
+                else:
+                    generate_docs_btn.enable()
+                    complete_btn.enable()
+                    save_draft_btn.enable()
+                    generate_logs_btn.disable()
+
+            def load_draft(d_id: int):
+                try:
+                    draft = controller.get_support_doc_by_id(ctx, d_id)
+                    if not draft:
+                        ui.notify(f'Помилка: Чернетку №{d_id} не знайдено в базі!', type='negative')
+                        return
+
+                    if draft.get('city') in city.options:
+                        city.value = draft['city']
+                    supp_date_input.value = draft.get('support_date', '')
+                    supp_number_input.value = draft.get('support_number', '')
+
+                    state['buffer'] = draft.get('payload', [])
+                    state['status'] = draft.get('status', SUPPORT_DOC_STATUS_DRAFT)
+
+                    refresh_status_ui()
+
+                    ui.notify(f'Чернетку №{d_id} успішно завантажено', type='positive')
+                except Exception as e:
+                    ui.notify(f'Помилка завантаження чернетки: {e}', type='negative')
+
+            # Якщо при відкритті сторінки передано draft_id - завантажуємо його
+            if draft_id is not None:
+                load_draft(draft_id)
+
             refresh_buffer_ui()
+
+
+def date_input(label: str, state, field: str, blur_handler=None):
+    """Створює поле для вводу дати зі спливаючим календарем (іконкою)"""
+    inp = ui.input(label=label)
+    inp.bind_value(state, field)
+
+    if blur_handler:
+        inp.on('blur', blur_handler)
+
+    with inp.add_slot('append'):
+        ui.icon('edit_calendar').classes('cursor-pointer')
+        with ui.menu():
+            ui.date().bind_value(state, field).props(f'mask="{UI_DATE_FORMAT}"')
+
+    return inp
+
+def fix_date(e):
+    val = e.sender.value
+    if not val:
+        return
+    parts = val.split('.')
+    # Якщо введено "ДД.ММ" (наприклад, 12.06)
+    if len(parts) == 2:
+        current_year = datetime.now().year
+        # Оновлюємо значення в полі
+        e.sender.value = f"{val}.{current_year}"

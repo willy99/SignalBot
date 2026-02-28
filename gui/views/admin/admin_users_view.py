@@ -105,7 +105,7 @@ def render_users_page(auth_manager):
                     {'name': 'actions', 'label': 'Дії', 'field': 'actions', 'align': 'center'},
                 ]
 
-                table = ui.table(columns=columns, rows=users, row_key='id').classes('w-full')
+                table = ui.table(columns=columns, rows=users, row_key='id').classes('w-full general-table')
 
                 # Кастомний слот для колонки "Роль" (випадаючий список прямо в таблиці)
                 table.add_slot('body-cell-role', f'''

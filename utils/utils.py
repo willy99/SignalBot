@@ -3,8 +3,10 @@ from datetime import timedelta
 from datetime import datetime, date
 import config
 import os
-from typing import Any
+from typing import Any, Tuple, Dict
 from dics.deserter_xls_dic import NA
+from domain.person_key import PersonKey
+
 
 def clean_text(text):
     if text is None: return None
@@ -143,3 +145,98 @@ def get_strint_fromfloat(value, default = None) -> str:
     except:
         value = str(value).strip() if value else default
     return value
+
+# 029384902_ІМЯ Прізвище по-батькові_24.02.1979
+def get_person_key_from_str(glued_key: str) -> PersonKey:
+    key = PersonKey(rnokpp=None, name=None, des_date=None)
+    if not glued_key: return key
+    spl = glued_key.split("_")
+    key.rnokpp = spl[0]
+    key.name = spl[1]
+    key.des_date = spl[2]
+    return key
+
+
+def to_genitive_case(fullname: str) -> str:
+    """
+    Перетворює ПІБ (Називний) у ПІБ (Родовий відмінок).
+    Приклад: "Шевченко Тарас Григорович" -> "Шевченка Тараса Григоровича"
+    """
+    if not fullname:
+        return ""
+
+    fullname = fullname.lower()
+    parts = fullname.strip().split()
+    if len(parts) != 3:
+        return fullname  # Якщо ввели просто "Шевченко Тарас" або 4 слова, повертаємо як є
+
+    surname, first_name, patronymic = parts
+
+    # 1. ВИЗНАЧАЄМО СТАТЬ ЗА ПО БАТЬКОВІ
+    gender = 'F' if patronymic.lower().endswith('вна') else 'M'
+
+    # 2. ВІДМІНЮЄМО ПО БАТЬКОВІ (Тут правила залізні)
+    if gender == 'M':
+        pat_gen = patronymic + 'а'
+    else:
+        pat_gen = patronymic[:-1] + 'и'  # -вна -> -вни
+
+    # 3. ВІДМІНЮЄМО ІМ'Я
+    first_gen = first_name
+    if gender == 'M':
+        if first_name.endswith(('й', 'ь')):
+            first_gen = first_name[:-1] + 'я'  # Андрій -> Андрія, Василь -> Василя
+        elif first_name.endswith('о'):
+            first_gen = first_name[:-1] + 'а'  # Дмитро -> Дмитра
+        elif first_name.endswith('а'):
+            first_gen = first_name[:-1] + 'и'  # Микола -> Миколи
+        elif first_name.endswith('я'):
+            first_gen = first_name[:-1] + 'і'  # Ілля -> Іллі
+        else:
+            first_gen = first_name + 'а'  # Іван -> Івана (приголосні)
+    else:  # Жіночі імена
+        if first_name.endswith('ія'):
+            first_gen = first_name[:-1] + 'ї'  # Марія -> Марії
+        elif first_name.endswith('я'):
+            first_gen = first_name[:-1] + 'і'  # Надія -> Надії
+        elif first_name.endswith('а'):
+            first_gen = first_name[:-1] + 'и'  # Олена -> Олени
+        elif first_name.endswith('ь'):
+            first_gen = first_name[:-1] + 'і'  # Нінель -> Нінелі
+
+    # 4. ВІДМІНЮЄМО ПРІЗВИЩЕ
+    surname = surname.lower()
+    if gender == 'M':
+        if surname.endswith('ий'):
+            sur_gen = surname[:-2] + 'ого'  # Залужний -> Залужного
+        elif surname.endswith('ьок'):
+                sur_gen = surname[:-3] + 'ька'
+        elif surname.endswith('о'):
+            sur_gen = surname[:-1] + 'а'  # Шевченко -> Шевченка
+        elif surname.endswith(('ь', 'й')):
+            sur_gen = surname[:-1] + 'я'  # Коваль -> Коваля, Палій -> Палія
+        elif surname.endswith('а'):
+            sur_gen = surname[:-1] + 'и'  # Сирота -> Сироти
+        elif surname.endswith('я'):
+            sur_gen = surname[:-1] + 'і'
+        elif surname[-1].lower() not in 'аеєиіїоуюяь':
+            sur_gen = surname + 'а'  # Мельник -> Мельника (приголосні)
+        else:
+            sur_gen = surname
+    else:  # Жіночі прізвища
+        if surname.endswith(('ська', 'цька')):
+            sur_gen = surname[:-2] + 'ої'  # Білецька -> Білецької
+        elif surname.endswith(('ова', 'єва', 'іна', 'їна')):
+            sur_gen = surname[:-1] + 'ої'  # Іванова -> Іванової (русифіковані)
+        elif surname.endswith('а'):
+            sur_gen = surname[:-1] + 'и'  # Лелека -> Лелеки
+        elif surname.endswith('я'):
+            sur_gen = surname[:-1] + 'і'
+        else:
+            sur_gen = surname
+        # Всі інші (на приголосний або 'о') у жінок не відмінюються! (Косач, Шевченко, Фаріон)
+    first_gen = first_gen.capitalize()
+    pat_gen = pat_gen.capitalize()
+    sur_gen = sur_gen.upper()
+
+    return f"{sur_gen} {first_gen} {pat_gen}"

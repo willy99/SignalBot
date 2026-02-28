@@ -14,6 +14,7 @@ from service.storage.LoggerManager import LoggerManager
 from datetime import date, datetime
 import threading
 from domain.person_filter import PersonSearchFilter
+from domain.person_key import PersonKey
 
 class ExcelProcessor:
     def __init__(self, file_path, log_manager: LoggerManager, batch_processing=False):
@@ -464,6 +465,56 @@ class ExcelProcessor:
 
         return results
 
+    def find_person(self, key: PersonKey) -> dict:
+        # self.switch_to_sheet(DESERTER_TAB_NAME, silent=True)
+
+        last_row = self.sheet.range((1048576, 1)).end('up').row
+        data = self.sheet.range(f"A2:BB{last_row}").value
+
+        print('find, last row = ' + str(last_row))
+
+        if data is None:
+            return None
+
+        pib_idx = self.header.get(COLUMN_NAME, 1) - 1
+        rnokpp_idx = self.header.get(COLUMN_ID_NUMBER, 1) - 1
+        des_date_idx = self.header.get(COLUMN_DESERTION_DATE, 1) - 1
+
+        target_name = (key.name or "").lower().strip()
+        target_rnokpp = (key.rnokpp or "").strip()
+        target_des_date = (key.des_date or "").strip()
+
+        for i, row in enumerate(data):
+            if not row[pib_idx]:
+                continue
+
+            pib_val = str(row[pib_idx]).lower().strip()
+            rnokpp_val = get_strint_fromfloat(row[rnokpp_idx], "").strip()
+
+            match_name = (target_name == pib_val) if target_name else True
+            match_rnokpp = (target_rnokpp == rnokpp_val) if target_rnokpp else True
+
+            match_bday = True
+            if target_des_date:
+                des_date_val = format_ukr_date(row[des_date_idx])
+
+                if isinstance(des_date_val, (datetime, date)):
+                    match_bday = (target_des_date == str(des_date_val.date()) or target_des_date == des_date_val.strftime("%d.%m.%Y"))
+                else:
+                    match_bday = (target_des_date == str(des_date_val).strip())
+
+            if match_name and match_rnokpp and match_bday:
+                serialized_row = []
+                for cell in row:
+                    self._transform_cell(cell, serialized_row)
+
+                return {
+                    'row_idx': i + 2,
+                    'data': dict(zip(self.header, serialized_row))
+                }
+
+        return None
+
     def _transform_cell(self, cell, serialized_row):
         if isinstance(cell, (datetime, date)):
             serialized_row.append(format_to_excel_date(cell))
@@ -477,7 +528,7 @@ class ExcelProcessor:
                 cell = str(cell).strip()
             serialized_row.append(cell)
 
-    def update_row_by_index(self, row_id: int, updated_data: dict, paint_with_color=None):
+    def update_row_by_id(self, row_id: int, updated_data: dict, paint_with_color=None):
         try:
             with self.lock:
                 headers = self.sheet.range('A1').expand('right').value

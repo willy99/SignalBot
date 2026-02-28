@@ -26,7 +26,7 @@ class ColumnConverter:
 
     def convert(self):
         # Тут можна викликати всі методи конвертації
-        self._convert_region()
+        self._convert_A7018()
 
     def _convert_region(self):
         print("--- Початок конвертації ---")
@@ -190,3 +190,134 @@ class ColumnConverter:
             if self.app:
                 self.app.quit()
             print("🏁 Excel сесію закрито.")
+
+
+
+    def _convert_A7018(self):
+        print("--- Початок конвертації ---")
+
+        try:
+            # Підключаємось до Excel (видимим чи невидимим)
+            self.app = xw.App(visible=False)
+            self.wb = self.app.books.open(self.file_path)
+            sheet = self.wb.sheets['А7018']
+
+            # Отримуємо індекси колонок
+            bio_col = self._get_column_index(sheet, COLUMN_BIO)
+            birth_col = self._get_column_index(sheet, COLUMN_BIRTHDAY)
+            rno_col = self._get_column_index(sheet, COLUMN_ID_NUMBER)
+            enlist_date_col = self._get_column_index(sheet, COLUMN_ENLISTMENT_DATE)
+            rtzk_col = self._get_column_index(sheet, COLUMN_TZK)
+            rtzk_region_col = self._get_column_index(sheet, COLUMN_TZK_REGION)
+            address_col = self._get_column_index(sheet, COLUMN_ADDRESS)
+            phone_col = self._get_column_index(sheet, COLUMN_PHONE)
+
+            condition_col = self._get_column_index(sheet, COLUMN_DESERT_CONDITIONS)
+            des_region_col = self._get_column_index(sheet, COLUMN_DESERTION_REGION)
+
+
+            if not all([condition_col, des_region_col]):
+                print("!!! Необхідні колонки для мапінгу відсутні!")
+                return
+
+            # Визначаємо останній рядок
+            last_row = sheet.range('A' + str(sheet.cells.last_cell.row)).end('up').row
+            print(f"Обробка {last_row - 1} рядків...")
+
+            # Для швидкості зчитуємо цілі діапазони в пам'ять (list of lists)
+
+            condition_values = sheet.range((2, condition_col), (last_row, condition_col)).value
+            des_region_values = sheet.range((2, des_region_col), (last_row, des_region_col)).value
+            bio_values = sheet.range((2, bio_col), (last_row, bio_col)).value
+            birth_values = sheet.range((2, birth_col), (last_row, birth_col)).value
+            rno_values = sheet.range((2, rno_col), (last_row, rno_col)).value
+            enlist_values = sheet.range((2, enlist_date_col), (last_row, enlist_date_col)).value
+            rtzk_values = sheet.range((2, rtzk_col), (last_row, rtzk_col)).value
+            rtzk_region_values = sheet.range((2, rtzk_region_col), (last_row, rtzk_region_col)).value
+            address_values = sheet.range((2, address_col), (last_row, address_col)).value
+            phone_values = sheet.range((2, phone_col), (last_row, phone_col)).value
+
+            print('>>> condition_values ' + str(len(condition_values)))
+            print('>>> des_region_values ' + str(len(des_region_values)))
+            print('>>> bio_values ' + str(len(bio_values)))
+            print('>>> birth_values ' + str(len(birth_values)))
+            print('>>> rno_values ' + str(len(rno_values)))
+            print('>>> enlist_values ' + str(len(enlist_values)))
+            print('>>> rtzk_values ' + str(len(rtzk_values)))
+            print('>>> rtzk_region_values ' + str(len(rtzk_region_values)))
+            print('>>> address_values ' + str(len(address_values)))
+            print('>>> phone_values ' + str(len(phone_values)))
+
+            # Список для результатів, які ми запишемо одним махом
+            des_region_results = []
+            birth_results = []
+            rno_results = []
+            enlist_date_results = []
+            rtzk_results = []
+            rtzk_regions_results = []
+            address_results = []
+            phone_results = []
+
+            for i in range(len(condition_values)):
+                row_idx = i + 2  # для логування або стилізації
+                condition = str(condition_values[i] or "").strip()
+                bio = str(bio_values[i] or "").strip()
+                des_region = str(des_region_values[i] or "").strip()
+
+                # Логіка підсвічування порожніх даних
+                if not condition:
+                    des_region_results.append([''])
+                    birth_results.append([''])
+                    rno_results.append([''])
+                    enlist_date_results.append([''])
+                    rtzk_results.append([''])
+                    rtzk_regions_results.append([''])
+                    address_results.append([''])
+                    phone_results.append([''])
+                    continue
+                    # У xlwings колір задається через RGB кортеж
+                    # sheet.range((row_idx, subunit_col)).color = (255, 199, 206)  # Pale Red
+
+                # Екстракція підрозділу
+                des_region = self.docProcessor._extract_desertion_region(condition)
+                birth = self.docProcessor._extract_birthday(bio)
+                rno = self.docProcessor._extract_id_number(bio)
+                enlist_date = self.docProcessor._extract_conscription_date(bio)
+                rtzk = self.docProcessor._extract_rtzk(bio)
+                rtzk_region = self.docProcessor._extract_region(bio)
+                address = self.docProcessor._extract_address(bio)
+                phone = self.docProcessor._extract_phone(bio)
+
+                des_region_results.append([des_region])
+                birth_results.append([birth])
+                rno_results.append([rno])
+                enlist_date_results.append([enlist_date])
+                rtzk_results.append([rtzk])
+                rtzk_regions_results.append([rtzk_region])
+                address_results.append([address])
+                phone_results.append([phone])
+
+            # Записуємо всі результати в колонку одним зверненням (це набагато швидше)
+            # print('processed: ' + str(len(phone_results)) + " vs values " + str(len(condition_values)))
+            sheet.range((2, des_region_col)).value = des_region_results
+            sheet.range((2, birth_col)).value = birth_results
+            sheet.range((2, rno_col)).value = rno_results
+            sheet.range((2, enlist_date_col)).value = enlist_date_results
+            sheet.range((2, rtzk_col)).value = rtzk_results
+            sheet.range((2, rtzk_region_col)).value = rtzk_regions_results
+            sheet.range((2, address_col)).value = address_results
+            sheet.range((2, phone_col)).value = phone_results
+
+            # self.wb.save()
+            print("✅ Конвертацію A7018 завершено успішно.")
+
+        except Exception as e:
+            print(f"🔴 КРИТИЧНА ПОМИЛКА: {e}")
+            print(traceback.format_exc())
+        finally:
+            if self.wb:
+                self.wb.close()
+            if self.app:
+                self.app.quit()
+            print("🏁 Excel сесію закрито.")
+

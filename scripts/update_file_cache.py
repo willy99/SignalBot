@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-
+import logging
 # CRONE-based задача, можна повішати на ніч, оскільки потребує ресурсів і часу позбирати
 # то лайнецо за попередні місяці та роки.
 
@@ -13,7 +13,7 @@ from service.storage.StorageFactory import StorageFactory
 from service.storage.LoggerManager import LoggerManager
 
 if __name__ == '__main__':
-    log_manager = LoggerManager()
+    log_manager = LoggerManager(logging.INFO)
     client = StorageFactory.create_client(config.DOCUMENT_STORAGE_PATH, log_manager)
     manager = FileCacheManager(config.CACHE_FILE_PATH, log_manager)
     manager.build_cache(config.DOCUMENT_STORAGE_PATH)

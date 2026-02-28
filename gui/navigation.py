@@ -24,12 +24,14 @@ import os
 import config
 from gui.components import menu
 from service.storage.FileCacher import FileCacheManager
-from service.storage.SMBFileClient import SMBFileClient
 
 def init_nicegui(workflow_obj):
     current_dir = Path(__file__).parent.absolute()
     static_dir = current_dir / 'static'
     templates_form = current_dir / '../resources/templates'
+    inbox_monitor_service = InboxMonitor(workflow_obj)
+    file_manager = FileCacheManager(config.CACHE_FILE_PATH, log_manager=workflow_obj.log_manager)
+
     app.add_static_files('/static', str(static_dir))
     app.add_static_files('/templates', str(templates_form))
     support_templates_dir = current_dir / '../resources/templates/support-form'
@@ -41,9 +43,6 @@ def init_nicegui(workflow_obj):
     person_ctrl = PersonController(workflow_obj, auth_manager)
     report_ctrl = ReportController(workflow_obj, auth_manager)
 
-    inbox_monitor_service = InboxMonitor(workflow_obj)
-    smb_client = SMBFileClient(config.DOCUMENT_STORAGE_PATH, workflow_obj.log_manager)
-    file_manager = FileCacheManager(config.CACHE_FILE_PATH, log_manager=workflow_obj.log_manager)
 
     create_login_page(auth_manager, workflow_obj.log_manager)
 
@@ -88,12 +87,13 @@ def init_nicegui(workflow_obj):
         menu(auth_manager)
         support_doc_list_view.render_drafts_list_page(support_ctrl, ctx)
 
+    @ui.page('/doc_support/create')
     @ui.page('/doc_support/edit/{draft_id}')
     @require_access(auth_manager, 'doc_support', 'read')
-    def support_doc():
+    def support_doc(draft_id: int = None):
         ctx = auth_manager.get_current_context()
         menu(auth_manager)
-        support_doc_view.render_document_page(support_ctrl, ctx)
+        support_doc_view.render_document_page(support_ctrl, person_ctrl, file_manager, ctx, draft_id)
 
     @ui.page('/doc_notif')
     @require_access(auth_manager, 'doc_notif', 'read')

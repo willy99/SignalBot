@@ -3,13 +3,14 @@ import os
 import config
 
 class LoggerManager:
-    def __init__(self, log_name="DeserterBot"):
+    def __init__(self, log_name="DeserterBot", logging_level=logging.DEBUG):
         self.log_dir = "logs"
         self._ensure_log_dir()
         self.log_file = os.path.join(self.log_dir, config.LOGGER_FILE_NAME)
 
         self.logger = logging.getLogger(log_name)
         self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(logging_level)
 
         # Запобігаємо дублюванню логів, якщо об'єкт створюється двічі
         if not self.logger.handlers:

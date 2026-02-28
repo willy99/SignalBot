@@ -4,7 +4,7 @@ from datetime import datetime
 import urllib.parse
 
 def menu(auth_manager):
-    ui.add_head_html('<link rel="stylesheet" href="../static/style.css">')
+    ui.add_head_html('<link rel="stylesheet" href="/static/style.css">')
     user_role = app.storage.user.get('user_info', {}).get('role', '')
 
     with ui.header().classes('bg-slate-800 items-center justify-between'):

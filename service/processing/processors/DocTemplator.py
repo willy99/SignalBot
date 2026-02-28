@@ -1,6 +1,7 @@
 import io
 from pathlib import Path
 from docxtpl import DocxTemplate
+from datetime import datetime
 
 class DocTemplator:
     def __init__(self, templates_dir: Path):
@@ -41,7 +42,17 @@ class DocTemplator:
         else:
             return f"{n}-ти"
 
-    def generate_support_batch(self, city: str, supp_number: str, raw_documents: list) -> tuple[bytes, str]:
+    def generate_support_logs(self, city: str, supp_number: str, supp_date: str, raw_documents: list) -> str:
+        lines = [
+            f"Супровід №{supp_number} від {supp_date} (м. {city})",
+            "-" * 50
+        ]
+        for idx, raw in enumerate(raw_documents, start=1):
+            name = self.format_name(raw.get('name', ''))
+            lines.append(f"{idx}. {name}")
+        return "\n".join(lines)
+
+    def generate_support_batch(self, city: str, supp_number: str, supp_date: str, raw_documents: list) -> tuple[bytes, str]:
         if city not in self.templates:
             raise FileNotFoundError(f"Шаблон для міста {city} не знайдено.")
 
@@ -57,8 +68,9 @@ class DocTemplator:
             # Формуємо словник саме так, як очікує шаблон Word
             formatted_doc = {
                 'SUPP_NUMBER': supp_number,
+                'SUPP_DATE': supp_date,
                 'INCREMENTAL': idx + 1,
-                'NAME': self.format_name(raw.get('name', '')),
+                'NAME': self.format_name(raw.get('name_gen', '')),
                 'TOTAL_PAGES': self.format_pages(raw.get('total', 0)),
                 'NOTIF_PAGES': self.format_pages(raw.get('notif', 0)),
                 'COM_ASSIGN_PAGES': self.format_pages(raw.get('assign', 0)),

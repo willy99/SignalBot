@@ -1,5 +1,34 @@
 /* style.css */
 
+/* =========================================
+   СТИЛІ ДЛЯ ЗАГАЛЬНИХ ТАБЛИЦЬ (general-table)
+   ========================================= */
+
+/* Стилізуємо шапку таблиці */
+.general-table thead tr th {
+    background-color: #1976D2 !important; /* Колір стандартної primary-кнопки (можете змінити на свій HEX) */
+    color: white !important;              /* Білий текст */
+    font-weight: bold !important;         /* Жирний шрифт */
+    font-size: 15px !important;           /* Збільшений шрифт (стандартний зазвичай 12-13px) */
+}
+
+/* Заокруглюємо саму таблицю, щоб кольорова шапка не мала гострих кутів */
+.general-table {
+    border-radius: 8px !important;
+    overflow: hidden !important;
+}
+
+/* Робимо рамки між клітинками трохи м'якшими (опціонально) */
+.general-table.q-table--bordered {
+    border: 1px solid #e0e0e0 !important;
+}
+
+
+/* =========================================
+   СТИЛІ ДЛЯ REPORT ТАБЛИЦЬ (report-table)
+   ========================================= */
+
+
 /* Базові налаштування сітки для нашої звітної таблиці */
 .report-table {
     border: 1px solid #9e9e9e !important;
@@ -163,7 +192,13 @@
 }
 
 
-/* # TABS  */
+
+
+
+/* =========================================
+   СТИЛІ ДЛЯ TABS
+   ========================================= */
+
 
 .q-tabs .q-tab--active {
     background-color: #e0f2fe !important; /* М'який пастельно-блакитний колір (Tailwind blue-100) */

@@ -72,9 +72,14 @@ class Person(BaseModel):
     def from_excel_dict(cls, data: dict):
         return cls(**data)
 
-    def to_excel_dict(self):
-        data = self.model_dump(by_alias=True)
+    def to_excel_dict(self, partial_update: bool = False):
+        data = self.model_dump(by_alias=True, exclude_unset=partial_update)
+        result = {}
         for key, val in data.items():
+            if partial_update and val in (None, ""):
+                continue
             if isinstance(val, (datetime, date)):
-                data[key] = format_to_excel_date(val)
-        return data
+                result[key] = format_to_excel_date(val)
+            else:
+                result[key] = val
+        return result

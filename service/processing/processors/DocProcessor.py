@@ -17,7 +17,7 @@ class DocProcessor:
     __PIECE_3 : Final  = 'piece 3'
     __PIECE_4 : Final  = 'piece 4'
 
-    def __init__(self, workflow, file_path, original_filename, insertion_date=datetime.now()):
+    def __init__(self, workflow, file_path, original_filename, insertion_date=datetime.now(), use_ml=True):
         self.file_path = file_path
         self.original_filename = original_filename
         self.workflow = workflow
@@ -29,7 +29,7 @@ class DocProcessor:
         if file_path:
             self.extension = Path(self.file_path).suffix
             self.engine = ParserFactory.get_parser(file_path, workflow.log_manager)
-        self.ml_parser = MLParser(model_path=config.ML_MODEL_PATH, log_manager=self.workflow.log_manager)
+        self.ml_parser = MLParser(model_path=config.ML_MODEL_PATH, log_manager=self.workflow.log_manager, use_ml=use_ml)
 
     def process(self):
         self.logger.debug(f"--- Обробка тексту... {self.extension}")
@@ -268,6 +268,8 @@ class DocProcessor:
     def _extract_conscription_date(text):
 
         start_match = re.search(PATTERN_RTZK_CALLED, text)
+        if start_match is None:
+            return NA
 
         lookback_area = text[start_match.start():-1]
         # 2. Шукаємо всі дати в цій зоні
@@ -315,7 +317,6 @@ class DocProcessor:
             return NA
 
         res = match.group(1).strip()
-        print('res = ' + res)
         for p in PATTERN_RTZK_TRASH:
             res = re.sub(p, '', res)
 

@@ -33,6 +33,7 @@ DESERTER_RESERVE_TAB_NAME : Final = "А7018"
 
 #DESERTER_XLSX_FILE_PATH:Final = f"\\\\{NET_SERVER_IP}\\{EXCEL_DIR}\\{DESERTER_XLSX}" # if using openpyxl (deprecated)
 DESERTER_XLSX_FILE_PATH:Final = f"/Volumes/exchange/projekt407/{DESERTER_XLSX}" # if using xlwings, actual one
+ROOT_STORAGE_PATH: Final = f"\\\\{NET_SERVER_IP}"
 DOCUMENT_STORAGE_PATH: Final = f"\\\\{NET_SERVER_IP}\\{DOC_DIR}"
 BACKUP_STORAGE_PATH: Final = f"\\\\{NET_SERVER_IP}\\{BACKUP_DIR}"
 INBOX_DIR_PATH: Final[str] = f"\\\\{NET_SERVER_IP}\\{DOC_DIR}\\inbox"

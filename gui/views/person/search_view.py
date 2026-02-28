@@ -37,7 +37,7 @@ def results_ui(data, person_ctrl, ctx: RequestContext, refresh_callback):
             'raw_model': person.model_dump()
         })
 
-    table = ui.table(columns=columns, rows=rows, row_key='rnokpp').classes('w-full max-w-8xl')
+    table = ui.table(columns=columns, rows=rows, row_key='rnokpp').classes('w-full max-w-8xl general-table')
 
     table.add_slot('body-cell-action', '''
             <q-td :props="props">

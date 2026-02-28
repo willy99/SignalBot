@@ -86,7 +86,6 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, on_close=None)
                         ui.input(COLUMN_PHONE).bind_value(person, 'phone').classes('w-40')
 
                     with ui.row().classes('w-full mt-2'):
-                        # Використовуємо наш новий хелпер
                         date_input(COLUMN_BIRTHDAY, person, 'birthday', blur_handler=fix_date).classes('w-1/3')
 
                 # ПАНЕЛЬ 2: ТЦК
