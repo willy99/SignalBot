@@ -5,6 +5,7 @@ from service.processing.processors.DocProcessor import DocProcessor
 from service.storage.LoggerManager import LoggerManager
 import tempfile
 import os
+import traceback
 
 class MockWorkflow:
     """Заглушка для workflow, щоб збирати статистику без бота"""
@@ -61,7 +62,8 @@ class FileCacheManager:
                     extracted_names = []
 
                     # === СМАРТ-ПАРСИНГ: Обробляємо тільки Word-документи ===
-                    if filename.lower().endswith(('.doc', '.docx')):
+                    # Ігноруємо системні файли macOS (._) та відкриті тимчасові файли Word (~$)
+                    if filename.lower().endswith(('.doc', '.docx')) and not filename.startswith(('._', '~$')):
                         temp_local_path = None
                         try:
                             # 1. Читаємо файл з мережі через ваш SMBFileClient у пам'ять
@@ -71,7 +73,8 @@ class FileCacheManager:
                             ext = '.docx' if filename.lower().endswith('.docx') else '.doc'
                             with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as temp_file:
                                 temp_file.write(file_buffer.read())
-                                temp_local_path = temp_file.name  # Отримуємо локальний шлях (напр. /tmp/tmpxyz123.docx)
+                                temp_file.flush()  # ВАЖЛИВО! Примусово скидаємо дані на диск
+                                temp_local_path = temp_file.name  # Отримуємо локальний шлях
 
                             # 3. Годуємо парсеру ЛОКАЛЬНИЙ файл
                             processor = DocProcessor(workflow, temp_local_path, filename, use_ml=False)

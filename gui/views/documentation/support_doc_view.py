@@ -1,13 +1,13 @@
 from nicegui import ui, run
 from gui.services.request_context import RequestContext
 from utils.utils import to_genitive_case
-from service.docworkflow.DocSupportService import SUPPORT_DOC_STATUS_DRAFT, SUPPORT_DOC_STATUS_COMPLETED
 from config import UI_DATE_FORMAT, OUTBOX_DIR_PATH
 from datetime import datetime
 from service.storage.FileCacher import FileCacheManager
 import io
 from gui.controllers.person_controller import PersonController
 from gui.controllers.support_controller import SupportController
+from service.constants import DOC_STATUS_COMPLETED, DOC_STATUS_DRAFT
 
 # --- КОНСТАНТИ ДЕФОЛТНИХ ЗНАЧЕНЬ СТОРІНОК ---
 DEF_NOTIF, DEF_ASSIGN, DEF_RESULT = 1, 3, 3
@@ -19,7 +19,7 @@ def render_document_page(controller: SupportController, person_controller: Perso
     ui.label('Масове створення супровідних листів').classes('w-full text-center text-2xl font-bold mb-8')
 
     state = {
-        'status': SUPPORT_DOC_STATUS_DRAFT,
+        'status': DOC_STATUS_DRAFT,
         'support_date': None,
         'edit_idx': None,
         'buffer': [],
@@ -294,7 +294,7 @@ def render_document_page(controller: SupportController, person_controller: Perso
                                               on_click=lambda idx=i: on_edit_click(idx)).props('flat dense size=sm')
                                     delete_button = ui.button(icon='delete', color='red',
                                               on_click=lambda idx=i: on_remove_click(idx)).props('flat dense size=sm')
-                                    if state['status'] == SUPPORT_DOC_STATUS_COMPLETED:
+                                    if state['status'] == DOC_STATUS_COMPLETED:
                                         edit_button.disable()
                                         delete_button.disable()
 
@@ -334,7 +334,7 @@ def render_document_page(controller: SupportController, person_controller: Perso
 
                 complete = controller.mark_as_completed(ctx,person_controller, draft_id)
                 if complete:
-                    state['status'] = SUPPORT_DOC_STATUS_COMPLETED
+                    state['status'] = DOC_STATUS_COMPLETED
                     refresh_status_ui()
                     ui.notify(f'Документи відправлені, дати та номери проставлені!', type='positive')
                 else:
@@ -378,15 +378,15 @@ def render_document_page(controller: SupportController, person_controller: Perso
                                           icon='description').classes('w-full mt-4 h-12').props('color="primary"')
 
             def refresh_status_ui():
-                current_status = state.get('status', SUPPORT_DOC_STATUS_DRAFT)
+                current_status = state.get('status', DOC_STATUS_DRAFT)
 
                 status_badge.set_text(current_status)
-                if current_status == SUPPORT_DOC_STATUS_COMPLETED:
+                if current_status == DOC_STATUS_COMPLETED:
                     status_badge.props('color="green"')
                 else:
                     status_badge.props('color="grey"')
 
-                if current_status == SUPPORT_DOC_STATUS_COMPLETED:
+                if current_status == DOC_STATUS_COMPLETED:
                     generate_docs_btn.disable()
                     complete_btn.disable()
                     save_draft_btn.disable()
@@ -410,7 +410,7 @@ def render_document_page(controller: SupportController, person_controller: Perso
                     supp_number_input.value = draft.get('support_number', '')
 
                     state['buffer'] = draft.get('payload', [])
-                    state['status'] = draft.get('status', SUPPORT_DOC_STATUS_DRAFT)
+                    state['status'] = draft.get('status', DOC_STATUS_DRAFT)
 
                     refresh_status_ui()
 

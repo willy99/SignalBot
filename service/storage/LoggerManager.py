@@ -9,7 +9,6 @@ class LoggerManager:
         self.log_file = os.path.join(self.log_dir, config.LOGGER_FILE_NAME)
 
         self.logger = logging.getLogger(log_name)
-        self.logger.setLevel(logging.DEBUG)
         self.logger.setLevel(logging_level)
 
         # Запобігаємо дублюванню логів, якщо об'єкт створюється двічі

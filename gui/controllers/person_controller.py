@@ -1,3 +1,5 @@
+from typing import Any
+
 from dics.deserter_xls_dic import *
 from domain.person import Person
 from domain.person_filter import PersonSearchFilter
@@ -32,6 +34,10 @@ class PersonController:
 
     def find_person(self, ctx: RequestContext, person_key: PersonKey):
         return self.processor.find_person(person_key)
+
+    def batch_search_names(self, ctx: RequestContext, names_list: List[str]) -> List[Dict[str, Any]] :
+        self.logger.debug('UI:' + ctx.user_name + ': Шукаємо список з ' + str(len(names_list)) + ' людей')
+        return self.processor.batch_search_names(names_list)
 
     def save_persons(self, ctx: RequestContext, person_list: list, partial_update=False, paint_color=None):
         self.logger.debug(f'UI:{ctx.user_name}: Зберігаємо пакет персон ({len(person_list)} шт.)')

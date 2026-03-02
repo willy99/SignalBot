@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Final
 from datetime import datetime
 
 class Task(BaseModel):
@@ -11,5 +11,5 @@ class Task(BaseModel):
     task_subject: str
     task_details: Optional[str] = ""
     task_deadline: Optional[datetime] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_date: Optional[datetime] = None
+    updated_date: Optional[datetime] = None

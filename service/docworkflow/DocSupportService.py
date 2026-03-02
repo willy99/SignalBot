@@ -1,10 +1,9 @@
 import json
-from typing import List, Dict, Any, Optional, Final
-from service.connection.MyDataBase import DB_TABLE_SUPPORT_DOC
+from typing import List, Dict, Any, Optional
+from service.constants import DB_TABLE_SUPPORT_DOC
 from service.connection.MyDataBase import MyDataBase
 from gui.services.request_context import RequestContext
-SUPPORT_DOC_STATUS_DRAFT: Final[str] = 'Draft'
-SUPPORT_DOC_STATUS_COMPLETED: Final[str] = 'Completed'
+from service.constants import DOC_STATUS_COMPLETED, DOC_STATUS_DRAFT
 
 class DocSupportService:
     def __init__(self, db:MyDataBase, ctx: RequestContext):
@@ -29,7 +28,7 @@ class DocSupportService:
         else:
             # СТВОРЕННЯ НОВОЇ ЧЕРНЕТКИ
             data_to_save['created_by'] = self.ctx.user_id
-            data_to_save['status'] = SUPPORT_DOC_STATUS_DRAFT  # Початковий статус
+            data_to_save['status'] = DOC_STATUS_DRAFT  # Початковий статус
             return self.db.insert_record(DB_TABLE_SUPPORT_DOC, data_to_save)
 
     def get_all_support_docs(self, created_by: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -85,5 +84,5 @@ class DocSupportService:
         self.db.delete_record(DB_TABLE_SUPPORT_DOC, support_doc_id)
 
     def mark_as_completed(self, support_doc_id: int) -> bool:
-        self.db.update_record(DB_TABLE_SUPPORT_DOC, support_doc_id, {'status': SUPPORT_DOC_STATUS_COMPLETED})
+        self.db.update_record(DB_TABLE_SUPPORT_DOC, support_doc_id, {'status': DOC_STATUS_COMPLETED})
         return True

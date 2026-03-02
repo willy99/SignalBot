@@ -9,6 +9,8 @@ from service.storage.LoggerManager import LoggerManager
 from service.processing.processors.ExcelReport import ExcelReporter
 from service.processing.converter.ColumnConverter import ColumnConverter
 from service.storage.BackupData import BackupData
+from service.users.UserService import UserService
+
 
 class MyWorkFlow:
 
@@ -115,7 +117,8 @@ class MyWorkFlow:
         return None
 
     def getResponseAndMove(self, user_id, text):
-        current_state = self.db.get_user_state(user_id)
+        user_service = UserService(self.db)
+        current_state = user_service.get_user_state(user_id)
         text = text.lower().strip()
 
         self.logger.debug(f"DEBUG: User={user_id}, State={current_state}, Text='{text}'")
@@ -125,27 +128,27 @@ class MyWorkFlow:
         menu_prompt = "Напишіть 'меню' для початку роботи."
 
         if text == "меню" or text == "start" or text == "menu":
-            self.db.set_user_state(user_id, "MAIN_MENU")
+            user_service.set_user_state(user_id, "MAIN_MENU")
             return main_menu
 
         if current_state == "MAIN_MENU":
             if text == "1":
-                self.db.set_user_state(user_id, "PROCESS")
+                user_service.set_user_state(user_id, "PROCESS")
                 return process_menu
             elif text == "2":
-                self.db.set_user_state(user_id, "STAT")
+                user_service.set_user_state(user_id, "STAT")
                 result = self.stats.get_report()
                 result += stat_menu
                 return result
             elif text == "4" or text == "вихід":
-                self.db.set_user_state(user_id, "START")
+                user_service.set_user_state(user_id, "START")
                 return menu_prompt
             elif text == "0":
                 return main_menu
 
         elif current_state == 'PROCESS':
             if text == "0":
-                self.db.set_user_state(user_id, "MAIN_MENU")
+                user_service.set_user_state(user_id, "MAIN_MENU")
                 return main_menu
             if text == "1" or text == 'batch':
                 batch_processor = BatchProcessor(self, self.excelFilePath)
@@ -157,7 +160,7 @@ class MyWorkFlow:
                 return "OK"
         elif current_state == "STAT":
             if text == "0":
-                self.db.set_user_state(user_id, "MAIN_MENU")
+                user_service.set_user_state(user_id, "MAIN_MENU")
                 return main_menu
             if text == "1":
                 return self.stats.get_full_report()

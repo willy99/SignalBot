@@ -562,3 +562,57 @@ class ExcelProcessor:
         if not hex_color: return
         """Зафарбовує весь рядок (від A до BB) вказаним кольором."""
         range.color = hex_color
+
+    def batch_search_names(self, names_list: List[str]) -> List[Dict[str, Any]]:
+        """
+        Масовий пошук ПІБ в базі Excel.
+        Повертає відсортований список словників: спочатку ті, кого НЕ знайдено (False), потім ті, хто Є (True).
+        """
+        # Переконуємось, що ми на правильному листі
+        self.switch_to_sheet(DESERTER_TAB_NAME, silent=True)
+
+        # 1. Знаходимо колонку з ПІБ
+        pib_col_idx = self.column_map.get(COLUMN_NAME.lower()) or self.header.get(COLUMN_NAME)
+        if not pib_col_idx:
+            self.logger.error(f"❌ Не знайдено колонку {COLUMN_NAME} для масового пошуку")
+            return []
+
+        # 2. Визначаємо останній рядок
+        try:
+            last_row = self.sheet.range((1048576, pib_col_idx)).end('up').row
+        except Exception:
+            last_row = self.sheet.used_range.last_cell.row
+
+        # 3. Забираємо всю колонку з бази ОДНИМ запитом
+        if last_row < 2:
+            excel_names_raw = []
+        else:
+            excel_names_raw = self.sheet.range((2, pib_col_idx), (last_row, pib_col_idx)).value
+
+        if not isinstance(excel_names_raw, list):
+            excel_names_raw = [excel_names_raw]
+
+        # 4. Формуємо Set (множину) у нижньому регістрі для миттєвого пошуку
+        excel_db_set = set()
+        for val in excel_names_raw:
+            if val:
+                excel_db_set.add(str(val).strip().lower())
+
+        # 5. Перевіряємо кожне ім'я з нашого списку (textarea)
+        results = []
+        for orig_name in names_list:
+            if not orig_name:
+                continue
+
+            search_name = str(orig_name).strip().lower()
+            is_found = search_name in excel_db_set
+
+            results.append({
+                'name': orig_name,  # Зберігаємо оригінальний регістр для красивого виводу
+                'found': is_found
+            })
+
+        # 6. Сортуємо: спочатку False (хрестики, бо False = 0), потім True (галочки, бо True = 1)
+        results.sort(key=lambda x: x['found'])
+
+        return results

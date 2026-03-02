@@ -32,11 +32,14 @@ def render_home_page(auth_manager):
                 if can_person:
                     create_nav_card('Пошук О/С', 'Глобальний пошук по базі військовослужбовців', 'search', '/search', 'blue')
                 if can_search:
-                    create_nav_card('Пошук Документів', 'Файловий пошук довідок по папцям в мережі', 'search', '/doc_files', 'blue')
+                    create_nav_card('Пошук Документів', 'Файловий пошук довідок по папцям в мережі', 'find_in_page', '/doc_files', 'blue')
+                if can_search and can_person:
+                    create_nav_card('Батч Пошук', 'Глобальний батч-пошук по списку прізвищ', 'manage_search', '/batch_search', 'blue')
 
         # --- Секція: ДОКУМЕНТООБІГ ---
         can_doc_support = auth_manager.has_access('doc_support', 'read')
         can_doc_notif = auth_manager.has_access('doc_notif', 'read')
+        can_doc_dbr = auth_manager.has_access('doc_dbr', 'read')
 
         if can_doc_support or can_doc_notif:
             ui.label('Документообіг').classes('text-xl font-bold w-full max-w-5xl mt-8 text-gray-600 border-b pb-2')
@@ -47,8 +50,8 @@ def render_home_page(auth_manager):
                 if can_doc_notif:
                     create_nav_card('Довідки', 'Формування довідок та витягів (В розробці)', 'description',
                                     '/doc_notif', 'green')
-                if can_person:
-                    create_nav_card('На ДБР', 'Відправка справ на ДБР і очікування  ЄРДР', 'gavel', '/erdr', 'orange')
+                if can_doc_dbr:
+                    create_nav_card('На ДБР', 'Відправка справ на ДБР і очікування  ЄРДР', 'gavel', '/doc_dbr', 'orange')
 
         # --- Секція: АНАЛІТИКА ---
         can_report_units = auth_manager.has_access('report_units', 'read')
@@ -62,7 +65,7 @@ def render_home_page(auth_manager):
                     create_nav_card('Звіт по підрозділам', 'Статистика СЗЧ по підрозділах (Додаток 2)', 'bar_chart',
                                     '/report_units', 'purple')
                 if can_report_general:
-                    create_nav_card('Дублікати прізвищ', 'Звіт по прізвищам, які дублюються в системі', 'bar_chart',
+                    create_nav_card('Дублікати прізвищ', 'Звіт по прізвищам, які дублюються в системі', 'people_outline',
                                     '/report_name_dups', 'purple')
 
         # --- Секція: СИСТЕМА (Тільки для Адміністраторів) ---

@@ -284,6 +284,10 @@ def test_name_extraction(processor_factory):
     res = processor._extract_name(text)
     assert "ГАВНОВ Назар-Іван Васильович" in res
 
+    text = "ДУМБА Михайло В’ячиславович, солдат за призовом, військовослужбовець за мобілізацією, стрілець-снайпер 1 взводу охорони  "
+    res = processor._extract_name(text)
+    assert "ДУМБА Михайло В’ячиславович" in res
+
 def test_title_extraction(processor_factory):
     processor = processor_factory("any.docx")
     text = "ПУНДІК Олег Вікторович, старший солдат, військовослужбовець військової служби за призовом, "

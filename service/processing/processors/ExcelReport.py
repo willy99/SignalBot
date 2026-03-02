@@ -5,7 +5,7 @@ import config
 from dics.deserter_xls_dic import *
 from collections import defaultdict
 from service.storage.LoggerManager import LoggerManager
-from config import DESERTER_TAB_NAME
+from config import DESERTER_TAB_NAME, EXCEL_DATE_FORMAT
 from utils.utils import get_strint_fromfloat
 from domain.person_filter import PersonSearchFilter
 
@@ -477,6 +477,119 @@ class ExcelReporter:
                 dupp_names[name] = records
 
         return dupp_names
+
+    def get_waiting_for_erdr_report(self, search_filter: PersonSearchFilter):
+        results = []
+
+        try:
+            last_row = self.excelProcessor.sheet.range((1048576, 1)).end('up').row
+        except Exception:
+            last_row = self.excelProcessor.sheet.used_range.last_cell.row
+
+        if last_row < 2:
+            return results
+
+        data = self.excelProcessor.sheet.range(f"A2:BB{last_row}").value
+        if not data:
+            return results
+
+        header = self.excelProcessor.header
+
+        pib_idx = header.get(COLUMN_NAME, 1) - 1
+        rnokpp_idx = header.get(COLUMN_ID_NUMBER, 1) - 1
+        dob_idx = header.get(COLUMN_BIRTHDAY, 1) - 1
+        des_date_idx = header.get(COLUMN_DESERTION_DATE, 1) - 1
+        rank_idx = header.get(COLUMN_TITLE, 1) - 1
+        unit_idx = header.get(COLUMN_SUBUNIT, 1) - 1
+        dbr_date_idx = header.get(COLUMN_DBR_DATE, 1) - 1
+        dbr_num_idx = header.get(COLUMN_DBR_NUMBER, 1) - 1
+        erdr_date_idx = header.get(COLUMN_ERDR_DATE, 1) - 1
+        erdr_num_idx = header.get(COLUMN_ERDR_NOTATION, 1) - 1
+
+        q_des_year = search_filter.des_year
+
+        for row in data:
+            if not row or not row[pib_idx]:
+                continue
+
+            des_date_val = row[des_date_idx]
+            des_date_year = None
+            des_date_str = ""
+
+            dbr_date_val = row[dbr_date_idx]
+            dbr_date_year = None
+            dbr_date_str = ""
+
+            erdr_date_val = row[erdr_date_idx]
+            erdr_date_year = None
+            erdr_date_str = ""
+
+            if isinstance(des_date_val, (datetime, date)):
+                des_date_year = str(des_date_val.year)
+                des_date_str = des_date_val.strftime(EXCEL_DATE_FORMAT)
+            elif des_date_val:
+                des_date_str = str(des_date_val).strip()
+                if len(des_date_str) >= 4:
+                    des_date_year = des_date_str[-4:]
+
+            if isinstance(dbr_date_val, (datetime, date)):
+                dbr_date_year = str(dbr_date_val.year)
+                dbr_date_str = dbr_date_val.strftime(EXCEL_DATE_FORMAT)
+            elif dbr_date_val:
+                dbr_date_str = str(dbr_date_val).strip()
+                if len(dbr_date_str) >= 4:
+                    dbr_date_year = dbr_date_str[-4:]
+
+            if erdr_date_val is not None and isinstance(erdr_date_val, (datetime, date)):
+                erdr_date_year = str(erdr_date_val.year)
+                erdr_date_str = erdr_date_val.strftime(EXCEL_DATE_FORMAT)
+            elif erdr_date_val:
+                erdr_date_str = str(erdr_date_val).strip()
+                if len(erdr_date_str) >= 4:
+                    erdr_date_year = erdr_date_str[-4:]
+
+            # --- ФІЛЬТРАЦІЯ ---
+            match_des_year = True
+            match_dbr_year = True
+            match_erdr_date = erdr_date_val is None
+
+            if q_des_year:
+                if isinstance(q_des_year, list):
+                    match_des_year = (des_date_year in q_des_year)
+                    match_dbr_year = (dbr_date_year in q_des_year)
+                else:
+                    match_des_year = (des_date_year == str(q_des_year))
+                    match_dbr_year = (dbr_date_year == str(q_des_year))
+
+            if not match_des_year or not match_dbr_year or not match_erdr_date:
+                continue
+
+            dob_val = row[dob_idx]
+            dob_str = dob_val.strftime(EXCEL_DATE_FORMAT) if isinstance(dob_val, (datetime, date)) else str(dob_val or '')
+
+            # Безпечне отримання РНОКПП (обходимо проблему .0 у Excel)
+            rnokpp_raw = row[rnokpp_idx]
+            if isinstance(rnokpp_raw, float):
+                rnokpp_str = str(int(rnokpp_raw))
+            else:
+                rnokpp_str = str(rnokpp_raw or '').strip()
+
+            # Додаємо запис у результати
+            results.append({
+                'des_date': des_date_str,
+                'pib': str(row[pib_idx] or '').strip(),
+                'rnokpp': rnokpp_str,
+                'dob': dob_str.strip(),
+                'rank': str(row[rank_idx] or '').strip(),
+                'unit': str(row[unit_idx] or '').strip(),
+                'dbr_date': dbr_date_str.strip(),
+                'dbr_number': str(row[dbr_num_idx] or '').strip() if dbr_num_idx >= 0 else '',
+                'erdr_date': erdr_date_str.strip(),
+                'erdr_number': str(row[erdr_num_idx] or '').strip() if erdr_num_idx >= 0 else ''
+
+            })
+
+        return results
 
     @staticmethod
     def _is_today(cell_value: Any, today_date: datetime.date) -> bool:
