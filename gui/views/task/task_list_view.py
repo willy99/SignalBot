@@ -1,17 +1,14 @@
-from nicegui import ui
+from nicegui import ui, app
 from gui.services.request_context import RequestContext
 from domain.task import *
 from gui.controllers.task_controller import TaskController
 from datetime import timedelta
 from service.constants import TASK_STATUS_COMPLETED, TASK_STATUS_NEW, TASK_STATUS_IN_PROGRESS
+from dics.deserter_xls_dic import TASK_TYPES
+
 # Словник іконок для різних типів задач
 def get_type_icon(task_type: str) -> str:
-    icons = {
-        'Документація': 'description',  # Класичний аркуш тексту
-        'Запити': 'manage_search',  # Або залишіть 'search' чи 'contact_mail'
-        'Фікс Даних': 'bug_report',  # Важливо: саме bug_report!
-        'Програмірувай': 'code'  # Або 'terminal' / 'developer_mode'
-    }
+    icons = TASK_TYPES
     return icons.get(task_type, 'task')
 
 
@@ -54,82 +51,167 @@ async def delete_task_with_confirm(task_id: int, controller: TaskController, ctx
         except Exception as e:
             ui.notify(f'Помилка видалення: {e}', type='negative')
 
-def render_task_list_page(controller: TaskController, ctx: RequestContext):
-    ui.label('Дошка задач').classes('w-full text-center text-3xl font-bold mb-4')
 
+def render_task_list_page(controller: TaskController, ctx: RequestContext):
     # Отримуємо список юзерів і робимо зручний словник {id: "Ім'я"}
     users_list = controller.get_available_users()
     users_map = {}
-    filter_options = {'all': 'Всі задачі', ctx.user_id: 'Мої задачі'}
+
+    assignee_options = {
+        'unassigned': 'Непризначені',
+        'all': 'Всі задачі',
+        ctx.user_id: 'Мої задачі',
+    }
 
     for u in users_list:
         name = u.get('full_name') or u.get('username') or f"User {u['id']}"
         users_map[u['id']] = name
         if u['id'] != ctx.user_id:
-            filter_options[u['id']] = name
+            assignee_options[u['id']] = name
 
-    # Стейт для фільтра (за замовчуванням - мої задачі)
-    state = {'assignee_filter': ctx.user_id}
+    # Типи задач
+    type_options = {'all': 'Всі типи'}
+    for t in TASK_TYPES.keys():
+        type_options[t] = t
 
-    # Верхня панель: Фільтр + Кнопка створення
-    def on_filter_change(e):
-        state['assignee_filter'] = e.value
-        refresh_board()
+    # Тематичний період
+    period_options = {
+        'all': 'Будь-який термін',
+        'overdue': '🔥 Прострочені',
+        'today': '⚡ На сьогодні / Актуальні',
+        'future': '📅 Майбутні / Безстрокові'
+    }
 
-    with ui.row().classes('w-full justify-between items-center mb-4 px-4'):
-        ui.select(
-            filter_options,
-            label='Фільтр за виконавцем',
-            value=state['assignee_filter'],
-            on_change=on_filter_change
-        ).classes('w-64')
-        ui.button('Створити нову', icon='add', on_click=lambda: ui.navigate.to('/tasks/edit/new')).props(
-            'color="primary"')
+    # Роки (від поточного -2 до +1)
+    current_year = datetime.now().year
+    year_options = {str(y): str(y) for y in range(current_year - 2, current_year + 2)}
 
-    # Головний контейнер дошки (w-full - на всю ширину, bg-white)
-    board_container = ui.row().classes(
-        'w-full items-start justify-between gap-0 flex-nowrap bg-white border-y border-gray-200 shadow-sm')
+    default_state = {
+        'search_query': '',
+        'assignee_id': ctx.user_id,
+        'task_type_filter': 'all',
+        'period_filter': 'all',
+        'created_year': None,
+        'created_from': None,
+        'created_to': None,
+    }
 
-    def refresh_board():
-        board_container.clear()
-        assignee_id_filter = None
-        if state['assignee_filter'] != 'all':
-            # tasks = [t for t in all_tasks if t.assignee == state['assignee_filter']]
-            assignee_id_filter = state['assignee_filter']
-        #else:
-            #tasks = all_tasks
+    state = app.storage.user.get('task_board_filters', default_state)
 
-        tasks = controller.get_all_tasks(ctx, assignee_id_filter)
+    # Захист: якщо збереженого юзера раптом видалили з бази
+    if state.get('assignee_id') not in assignee_options:
+        state['assignee_id'] = ctx.user_id
+
+    # === СТВОРЮЄМО ОНОВЛЮВАНУ ДОШКУ (Але поки не малюємо) ===
+    @ui.refreshable
+    def task_board():
+        # Тепер ми передаємо весь словник state прямо в контролер
+        tasks = controller.get_all_tasks(ctx, search_filter=state)
+        # ДОДАТКОВИЙ PYTHON-ФІЛЬТР ДЛЯ КИРИЛИЦІ
+        if state.get('search_query', ''):
+            search_query = state.get('search_query', '').strip().lower()
+            if search_query:
+                tasks = [
+                    t for t in tasks
+                    if (t.task_subject and search_query in t.task_subject.lower()) or
+                       (t.task_details and search_query in t.task_details.lower())
+                ]
 
         # Розподіляємо по списках
         new_tasks = [t for t in tasks if t.task_status == TASK_STATUS_NEW]
         in_progress_tasks = [t for t in tasks if t.task_status == TASK_STATUS_IN_PROGRESS]
         completed_tasks = [t for t in tasks if t.task_status == TASK_STATUS_COMPLETED]
 
-        with board_container:
-            # СТОВПЧИК 1: NEW (додали border-r для тонкої роздільної лінії)
+        with ui.row().classes(
+                'w-full items-start justify-between gap-0 flex-nowrap bg-white border-y border-gray-200 shadow-sm'):
+            # СТОВПЧИК 1: NEW
             with ui.column().classes('flex-1 p-4 min-h-[70vh] border-r border-gray-200'):
                 ui.label(f'НОВІ ({len(new_tasks)})').classes(
                     'font-bold text-gray-500 text-sm mb-4 text-center w-full uppercase tracking-wider')
                 for t in new_tasks:
-                    render_task_card(t, controller, ctx, refresh_board, users_map)
+                    render_task_card(t, controller, ctx, task_board.refresh, users_map)
 
-            # СТОВПЧИК 2: IN PROGRESS (border-r)
+            # СТОВПЧИК 2: IN PROGRESS
             with ui.column().classes('flex-1 p-4 min-h-[70vh] border-r border-gray-200'):
                 ui.label(f'В РОБОТІ ({len(in_progress_tasks)})').classes(
                     'font-bold text-blue-500 text-sm mb-4 text-center w-full uppercase tracking-wider')
                 for t in in_progress_tasks:
-                    render_task_card(t, controller, ctx, refresh_board, users_map)
+                    render_task_card(t, controller, ctx, task_board.refresh, users_map)
 
-            # СТОВПЧИК 3: COMPLETED (без правого бордера)
+            # СТОВПЧИК 3: COMPLETED
             with ui.column().classes('flex-1 p-4 min-h-[70vh]'):
                 ui.label(f'ЗАВЕРШЕНІ ({len(completed_tasks)})').classes(
                     'font-bold text-green-600 text-sm mb-4 text-center w-full uppercase tracking-wider')
                 for t in completed_tasks:
-                    render_task_card(t, controller, ctx, refresh_board, users_map)
+                    render_task_card(t, controller, ctx, task_board.refresh, users_map)
 
-    # Перше малювання дошки
-    refresh_board()
+    # === ОБРОБНИКИ ПОДІЙ ===
+    def on_filter_change(e=None):
+        app.storage.user['task_board_filters'] = state
+        task_board.refresh()  # Перемальовуємо дошку одним викликом
+
+    def reset_filters():
+        # Скидаємо все на дефолт
+        state.update({k: v for k, v in default_state.items()})
+        on_filter_change()
+
+    # === МАЛЮЄМО UI ===
+    with ui.row().classes('w-full justify-between items-center mb-4 px-4'):
+        # 1. Заголовок (зліва)
+        ui.label('Дошка задач').classes('text-3xl font-bold')
+
+        # 2. Блок з фільтром та кнопкою (справа)
+        with ui.row().classes('items-center gap-4 flex-grow justify-end'):
+            ui.input('Пошук (тема, опис)', on_change=on_filter_change) \
+                .bind_value(state, 'search_query') \
+                .props('clearable outlined dense debounce=500') \
+                .classes('w-64')
+            # Важливо: використовуємо bind_value(state, 'assignee_id') замість value=
+            filter_select = ui.select(
+                assignee_options,
+                label='Фільтр за виконавцем',
+                on_change=on_filter_change
+            ).bind_value(state, 'assignee_id').classes('w-64')
+
+            filter_select.add_slot('option', f'''
+                    <q-item v-bind="props.itemProps" 
+                            :class="props.opt.value == {ctx.user_id} ? 'bg-orange-50 text-orange-900 font-bold border-l-4 border-orange-200' : ''">
+                        <q-item-section>
+                            <q-item-label v-html="props.opt.label"></q-item-label>
+                        </q-item-section>
+                    </q-item>
+                ''')
+
+            ui.button('Створити нову', icon='add', on_click=lambda: ui.navigate.to('/tasks/edit/new')).props(
+                'color="primary"')
+
+    # --- РОЗШИРЕНІ ФІЛЬТРИ (Сховані в гармошку) ---
+    with ui.expansion('Розширені фільтри (Дати, Типи, Періоди)', icon='filter_alt') \
+            .classes('w-full mt-2 bg-gray-50 rounded-md border border-gray-200'):
+        with ui.row().classes('w-full items-center gap-4 p-4'):
+            ui.select(type_options, label='Тип задачі', on_change=on_filter_change) \
+                .bind_value(state, 'task_type_filter').props('outlined dense').classes('w-48')
+
+            ui.select(period_options, label='Тематичний період', on_change=on_filter_change) \
+                .bind_value(state, 'period_filter').props('outlined dense').classes('w-64')
+
+            ui.separator().props('vertical').classes('mx-2')
+
+            ui.select(year_options, label='Рік створ.', clearable=True, on_change=on_filter_change) \
+                .bind_value(state, 'created_year').props('outlined dense').classes('w-32')
+
+            ui.input('Створено з', on_change=on_filter_change) \
+                .bind_value(state, 'created_from').props('type=date clearable outlined dense').classes('w-40')
+
+            ui.input('Створено до', on_change=on_filter_change) \
+                .bind_value(state, 'created_to').props('type=date clearable outlined dense').classes('w-40')
+
+            # Кнопка скидання фільтрів (притиснута до правого краю)
+            ui.button('Скинути', icon='restart_alt', on_click=reset_filters) \
+                .props('flat color="red"').classes('ml-auto')
+
+    # === РЕНДЕРИМО ДОШКУ ===
+    task_board()  # Викликаємо функцію, щоб вона намалювала дошку на екрані
 
 
 def render_task_card(task, controller: TaskController, ctx: RequestContext, refresh_callback, users_map: dict):

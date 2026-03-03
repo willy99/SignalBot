@@ -77,7 +77,7 @@ def render_dbr_drafts_list_page(dbr_ctrl, ctx: RequestContext):
         # 6. Обробники подій
         def on_edit(e):
             draft_id = e.args
-            ui.navigate.to(f'/dbr/edit/{draft_id}')
+            ui.navigate.to(f'/doc_dbr/edit/{draft_id}')
 
         async def on_delete(e):
             draft_id = e.args

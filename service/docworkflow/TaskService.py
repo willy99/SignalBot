@@ -2,8 +2,8 @@ from typing import List
 from domain.task import *
 from gui.services.request_context import RequestContext
 from service.connection.MyDataBase import MyDataBase
-from service.constants import DB_TABLE_TASK, TASK_STATUS_IN_PROGRESS, TASK_STATUS_NEW
-from datetime import datetime
+from service.constants import DB_TABLE_TASK, TASK_STATUS_IN_PROGRESS, TASK_STATUS_NEW, TASK_STATUS_COMPLETED
+from datetime import datetime, timedelta
 
 class TaskService:
     def __init__(self, db: MyDataBase, ctx: RequestContext):
@@ -35,20 +35,85 @@ class TaskService:
             data_to_save['updated_date'] = current_time
             return self.db.insert_record(DB_TABLE_TASK, data_to_save)
 
-    def get_all_tasks(self, assignee_id: Optional[int] = None, created_by: Optional[int] = None) -> List[Task]:
-        """Отримує всі задачі, з можливістю фільтрації по виконавцю або автору."""
-        query = f"SELECT id, created_by, assignee, task_status, task_type, task_subject, task_details, task_deadline, created_date, updated_date FROM {DB_TABLE_TASK} WHERE 1=1"
+    def get_all_tasks(self, search_filter: dict) -> List[Task]:
+        """
+        Отримує всі задачі, динамічно будуючи SQL-запит на основі словника фільтрів з UI.
+        """
+        query = f"""
+            SELECT id, created_by, assignee, task_status, task_type, 
+                   task_subject, task_details, task_deadline, created_date, updated_date 
+            FROM {DB_TABLE_TASK} 
+            WHERE 1=1
+        """
         params = []
 
-        if assignee_id:
+        # 1. Фільтр по виконавцю (assignee)
+        assignee_id = search_filter.get('assignee_id', 'all')
+        if assignee_id == 'unassigned':
+            query += " AND assignee IS NULL"
+        elif assignee_id != 'all' and assignee_id is not None:
             query += " AND assignee = ?"
             params.append(assignee_id)
-        if created_by:
-            query += " AND created_by = ?"
-            params.append(created_by)
 
+        # Автор (якщо передано, наприклад, для перегляду "задач, які я створив")
+        #if created_by:
+        #    query += " AND created_by = ?"
+        #    params.append(created_by)
+
+        # 3. Фільтр по типу задачі
+        task_type = search_filter.get('task_type_filter', 'all')
+        if task_type != 'all' and task_type is not None:
+            query += " AND task_type = ?"
+            params.append(task_type)
+
+        # 4. Фільтр по даті створення (Рік, З, До)
+        created_year = search_filter.get('created_year')
+        if created_year:
+            # У SQLite дати зберігаються як рядки 'YYYY-MM-DD ...'
+            query += " AND created_date LIKE ?"
+            params.append(f"{created_year}-%")
+
+        created_from = search_filter.get('created_from')
+        if created_from:
+            query += " AND created_date >= ?"
+            params.append(f"{created_from} 00:00:00")  # Початок доби
+
+        created_to = search_filter.get('created_to')
+        if created_to:
+            query += " AND created_date <= ?"
+            params.append(f"{created_to} 23:59:59")  # Кінець доби
+
+        # 5. Тематичний період (дедлайни)
+        period = search_filter.get('period_filter', 'all')
+        if period != 'all':
+            now = datetime.now()
+            now_str = now.strftime('%Y-%m-%d %H:%M:%S')
+
+            # Логічно: якщо ми шукаємо "прострочені" чи "на сьогодні",
+            # нас цікавлять тільки АКТИВНІ задачі. Завершені ми відкидаємо.
+            query += f" AND task_status != '{TASK_STATUS_COMPLETED}'"
+
+            if period == 'overdue':
+                # 🔥 Прострочені: є дедлайн і він у минулому
+                query += " AND task_deadline IS NOT NULL AND task_deadline < ?"
+                params.append(now_str)
+
+            elif period == 'today':
+                # ⚡ На сьогодні: від -7 днів до +3 днів, АБО безстрокові
+                minus_7_str = (now - timedelta(days=7)).strftime('%Y-%m-%d 00:00:00')
+                plus_3_str = (now + timedelta(days=3)).strftime('%Y-%m-%d 23:59:59')
+                query += " AND (task_deadline IS NULL OR (task_deadline >= ? AND task_deadline <= ?))"
+                params.extend([minus_7_str, plus_3_str])
+
+            elif period == 'future':
+                # 📅 Майбутні: дедлайн більший за зараз, АБО безстрокові
+                query += " AND (task_deadline IS NULL OR task_deadline >= ?)"
+                params.append(now_str)
+
+        # Сортуємо: найсвіжіші зміни — зверху
         query += " ORDER BY updated_date DESC"
 
+        # Виконуємо запит
         rows = self.db.__execute_fetchall__(query, tuple(params))
         return [self._map_row_to_task(r) for r in rows]
 

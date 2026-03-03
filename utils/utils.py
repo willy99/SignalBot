@@ -240,3 +240,10 @@ def to_genitive_case(fullname: str) -> str:
     sur_gen = sur_gen.upper()
 
     return f"{sur_gen} {first_gen} {pat_gen}"
+
+def is_number(s):
+    try:
+        float(s) # Try converting to a float
+        return True
+    except ValueError:
+        return False

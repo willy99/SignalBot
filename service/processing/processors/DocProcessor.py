@@ -93,6 +93,7 @@ class DocProcessor:
             fields[col.COLUMN_DESERTION_PLACE] = self._extract_desertion_place(clean_text(text), get_file_name(self.original_filename))
             fields[col.COLUMN_RETURN_DATE] = self._extract_return_date(fields[col.COLUMN_DESERT_CONDITIONS])
             fields[col.COLUMN_DESERTION_TYPE] = self._extract_desertion_type(text, fields[col.COLUMN_DESERTION_PLACE])
+            fields[col.COLUMN_CC_ARTICLE] = self._extract_cc_article(col.COLUMN_DESERTION_TYPE)
             if self._check_return_sign(text_pieces[self.__PIECE_1]):
                 fields[col.COLUMN_RETURN_DATE] = self._extract_return_date(text) or fields[col.COLUMN_DESERTION_DATE]
                 fields[col.COLUMN_DESERTION_DATE] = NA
@@ -488,6 +489,9 @@ class DocProcessor:
         if desertion_where == 'НЦ':
             des_type = 'СЗЧ з А2900'
         return des_type
+
+    def _extract_cc_article(self, desertion_type):
+        return "407"
 
     def check_for_errors(self, data_for_excel):
         result = True

@@ -388,6 +388,10 @@ def test_rtzk_extraction(processor_factory):
     res = processor._extract_rtzk(text)
     assert res == "3-ім відділом Одеського РТЦК та СП Одеської області"
 
+    text = "батальйону військової частини А0224, зарахований до списків військової частини А0224 15.06.2025, 09.03.1995 року народження, українець, освіта професійно-технічна, неодружений. Призваний 1-відділом Ізмаїльського РТЦК та СП м. Ізмаїл Одеської області, 14.06.2025 року. "
+    res = processor._extract_rtzk(text)
+    assert res == "1-відділом Ізмаїльського РТЦК та СП м. Ізмаїл Одеської області"
+
 
 def test_rtzk_region_extraction(processor_factory):
     processor = processor_factory("any.docx")
@@ -684,6 +688,17 @@ def test_desertion_type_extraction(processor_factory):
     res = processor._extract_desertion_type(text, where)
     assert res == 'СЗЧ зброя'
 
+    text = "22.12.2025 року близько 09:00 години солдат БУЙНОВ Дмитро Анатолійович здійснив самовільне залишення району виконання бойового завдання підрозділом поблизу населеного пункту Мирноград Донецької області. Військовослужбовець, солдат БУЙНОВ Дмитро Анатолійович з особистою зброєю (5,56 x 45 мм штурмова гвинтівка CZ Bren 2, номер зброї J103408, набої 5,56 x 45 в кількості 150 шт.) залишив позицію та убув у невідомому напрямку. "
+    where = processor._extract_desertion_place(text)
+    assert where == 'РВБЗ'
+    res = processor._extract_desertion_type(text, where)
+    assert res == 'СЗЧ зброя'
+
+    text = "22.12.2025 року під час перевірки наявності особового складу був відсутній солдат БУЙНОВ Андрій Валентинович, який самовільно залишив район виконання завдання за призначенням. Пошук військовослужбовця в районі зосередження підрозділу в н.п. Шахтарське Дніпропетровської області позитивного результату не приніс. Місце знаходження військовослужбовця невідоме."
+    where = processor._extract_desertion_place(text)
+    assert where == 'РВБЗ'
+    res = processor._extract_desertion_type(text, where)
+    assert res == 'СЗЧ'
 
 def test_return_sign(processor_factory):
     processor = processor_factory("any.docx")

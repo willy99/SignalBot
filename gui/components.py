@@ -155,7 +155,7 @@ def menu(auth_manager, ctx: RequestContext, task_controller):
                         if can_report_general:
                             make_menu_item('Дублікати прізвищ', 'people_outline', '/report_name_dups')
                         if can_report_general:
-                            make_menu_item('Чекаємо на ЄРДР', 'gavel', '/report_waiting_erdr')
+                            make_menu_item('Чекаємо на ЄРДР', 'pending_actions', '/report_waiting_erdr')
 
             # 5. Адмінка
             if auth_manager.has_access('admin_panel', 'read'):

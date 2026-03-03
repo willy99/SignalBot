@@ -4,7 +4,7 @@ from gui.services.request_context import RequestContext
 from domain.task import Task
 from gui.controllers.task_controller import TaskController
 from service.constants import TASK_STATUS_NEW, TASK_STATUS_COMPLETED
-
+from dics.deserter_xls_dic import TASK_TYPES
 
 def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_id: int = None):
     is_new = task_id is None
@@ -34,7 +34,7 @@ def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_
             users_options[user_id] = f"{display_name} (Ви)"
         else:
             users_options[user_id] = display_name
-    type_options = ['Документація', 'Запити', 'Фікс Даних', 'Програмірувай']
+    type_options = list(TASK_TYPES.keys())
 
     # --- ЗАВАНТАЖЕННЯ ДАНИХ (Якщо це редагування) ---
     if not is_new:

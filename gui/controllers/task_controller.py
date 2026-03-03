@@ -14,11 +14,10 @@ class TaskController:
         self.log_manager = self.workflow.log_manager
         self.logger = self.log_manager.get_logger()
 
-    def get_all_tasks(self, ctx: RequestContext, assignee_id = None):
+    def get_all_tasks(self, ctx: RequestContext, search_filter = None):
         # self.logger.debug('UI:' + ctx.user_name + ': Забираємо задачі для: ' + str(assignee_id))
         service = TaskService(self.db, ctx)
-        # Можна передати assignee_id=ctx.user_id, якщо треба бачити ТІЛЬКИ свої задачі
-        return service.get_all_tasks(assignee_id)
+        return service.get_all_tasks(search_filter)
 
     def update_task_status(self, ctx: RequestContext, task_id: int, new_status: str):
         # self.logger.debug('UI:' + ctx.user_name + ': Зберігаємо статус задачі: ' + str(task_id) + ' : ' + str(new_status))

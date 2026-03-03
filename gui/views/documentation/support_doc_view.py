@@ -325,6 +325,7 @@ def render_document_page(controller: SupportController, person_controller: Perso
                 client = file_cache_manager.client
                 with client:
                     client.save_file_from_buffer(destination_path, log_buffer)
+                    ui.notify('Документ для СЕДО збережено в ' + str(destination_path), type="positive")
 
             async def on_send_dbr_click():
                 # validate
@@ -332,13 +333,41 @@ def render_document_page(controller: SupportController, person_controller: Perso
                     ui.notify('Непогано б заповнити дату та номер супроводу!', type='warning')
                     return
 
-                complete = controller.mark_as_completed(ctx,person_controller, draft_id)
-                if complete:
-                    state['status'] = DOC_STATUS_COMPLETED
-                    refresh_status_ui()
-                    ui.notify(f'Документи відправлені, дати та номери проставлені!', type='positive')
-                else:
-                    ui.notify(f'Документи не відправлені, щось не той!', type='negative')
+                # Захист: чи є в нас взагалі ID чернетки?
+                current_id = state.get('current_support_doc_id')
+                if not current_id:
+                    ui.notify('Спочатку збережіть чернетку!', type='warning')
+                    return
+
+                complete_btn.disable()
+                complete_btn.props('loading')
+                ui.notify('⏳ Оновлюємо дані в Excel, зачекайте...', type='info')
+
+                try:
+                    # 2. Викликаємо ВАЖКУ синхронну функцію у фоновому потоці
+                    complete = await run.io_bound(
+                        controller.mark_as_completed,
+                        ctx,
+                        person_controller,
+                        current_id
+                    )
+
+                    if complete:
+                        state['status'] = DOC_STATUS_COMPLETED
+                        refresh_status_ui()
+                        ui.notify('✅ Документи відправлені, дати та номери проставлені в базі!', type='positive')
+                    else:
+                        ui.notify('⚠️ Документи не відправлені, сталася помилка логіки!', type='negative')
+
+                except Exception as e:
+                    # 3. Перехоплюємо помилки, які ви кидаєте через raise Exception у контролері
+                    ui.notify(f'❌ Помилка під час відправки: {e}', type='negative')
+
+                finally:
+                    # 4. Обов'язково знімаємо лоадер, розблоковуємо кнопку і прибираємо сповіщення
+                    complete_btn.props(remove='loading')
+                    if state.get('status') != DOC_STATUS_COMPLETED:
+                        complete_btn.enable()
 
             async def on_save_draft_click():
                 if not state['buffer']:
@@ -347,7 +376,7 @@ def render_document_page(controller: SupportController, person_controller: Perso
 
                 save_draft_btn.disable()
                 try:
-                    draft_id = await run.io_bound(
+                    draft_new_id = await run.io_bound(
                         controller.save_support_doc,
                         ctx,
                         city.value,
@@ -357,9 +386,9 @@ def render_document_page(controller: SupportController, person_controller: Perso
                         state.get('current_support_doc_id')
                     )
 
-                    state['current_support_doc_id'] = draft_id
+                    state['current_support_doc_id'] = draft_new_id
 
-                    ui.notify(f'Чернетку №{draft_id} збережено!', type='positive', icon='cloud_done')
+                    ui.notify(f'Чернетку №{draft_new_id} збережено!', type='positive', icon='cloud_done')
                 except Exception as e:
                     ui.notify(f'Помилка БД: {e}', type='negative')
                 finally:
@@ -374,7 +403,7 @@ def render_document_page(controller: SupportController, person_controller: Perso
             complete_btn = ui.button('ВІДПРАВКА НА ДБР', on_click=on_send_dbr_click,
                                      icon='exit_to_app').classes('w-full mt-2 h-10').props('color="primary"')
 
-            generate_logs_btn = ui.button('ЗГЕНЕРУВАТИ INFO ДЛЯ СЄДО', on_click=on_generate_logs_click,
+            generate_logs_btn = ui.button('ЗГЕНЕРУВАТИ INFO ДЛЯ СEДО', on_click=on_generate_logs_click,
                                           icon='description').classes('w-full mt-4 h-12').props('color="primary"')
 
             def refresh_status_ui():
