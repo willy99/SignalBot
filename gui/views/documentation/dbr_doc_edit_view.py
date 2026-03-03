@@ -1,5 +1,8 @@
 from nicegui import ui, run
 
+from dics.deserter_xls_dic import COLUMN_ORDER_ASSIGNMENT_NUMBER, COLUMN_ORDER_ASSIGNMENT_DATE, \
+    COLUMN_ORDER_RESULT_NUMBER, COLUMN_ORDER_RESULT_DATE, COLUMN_KPP_NUMBER, COLUMN_KPP_DATE, COLUMN_DBR_NUMBER, \
+    COLUMN_DBR_DATE
 from gui.controllers.dbr_controller import DbrController
 from gui.controllers.person_controller import PersonController
 from service.storage.FileCacher import FileCacheManager
@@ -8,6 +11,7 @@ from domain.person_filter import PersonSearchFilter
 from config import UI_DATE_FORMAT
 from datetime import datetime, date
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
+from utils.utils import is_number, format_to_excel_date
 
 
 def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file_cache_manager: FileCacheManager,
@@ -19,25 +23,19 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
         'status': DOC_STATUS_DRAFT,
         'out_date': None,
         'out_number': '',
-        'buffer': [],  # Тут будуть зберігатися словники обраних осіб
+        'buffer': [],
         'current_search_results': {},
         'dbr_doc_id': dbr_doc_id,
 
-        # Стейт для поточного обраного бійця (редагування перед додаванням)
         'edit_idx': None,
         'current_person': {
             'o_ass_num': '', 'o_ass_date': '',
             'o_res_num': '', 'o_res_date': '',
             'kpp_num': '', 'kpp_date': '',
-            'dbr_num': '', 'dbr_date': ''
+            'dbr_num': '', 'dbr_date': '',
+            'review_status': ''
         }
     }
-
-    # Допоміжна функція для форматування дати з БД
-    def format_db_date(dt):
-        if not dt: return ''
-        if isinstance(dt, (datetime, date)): return dt.strftime('%d.%m.%Y')
-        return str(dt)
 
     with ui.grid(columns=12).classes('w-full gap-6 items-start max-w-7xl mx-auto'):
 
@@ -55,17 +53,36 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                     ui.label('Статус:').classes('text-gray-500 font-medium')
                     status_badge = ui.badge(status_text, color=badge_color).classes('text-sm px-2 py-1')
 
-                out_number_input = ui.input('Загальний вих. номер (СЄДО)').bind_value(state, 'out_number').classes(
-                    'flex-1')
-                out_date_input = date_input('Дата відправки', state, 'out_date', blur_handler=fix_date).classes(
-                    'flex-1')
+                out_number_input = ui.input('Загальний вих. номер (СЕДО)') \
+                    .bind_value(state, 'out_number') \
+                    .on_value_change(lambda e: state['current_person'].update({'dbr_num': e.value})) \
+                    .classes('flex-1')
+
+                out_date_input = date_input(
+                    'Дата відправки', state, 'out_date',
+                    blur_handler=fix_date,
+                    change_handler=lambda e: state['current_person'].update({'dbr_date': e.value})
+                ).classes('flex-1')
 
             # --- 2. Блок пошуку ---
             ui.label('Додавання військовослужбовців').classes('text-lg font-bold text-gray-700 mb-2')
 
             with ui.row().classes('w-full gap-2 items-center mb-4'):
-                search_input = ui.input('ПІБ або РНОКПП...').classes('flex-grow').props('clearable autofocus outlined')
+                search_input = ui.input('ПІБ або Номер наказу...').classes('flex-grow').props('clearable autofocus outlined')
                 search_btn = ui.button('Шукати', icon='search').props('elevated color="primary" size="md"')
+
+            def update_review_badge(status_val):
+                """Оновлює колір та текст бейджа статусу"""
+                if not status_val:
+                    review_status_badge.set_visibility(False)
+                    return
+
+                review_status_badge.set_text(f"Статус: {status_val}")
+                if status_val.strip().upper() == 'ЄРДР':
+                    review_status_badge.props('color="red"')
+                else:
+                    review_status_badge.props('color="green"')
+                review_status_badge.set_visibility(True)
 
             def on_person_selected(e):
                 if not e.value:
@@ -74,6 +91,10 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
 
                 # Заповнюємо форму даними з бази
                 data = state['current_search_results'].get(e.value, {})
+                db_dbr_num = data.get('dbr_num', '')
+                db_dbr_date = data.get('dbr_date', '')
+                rev_status = data.get('review_status', '')
+
                 state['current_person'].update({
                     'o_ass_num': data.get('o_ass_num', ''),
                     'o_ass_date': data.get('o_ass_date', ''),
@@ -81,10 +102,12 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                     'o_res_date': data.get('o_res_date', ''),
                     'kpp_num': data.get('kpp_num', ''),
                     'kpp_date': data.get('kpp_date', ''),
-                    'dbr_num': data.get('dbr_num', ''),
-                    'dbr_date': data.get('dbr_date', '')
+                    'dbr_num': db_dbr_num if (db_dbr_num and db_dbr_num != '0') else state.get('out_number', ''),
+                    'dbr_date': db_dbr_date if db_dbr_date else state.get('out_date', ''),
+                    'review_status': rev_status
                 })
                 person_details_container.set_visibility(True)
+                update_review_badge(rev_status)
 
             person_select = ui.select(options={}, label='Оберіть особу зі знайдених',
                                       on_change=on_person_selected).classes('w-full mb-4').props('outlined')
@@ -94,28 +117,32 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
             with ui.column().classes(
                     'w-full gap-2 p-4 bg-blue-50 rounded-md border border-blue-100 mb-4') as person_details_container:
                 person_details_container.set_visibility(False)
-                ui.label('Деталі справи (будуть збережені в пейлоад)').classes('text-sm font-bold text-blue-800 mb-2')
+                # Заголовок та бейдж статусу в один рядок
+                with ui.row().classes('w-full items-center justify-between mb-2'):
+                    ui.label('Деталі справи').classes('text-sm font-bold text-blue-800')
+                    review_status_badge = ui.badge('', color='green').classes('text-xs font-bold px-2 py-1 shadow-sm')
+                    review_status_badge.set_visibility(False)
 
                 with ui.row().classes('w-full items-center gap-4'):
-                    ui.input('Наказ призначення №').bind_value(state['current_person'], 'o_ass_num').classes(
+                    ui.input(COLUMN_ORDER_ASSIGNMENT_NUMBER).bind_value(state['current_person'], 'o_ass_num').classes(
                         'flex-1 bg-white')
-                    date_input('Дата призначення', state['current_person'], 'o_ass_date', fix_date).classes(
-                        'flex-1 bg-white')
-
-                with ui.row().classes('w-full items-center gap-4'):
-                    ui.input('Наказ результатів №').bind_value(state['current_person'], 'o_res_num').classes(
-                        'flex-1 bg-white')
-                    date_input('Дата результатів', state['current_person'], 'o_res_date', fix_date).classes(
-                        'flex-1 bg-white')
-
-                with ui.row().classes('w-full items-center gap-4'):
-                    ui.input('Повід. КПП №').bind_value(state['current_person'], 'kpp_num').classes('flex-1 bg-white')
-                    date_input('Дата повід. КПП', state['current_person'], 'kpp_date', fix_date).classes(
+                    date_input(COLUMN_ORDER_ASSIGNMENT_DATE, state['current_person'], 'o_ass_date', fix_date).classes(
                         'flex-1 bg-white')
 
                 with ui.row().classes('w-full items-center gap-4'):
-                    ui.input('Вих. на ДБР №').bind_value(state['current_person'], 'dbr_num').classes('flex-1 bg-white')
-                    date_input('Дата вих. на ДБР', state['current_person'], 'dbr_date', fix_date).classes(
+                    ui.input(COLUMN_ORDER_RESULT_NUMBER).bind_value(state['current_person'], 'o_res_num').classes(
+                        'flex-1 bg-white')
+                    date_input(COLUMN_ORDER_RESULT_DATE, state['current_person'], 'o_res_date', fix_date).classes(
+                        'flex-1 bg-white')
+
+                with ui.row().classes('w-full items-center gap-4'):
+                    ui.input(COLUMN_KPP_NUMBER).bind_value(state['current_person'], 'kpp_num').classes('flex-1 bg-white')
+                    date_input(COLUMN_KPP_DATE, state['current_person'], 'kpp_date', fix_date).classes(
+                        'flex-1 bg-white')
+
+                with ui.row().classes('w-full items-center gap-4'):
+                    ui.input(COLUMN_DBR_NUMBER).bind_value(state['current_person'], 'dbr_num').classes('flex-1 bg-white')
+                    date_input(COLUMN_DBR_DATE, state['current_person'], 'dbr_date', fix_date).classes(
                         'flex-1 bg-white')
 
             # --- Логіка пошуку ---
@@ -127,7 +154,10 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
 
                 search_btn.disable()
                 try:
-                    search_filter = PersonSearchFilter(query=query)
+                    if is_number(query):
+                        search_filter = PersonSearchFilter(o_ass_num=query)
+                    else:
+                        search_filter = PersonSearchFilter(query=query)
                     results = await run.io_bound(person_ctrl.search, ctx, search_filter)
 
                     state['current_search_results'].clear()
@@ -140,21 +170,21 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                         return
 
                     for p in results:
-                        id_num = f"{p.rnokpp}_{p.name}"
-                        # Зберігаємо всі поля, які потрібні для редагування
+                        id_num = f"{p.rnokpp}_{p.name}_{p.desertion_date}"
                         state['current_search_results'][id_num] = {
                             'rnokpp': p.rnokpp,
                             'name': p.name,
                             'o_ass_num': getattr(p, 'o_ass_num', ''),
-                            'o_ass_date': format_db_date(getattr(p, 'o_ass_date', '')),
+                            'o_ass_date': format_to_excel_date(getattr(p, 'o_ass_date', '')),
                             'o_res_num': getattr(p, 'o_res_num', ''),
-                            'o_res_date': format_db_date(getattr(p, 'o_res_date', '')),
+                            'o_res_date': format_to_excel_date(getattr(p, 'o_res_date', '')),
                             'kpp_num': getattr(p, 'kpp_num', ''),
-                            'kpp_date': format_db_date(getattr(p, 'kpp_date', '')),
+                            'kpp_date': format_to_excel_date(getattr(p, 'kpp_date', '')),
                             'dbr_num': getattr(p, 'dbr_num', ''),
-                            'dbr_date': format_db_date(getattr(p, 'dbr_date', ''))
+                            'dbr_date': format_to_excel_date(getattr(p, 'dbr_date', '')),
+                            'review_status': getattr(p, 'review_status', '')
                         }
-                        options[id_num] = f"{p.name} (РНОКПП: {p.rnokpp})"
+                        options[id_num] = f"{p.name} (РНОКПП: {p.rnokpp} СЗЧ: {p.desertion_date})"
 
                     person_select.options = options
                     person_select.visible = True
@@ -202,14 +232,24 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                     ui.notify(f'Ця особа вже є у списку на відправку!', type='warning')
                     return
 
+                # 2. ВАЛІДАЦІЯ: Перевірка унікальності номера ДБР у поточному списку
+                new_dbr_num = state['current_person'].get('dbr_num', '').strip()
+                if new_dbr_num:
+                    for i, doc in enumerate(buffer_data):
+                        if i != edit_idx and doc.get('dbr_num') == new_dbr_num:
+                            ui.notify(
+                                f'Увага! Номер виходу на ДБР "{new_dbr_num}" вже використовується для іншої особи у цьому списку!',
+                                type='negative')
+                            return
+
                 selected_person = state['current_search_results'].get(selected_id, {})
 
                 # Формуємо об'єкт для пейлоаду зі зміненими даними з форми
                 raw_data = {
                     'id_number': selected_id,
-                    'rnokpp': selected_person.get('rnokpp'),
-                    'name': selected_person.get('name'),
-                    # Забираємо актуальні значення прямо зі state['current_person']
+                    'rnokpp': selected_person.get('rnokpp', ''),
+                    'name': selected_person.get('name', ''),
+                    'desertion_date': selected_person.get('desertion_date', ''),
                     'o_ass_num': state['current_person']['o_ass_num'],
                     'o_ass_date': state['current_person']['o_ass_date'],
                     'o_res_num': state['current_person']['o_res_num'],
@@ -217,7 +257,8 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                     'kpp_num': state['current_person']['kpp_num'],
                     'kpp_date': state['current_person']['kpp_date'],
                     'dbr_num': state['current_person']['dbr_num'],
-                    'dbr_date': state['current_person']['dbr_date']
+                    'dbr_date': state['current_person']['dbr_date'],
+                    'review_status': state['current_person']['review_status']
                 }
 
                 if edit_idx is not None:
@@ -240,34 +281,55 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
         # ==========================================
         # ПРАВА ЧАСТИНА: БУФЕР ТА ДІЇ
         # ==========================================
-        with ui.column().classes('col-span-12 md:col-span-4 w-full'):
+        # СТАЛО:
+        with ui.column().classes(
+                'col-span-12 md:col-span-4 w-full') as right_panel:
             ui.label('Список на відправку:').classes('text-xl font-bold')
             buffer_container = ui.column().classes(
                 'w-full gap-2 p-4 border rounded-lg bg-gray-50 min-h-[300px] shadow-inner')
 
-            def on_remove_click(idx):
-                if 0 <= idx < len(state['buffer']):
-                    removed = state['buffer'].pop(idx)
-                    ui.notify(f"{removed['name']} видалено зі списку", type='info')
-                if state['edit_idx'] == idx:
-                    clear_inputs()
-                elif state['edit_idx'] is not None and state['edit_idx'] > idx:
-                    state['edit_idx'] -= 1
-                refresh_buffer_ui()
+            async def on_remove_click(idx):
+                with right_panel:
+                    dialog = ui.dialog()
+                    with dialog, ui.card().classes('p-6 min-w-[300px]'):
+                        ui.label('Підтвердження').classes('text-xl font-bold text-red-600 mb-2')
+                        ui.label('Ви дійсно хочете видалити цю особу зі списку?').classes('text-gray-600 mb-6')
+
+                        with ui.row().classes('w-full justify-end gap-2'):
+                            ui.button('Скасувати', on_click=lambda: dialog.submit(False)).props('flat color="gray"')
+                            ui.button('Видалити', on_click=lambda: dialog.submit(True)).props('color="red"')
+
+                result = await dialog
+
+                if result:
+                    if 0 <= idx < len(state['buffer']):
+                        removed = state['buffer'].pop(idx)
+                        ui.notify(f"{removed.get('name', 'Особу')} видалено зі списку", type='info')
+
+                    if state['edit_idx'] == idx:
+                        clear_inputs()
+                    elif state['edit_idx'] is not None and state['edit_idx'] > idx:
+                        state['edit_idx'] -= 1
+
+                    refresh_buffer_ui()
 
             def on_edit_click(idx):
                 state['edit_idx'] = idx
                 doc = state['buffer'][idx]
                 id_num = doc['id_number']
 
-                # Відновлюємо візуальний стан зліва
                 search_input.value = doc['name']
 
-                # Тимчасово кладемо в current_search_results, щоб on_person_selected спрацював коректно
                 state['current_search_results'][id_num] = doc
-                person_select.options = {id_num: f"{doc['name']} (РНОКПП: {doc.get('rnokpp', '')})"}
+                rnokpp_str = doc.get('rnokpp', 'Невідомо')
+                des_date_str = doc.get('desertion_date', 'Невідомо')
+
+                # Показуємо всю інформацію у селекті під час редагування
+                person_select.options = {id_num: f"{doc['name']} (РНОКПП: {rnokpp_str} СЗЧ: {des_date_str})"}
                 person_select.value = id_num
                 person_select.visible = True
+
+                update_review_badge(doc.get('review_status', ''))
 
                 # Змінюємо кнопку на "Зберегти"
                 add_btn.text = 'Зберегти зміни'
@@ -294,6 +356,8 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                                     # Виводимо частину інформації для розуміння
                                     info_str = f"Нак: {p.get('o_ass_num', '—')} | ДБР: {p.get('dbr_num', '—')}"
                                     ui.label(info_str).classes('text-xs text-gray-500')
+                                    if p.get('review_status') == 'ЄРДР':
+                                        ui.badge('ЄРДР', color='red').classes('text-[10px] px-1 py-0 mt-1')
 
                                 with ui.row().classes('gap-1'):
                                     edit_button = ui.button(icon='edit', color='blue',
@@ -329,27 +393,40 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                 finally:
                     save_draft_btn.enable()
 
+
             async def on_send_dbr_click():
-                if not state['out_number'] or not state['out_date']:
-                    ui.notify('Обов\'язково заповніть номер та дату відправки!', type='warning')
-                    return
 
-                success = await run.io_bound(
-                    dbr_ctrl.mark_as_completed,
-                    ctx,
-                    state['dbr_doc_id'],
-                    state['buffer'],
-                    state['out_number'],
-                    state['out_date'],
-                    person_ctrl
-                )
+                complete_btn.disable()
+                complete_btn.props('loading')
+                ui.notify('⏳ Оновлюємо дані в Excel, зачекайте...', type='info')
 
-                if success:
-                    state['status'] = DOC_STATUS_COMPLETED
-                    refresh_status_ui()
-                    ui.notify(f'Справи успішно відправлені на ДБР!', type='positive')
-                else:
-                    ui.notify(f'Виникла помилка під час відправки', type='negative')
+                try:
+
+                    success = await run.io_bound(
+                        dbr_ctrl.mark_as_completed,
+                        ctx,
+                        state['dbr_doc_id'],
+                        state['buffer'],
+                        state['out_number'],
+                        state['out_date'],
+                        person_ctrl
+                    )
+
+                    if success:
+                        state['status'] = DOC_STATUS_COMPLETED
+                        refresh_status_ui()
+                        ui.notify(f'Справи успішно відправлені на ДБР!', type='positive')
+                    else:
+                        ui.notify(f'Виникла помилка під час відправки', type='negative')
+                except Exception as e:
+                    # 3. Перехоплюємо помилки, які ви кидаєте через raise Exception у контролері
+                    ui.notify(f'❌ Помилка під час відправки: {e}', type='negative')
+
+                finally:
+                    # 4. Обов'язково знімаємо лоадер, розблоковуємо кнопку і прибираємо сповіщення
+                    complete_btn.props(remove='loading')
+                    if state.get('status') != DOC_STATUS_COMPLETED:
+                        complete_btn.enable()
 
             save_draft_btn = ui.button('ЗБЕРЕГТИ ЧЕРНЕТКУ', on_click=on_save_draft_click, icon='save').classes(
                 'w-full mt-4 h-12').props('outline color="primary"')
@@ -389,16 +466,19 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
             refresh_buffer_ui()
 
 
-# --- Допоміжні функції (залишаються без змін) ---
-def date_input(label: str, state, field: str, blur_handler=None):
+def date_input(label: str, state, field: str, blur_handler=None, change_handler=None):
+    """Створює поле для вводу дати зі спливаючим календарем (іконкою)"""
     inp = ui.input(label=label).bind_value(state, field)
-    if blur_handler: inp.on('blur', blur_handler)
+    if blur_handler:
+        inp.on('blur', blur_handler)
+    if change_handler:
+        inp.on_value_change(change_handler)  # ДОДАНО: обробник зміни значення
+
     with inp.add_slot('append'):
         ui.icon('edit_calendar').classes('cursor-pointer')
         with ui.menu():
             ui.date().bind_value(state, field).props(f'mask="{UI_DATE_FORMAT}"')
     return inp
-
 
 def fix_date(e):
     val = e.sender.value

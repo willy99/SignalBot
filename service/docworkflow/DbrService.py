@@ -81,7 +81,7 @@ class DbrService:
         }
 
     def mark_as_completed(self, dbr_doc_id: int, out_number: str, out_date: str) -> bool:
-        return self.db.update_record(DB_TABLE_DBR_DOC, dbr_doc_id, {'status': DOC_STATUS_COMPLETED, 'out_number': out_number})
+        return self.db.update_record(DB_TABLE_DBR_DOC, dbr_doc_id, {'status': DOC_STATUS_COMPLETED, 'out_number': out_number, 'out_date': out_date})
 
 
     def delete_dbr_doc(self, dbr_doc_id: int):

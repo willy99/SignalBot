@@ -62,7 +62,7 @@ def render_drafts_list_page(controller, ctx: RequestContext):
         ''')
         table.add_slot('body-cell-status', '''
                     <q-td :props="props">
-                        <q-badge :color="props.row.status === 'Completed' ? 'green' : 'grey'" class="text-bold q-pa-sm">
+                        <q-badge :color="props.row.status === \'''' + DOC_STATUS_COMPLETED + '''\' ? 'green' : 'grey'" class="text-bold q-pa-sm">
                             {{ props.row.status }}
                         </q-badge>
                     </q-td>

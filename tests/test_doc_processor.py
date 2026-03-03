@@ -157,6 +157,34 @@ def test_process_doc_two_persons(processor_factory):
         assert "НЕГОЛЮК" in field[COLUMN_DESERT_CONDITIONS]
         assert field[COLUMN_EXECUTOR] == 'БЕЗКРОВНИЙ Володимир Володимирович'
 
+
+def test_10_refusal(processor_factory):
+    filename = "10_02.03.2026  відмова ДУМБЄКОВ С.А. 8 дшр 2 дшб.doc"
+    processor = processor_factory(filename)
+    result = processor.process()
+    assert isinstance(result, list)
+    assert len(result) == 1
+
+    # --- ПЕРЕВІРКА ПЕРШОЇ ОСОБИ (ІВОНЧАК) ---
+    person = result[0]
+    assert person[COLUMN_NAME] == 'ДУМБЄКОВ Сергій Анатолійович'
+    assert person[COLUMN_TITLE] == 'солдат'
+    assert person[COLUMN_ID_NUMBER] == '2111111119'
+    assert person[COLUMN_BIRTHDAY] == '03.02.1979'
+    assert person[COLUMN_SUBUNIT] == '2 дшб'
+    assert person[COLUMN_SUBUNIT2] == '8 дшр'
+    assert person[COLUMN_SERVICE_TYPE] == 'призивом'
+    assert person[COLUMN_PHONE] == '0951111111'
+    assert person[COLUMN_ADDRESS] == "Миколаївська область м. Первомайськ, вул. Громова 11."
+    assert person[COLUMN_TZK] == 'Первомайським РТЦК та СП м. Первомайськ Миколаївська область'
+    assert person[COLUMN_TZK_REGION] == "Миколаївська область"
+    assert person[COLUMN_ENLISTMENT_DATE] == '09.12.2025'
+    assert person[COLUMN_SERVICE_DAYS] == 78
+    assert person[COLUMN_DESERTION_PLACE] == 'РВБЗ'
+    assert person[COLUMN_DESERTION_TYPE] == 'відмова'
+    assert person[COLUMN_CC_ARTICLE] == '402'
+
+
 def test_process_doc_tzk_is_full(processor_factory):
     # перевірка, що тцк розпарсився правильно та повно. матьйїхйоп
     filename = "05_05.02.2026 СЗЧ з РВБЗ (Гавнов В.М.) рбс 3 дшб_tzk.doc"
@@ -687,18 +715,24 @@ def test_desertion_type_extraction(processor_factory):
     assert where == 'РВБЗ'
     res = processor._extract_desertion_type(text, where)
     assert res == 'СЗЧ зброя'
+    cc = processor._extract_cc_article(res)
+    assert cc == '429'
 
     text = "22.12.2025 року близько 09:00 години солдат БУЙНОВ Дмитро Анатолійович здійснив самовільне залишення району виконання бойового завдання підрозділом поблизу населеного пункту Мирноград Донецької області. Військовослужбовець, солдат БУЙНОВ Дмитро Анатолійович з особистою зброєю (5,56 x 45 мм штурмова гвинтівка CZ Bren 2, номер зброї J103408, набої 5,56 x 45 в кількості 150 шт.) залишив позицію та убув у невідомому напрямку. "
     where = processor._extract_desertion_place(text)
     assert where == 'РВБЗ'
     res = processor._extract_desertion_type(text, where)
     assert res == 'СЗЧ зброя'
+    cc = processor._extract_cc_article(res)
+    assert cc == '429'
 
     text = "22.12.2025 року під час перевірки наявності особового складу був відсутній солдат БУЙНОВ Андрій Валентинович, який самовільно залишив район виконання завдання за призначенням. Пошук військовослужбовця в районі зосередження підрозділу в н.п. Шахтарське Дніпропетровської області позитивного результату не приніс. Місце знаходження військовослужбовця невідоме."
     where = processor._extract_desertion_place(text)
     assert where == 'РВБЗ'
     res = processor._extract_desertion_type(text, where)
     assert res == 'СЗЧ'
+    cc = processor._extract_cc_article(res)
+    assert cc == '407'
 
 def test_return_sign(processor_factory):
     processor = processor_factory("any.docx")

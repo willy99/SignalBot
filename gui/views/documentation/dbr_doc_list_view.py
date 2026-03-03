@@ -18,6 +18,7 @@ def render_dbr_drafts_list_page(dbr_ctrl, ctx: RequestContext):
         # Безпечно отримуємо список людей (може бути порожнім, якщо JSON не розпарсився)
         payload = d.get('payload') or []
 
+
         rows.append({
             'id': d.get('id'),
             'out_number': d.get('out_number') or '—',
@@ -56,8 +57,8 @@ def render_dbr_drafts_list_page(dbr_ctrl, ctx: RequestContext):
         # 4. Кастомний слот для статусів
         table.add_slot('body-cell-status', '''
             <q-td :props="props">
-                <q-badge :color="props.row.status === ''' + DOC_STATUS_COMPLETED + ''' ? 'green' : 'orange'" class="text-bold q-pa-sm">
-                    {{ props.row.status === ''' + DOC_STATUS_COMPLETED + ''' ? 'Відправлено' : 'Чернетка' }}
+                <q-badge :color="props.row.status === \'''' + DOC_STATUS_COMPLETED + '''\' ? 'green' : 'orange'" class="text-bold q-pa-sm">
+                    {{ props.row.status === \'''' + DOC_STATUS_COMPLETED + '''\' ? 'Відправлено' : 'Чернетка' }}
                 </q-badge>
             </q-td>
         ''')
@@ -97,7 +98,7 @@ def render_dbr_drafts_list_page(dbr_ctrl, ctx: RequestContext):
             if result:
                 try:
                     # Потрібно реалізувати delete_draft в DbrController
-                    dbr_ctrl.delete_draft(ctx, draft_id)
+                    dbr_ctrl.delete_dbr_doc(ctx, draft_id)
 
                     # Видаляємо рядок з таблиці без перезавантаження сторінки
                     table.rows = [row for row in table.rows if row['id'] != draft_id]
