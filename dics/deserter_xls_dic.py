@@ -376,6 +376,8 @@ REVIEW_STATUS_MAP: Final[Dict[str, List[str]]] = {
     REVIEW_STATUS_NON_EVIL: ['помилково', 'не направляємо']
 }
 
+REPORT_SUBUNIT_EXCLUDE_ARTICLES = ['402']
+
 SUSPENDED_KEYWORD:Final[str] = 'призупинено В/С'
 DESERTION_TYPE_WEAPON_KEYWORD: Final[str] = 'СЗЧ зброя'
 

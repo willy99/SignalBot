@@ -11,7 +11,13 @@
   </component>
   <component name="DBNavigator.Project.DatabaseAssistantManager">
     <assistants>
-      <assistant-state connection-id="2095744c-20ac-46db-a7ec-60ef916e264b" assistant-type="PUBLIC" default-profile-name="" selected-chat-id="" availability="AVAILABLE" acknowledgement="NONE" selected="true">
+      <assistant-state connection-id="2095744c-20ac-46db-a7ec-60ef916e264b" assistant-type="PUBLIC" default-profile-name="" selected-chat-id="36DA56D8CABC4AFBADF313A5239EAEB8" availability="AVAILABLE" acknowledgement="ENGAGED" selected="true">
+        <chats>
+          <chat id="36DA56D8CABC4AFBADF313A5239EAEB8" title="" session-signature="" timestamp="1772558910682">
+            <messages />
+            <context provider="" profile="" model="" action="" interactive="true" />
+          </chat>
+        </chats>
         <tools />
       </assistant-state>
     </assistants>

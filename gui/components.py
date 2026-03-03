@@ -153,6 +153,8 @@ def menu(auth_manager, ctx: RequestContext, task_controller):
                         if can_report_units:
                             make_menu_item('Звіт по підрозділам', 'bar_chart', '/report_units')
                         if can_report_general:
+                            make_menu_item('Звіт по рокам', 'calendar_today', '/report_yearly')
+                        if can_report_general:
                             make_menu_item('Дублікати прізвищ', 'people_outline', '/report_name_dups')
                         if can_report_general:
                             make_menu_item('Чекаємо на ЄРДР', 'pending_actions', '/report_waiting_erdr')

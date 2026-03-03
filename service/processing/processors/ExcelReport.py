@@ -6,7 +6,7 @@ from dics.deserter_xls_dic import *
 from collections import defaultdict
 from service.storage.LoggerManager import LoggerManager
 from config import DESERTER_TAB_NAME, EXCEL_DATE_FORMAT
-from utils.utils import get_strint_fromfloat
+from utils.utils import get_strint_fromfloat, get_year_safe, is_number
 from domain.person_filter import PersonSearchFilter
 
 class ExcelReporter:
@@ -79,11 +79,13 @@ class ExcelReporter:
             dbr_num_idx: Final[int] = self.excelProcessor.header.get(COLUMN_DBR_NUMBER) - 1
             suspended_idx: Final[int] = self.excelProcessor.header.get(COLUMN_SUSPENDED) - 1
             des_type_idx: Final[int] = self.excelProcessor.header.get(COLUMN_DESERTION_TYPE) - 1
+            article_idx: Final[int] = self.excelProcessor.header.get(COLUMN_CC_ARTICLE) - 1
 
             # Читаємо весь заповнений діапазон
 
-            last_row = self.excelProcessor.sheet.range((65536, 1)).end('up').row
+            last_row = self.excelProcessor.get_last_row()
             data = self.excelProcessor.sheet.range(f"A2:BB{last_row}").value
+            print('last row ' + str(last_row))
 
             people_history = defaultdict(list)
 
@@ -94,18 +96,18 @@ class ExcelReporter:
             for i, row in enumerate(data):
                 # filter date
                 des_date = row[des_date_idx] # mandatory field
-                des_date_year = str(des_date.year) if des_date is not None else None
+                des_date_year = get_year_safe(des_date)
 
                 ret_mu_date = row[ret_mu_idx]
-                ret_mu_date_year = str(ret_mu_date.year) if ret_mu_date is not None else None
+                ret_mu_date_year = get_year_safe(ret_mu_date)
                 ret_res_date = row[ret_res_idx]
-                ret_res_date_year = str(ret_res_date.year) if ret_res_date is not None else None
+                ret_res_date_year = get_year_safe(ret_res_date)
 
                 kpp_date = row[kpp_date_idx]
-                kpp_date_year = str(kpp_date.year) if kpp_date is not None else None
+                kpp_date_year = get_year_safe(kpp_date)
                 kpp_num = row[kpp_num_idx]
                 dbr_date = row[dbr_date_idx]
-                dbr_date_year = str(dbr_date.year) if dbr_date is not None else None
+                dbr_date_year = get_year_safe(dbr_date)
                 dbr_num = row[dbr_num_idx]
 
                 name = str(row[name_idx]).strip()
@@ -122,8 +124,14 @@ class ExcelReporter:
                 is_sergeant = any(word in rank for word in sergeant_keywords)
                 rank_key = 'офіцер' if is_officer else 'рядовий_сержант'
 
+                cc_article = get_strint_fromfloat(str(row[article_idx]))
+
                 suspended = str(row[suspended_idx]).strip()
+
                 # ЛОГІКА ФІЛЬТРАЦІЇ ДЛЯ СЗЧ
+                match_exclude_article = cc_article in REPORT_SUBUNIT_EXCLUDE_ARTICLES
+                if match_exclude_article:
+                    continue
 
                 match_des_year = True
                 if q_des_year:
@@ -313,9 +321,208 @@ class ExcelReporter:
             traceback.print_exc()
             return []
 
+    def get_yearly_desertion_stats(self):
+        """Збирає статистику виключно по роках (по року СЗЧ), без жодних фільтрів."""
+        self.excelProcessor.switch_to_sheet(DESERTER_TAB_NAME)
+        try:
+            def get_stats_template():
+                return {
+                    'under_3': 0, 'over_3': 0, 'ret_mu': 0, 'ret_res': 0,
+                    REVIEW_STATUS_NOT_ASSIGNED: 0, REVIEW_STATUS_EXECUTING: 0, REVIEW_STATUS_CLOSED: 0,
+                    REVIEW_STATUS_NON_ERDR: 0, REVIEW_STATUS_ERDR: 0, REVIEW_STATUS_NON_EVIL: 0,
+                    'dupl': 0, 'un_des': 0, 'un_ret': 0,
+                    'st_term': 0, 'st_call': 0, 'st_contr': 0,
+                    'pl_ppd': 0, 'pl_rvbz': 0, 'pl_other': 0,
+                    'weapon': 0, 'rev_specified': 0, 'rev_dbr_notif': 0, 'rev_dbr_mater': 0,
+                    'rev_dbr_nonerdr': 0, 'rev_dbr_erdr': 0, 'rev_suspend': 0,
+                    'rev_courts': 0, 'rev_punish': 0, 'rev_nonevil': 0,
+                }
 
+            stats = defaultdict(lambda: {
+                'рядовий_сержант': get_stats_template(),
+                'офіцер': get_stats_template(),
+                'сержант': get_stats_template(),
+                'рядовий': get_stats_template(),
+                'all': get_stats_template(),
+            })
 
+            # Отримуємо індекси стовпців
+            name_idx: Final[int] = self.excelProcessor.header.get(COLUMN_NAME) - 1
+            id_idx: Final[int] = self.excelProcessor.header.get(COLUMN_ID_NUMBER) - 1
+            rank_idx: Final[int] = self.excelProcessor.header.get(COLUMN_TITLE_2) - 1
+            des_date_idx: Final[int] = self.excelProcessor.header.get(COLUMN_DESERTION_DATE) - 1
+            ret_mu_idx: Final[int] = self.excelProcessor.header.get(COLUMN_RETURN_DATE) - 1
+            ret_res_idx: Final[int] = self.excelProcessor.header.get(COLUMN_RETURN_TO_RESERVE_DATE) - 1
+            exp_review_idx: Final[int] = self.excelProcessor.header.get(COLUMN_REVIEW_STATUS) - 1
+            where_idx: Final[int] = self.excelProcessor.header.get(COLUMN_DESERTION_PLACE) - 1
+            service_type_idx: Final[int] = self.excelProcessor.header.get(COLUMN_SERVICE_TYPE) - 1
+            kpp_date_idx: Final[int] = self.excelProcessor.header.get(COLUMN_KPP_DATE) - 1
+            kpp_num_idx: Final[int] = self.excelProcessor.header.get(COLUMN_KPP_NUMBER) - 1
+            dbr_date_idx: Final[int] = self.excelProcessor.header.get(COLUMN_DBR_DATE) - 1
+            dbr_num_idx: Final[int] = self.excelProcessor.header.get(COLUMN_DBR_NUMBER) - 1
+            suspended_idx: Final[int] = self.excelProcessor.header.get(COLUMN_SUSPENDED) - 1
+            des_type_idx: Final[int] = self.excelProcessor.header.get(COLUMN_DESERTION_TYPE) - 1
+            article_idx: Final[int] = self.excelProcessor.header.get(COLUMN_CC_ARTICLE) - 1
 
+            last_row = self.excelProcessor.get_last_row()
+            data = self.excelProcessor.sheet.range(f"A2:BB{last_row}").value
+            people_history = defaultdict(list)
+
+            if not data: return stats
+
+            for row in data:
+                if not row: continue
+
+                # 1. Визначаємо БАЗОВИЙ РІК (кошик), куди все полетить
+                des_date = row[des_date_idx]
+                des_date_year = get_year_safe(des_date) or "Невідомо"
+
+                cc_article = get_strint_fromfloat(str(row[article_idx]))
+                if cc_article in REPORT_SUBUNIT_EXCLUDE_ARTICLES:
+                    continue
+
+                ret_mu_date = row[ret_mu_idx]
+                ret_mu_date_year = get_year_safe(ret_mu_date)
+                ret_res_date = row[ret_res_idx]
+                ret_res_date_year = get_year_safe(ret_res_date)
+
+                name = str(row[name_idx]).strip()
+                id_number = get_strint_fromfloat(row[id_idx], "")
+                where = str(row[where_idx] or "Не вказано").strip()
+                service_type = str(row[service_type_idx] or "Не вказано").strip()
+                des_type = str(row[des_type_idx] or "Не вказано").strip()
+                rank = str(row[rank_idx] or "").lower().strip()
+
+                is_officer = 'офіцер' in rank
+                is_sergeant = 'сержант' in rank
+                rank_key = 'офіцер' if is_officer else 'рядовий_сержант'
+                suspended = str(row[suspended_idx]).strip()
+                review_status = str(row[exp_review_idx]).strip().lower()
+
+                name_key = f"{id_number}_{name}"
+                rank_separated_key = 'офіцер' if is_officer else 'сержант' if is_sergeant else 'рядовий'
+
+                # Зберігаємо історію для унікального підрахунку
+                people_history[name_key].append({
+                    'des_date': des_date,
+                    'ret_mu_date': ret_mu_date,
+                    'ret_res_date': ret_res_date,
+                    'rank': rank_separated_key,
+                    'service_type': service_type
+                })
+
+                # === УСЯ СТАТИСТИКА ЗАПИСУЄТЬСЯ В des_date_year ===
+
+                # 1. СЗЧ Терміни
+                try:
+                    if ret_mu_date and des_date and isinstance(des_date, (datetime, date)) and isinstance(ret_mu_date, (
+                    datetime, date)):
+                        days = (ret_mu_date - des_date).days
+                    else:
+                        days = 4
+                except Exception:
+                    days = 0
+
+                period_key = 'under_3' if days <= 3 else 'over_3'
+                stats[des_date_year][rank_key][period_key] += 1
+
+                # 2. ПОВЕРНЕННЯ
+                ret_mu_str = str(ret_mu_date).strip()
+                if ret_mu_str and ret_mu_str != 'None' and ret_mu_date_year == des_date_year:
+                    stats[des_date_year][rank_key]['ret_mu'] += 1
+
+                ret_res_str = str(ret_res_date).strip()
+                if ret_res_str and ret_res_str != 'None' and ret_res_date_year == des_date_year:
+                    stats[des_date_year][rank_key]['ret_res'] += 1
+
+                # 3. ІНШІ СТАТУСИ
+                for review_key, value in REVIEW_STATUS_MAP.items():
+                    if review_status in value:
+                        stats[des_date_year]['all'][review_key] += 1
+
+                if where in ['РВБЗ']:
+                    stats[des_date_year]['all']['pl_rvbz'] += 1
+                elif where in ['ППД']:
+                    stats[des_date_year]['all']['pl_ppd'] += 1
+                else:
+                    stats[des_date_year]['all']['pl_other'] += 1
+
+                if des_type == DESERTION_TYPE_WEAPON_KEYWORD:
+                    stats[des_date_year]['all']['weapon'] += 1
+
+                # 4. КПП ТА ДБР
+                kpp_val = str(row[kpp_num_idx] or "").strip()
+                kpp_date = row[kpp_date_idx]
+                kpp_date_year = get_year_safe(kpp_date)
+
+                if kpp_val is not None and kpp_date_year == des_date_year:
+                    stats[des_date_year]['all']['rev_dbr_notif'] += 1
+                    if is_officer: stats[des_date_year]['офіцер']['rev_dbr_notif'] += 1
+
+                dbr_val = str(row[dbr_num_idx] or "").strip()
+                dbr_date = row[dbr_date_idx]
+                dbr_date_year = get_year_safe(dbr_date)
+
+                if dbr_val is not None and dbr_date_year == des_date_year:
+                    stats[des_date_year]['all']['rev_dbr_mater'] += 1
+                    if is_officer: stats[des_date_year]['офіцер']['rev_dbr_mater'] += 1
+
+                if review_status in REVIEW_STATUS_MAP[REVIEW_STATUS_NON_ERDR]:
+                    stats[des_date_year]['all']['rev_dbr_nonerdr'] += 1
+                    if is_officer: stats[des_date_year]['офіцер']['rev_dbr_nonerdr'] += 1
+                if review_status in REVIEW_STATUS_MAP[REVIEW_STATUS_ERDR]:
+                    stats[des_date_year]['all']['rev_dbr_erdr'] += 1
+                    if is_officer: stats[des_date_year]['офіцер']['rev_dbr_erdr'] += 1
+
+                if suspended == SUSPENDED_KEYWORD:
+                    stats[des_date_year]['all']['rev_suspend'] += 1
+                    if is_officer: stats[des_date_year]['офіцер']['rev_suspend'] += 1
+
+                if review_status in REVIEW_STATUS_MAP[REVIEW_STATUS_NON_EVIL]:
+                    stats[des_date_year]['all']['rev_nonevil'] += 1
+                    if is_officer: stats[des_date_year]['офіцер']['rev_nonevil'] += 1
+
+            # =======================================================
+            # 5. ПІДРАХУНОК УНІКАЛЬНИХ ВИПАДКІВ
+            # (також жорстко прив'язаний до року останнього СЗЧ)
+            # =======================================================
+            for name_key, cases in people_history.items():
+                valid_cases = [c for c in cases if c['des_date'] and isinstance(c['des_date'], (datetime, date))]
+                if not valid_cases:
+                    valid_cases = cases
+                else:
+                    valid_cases.sort(key=lambda x: x['des_date'])
+
+                last_case = valid_cases[-1]
+                last_des_date_year = get_year_safe(last_case['des_date']) or "Невідомо"
+
+                rank = last_case['rank']
+                service_type = last_case['service_type']
+
+                has_ret_mu = bool(str(last_case['ret_mu_date'] or "").strip() and str(
+                    last_case['ret_mu_date'] or "").strip() != 'None')
+                has_ret_res = bool(str(last_case['ret_res_date'] or "").strip() and str(
+                    last_case['ret_res_date'] or "").strip() != 'None')
+
+                # Якщо немає ОБИДВОХ дат повернення -> це СЗЧ
+                if not has_ret_mu and not has_ret_res:
+                    stats[last_des_date_year][rank]['un_des'] += 1
+                # Якщо є ХОЧА Б ОДНА з дат -> людина повернулася
+                else:
+                    stats[last_des_date_year][rank]['un_ret'] += 1
+
+                if len(cases) > 1:
+                    stats[last_des_date_year][rank]['dupl'] += 1
+                else:
+                    service_map = {'призивом': 'st_call', 'контрактом': 'st_contr'}
+                    service_key = service_map.get(service_type, 'st_term')
+                    stats[last_des_date_year]['all'][service_key] += 1
+
+            return stats
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {}
 
 
     def get_summary_report(self) -> str:
@@ -334,8 +541,7 @@ class ExcelReporter:
             return "❌ Помилка: Не знайдено необхідні стовпці для звіту."
 
         # Отримуємо останній рядок
-        last_row = self.excelProcessor.sheet.range('A' + str(self.excelProcessor.sheet.cells.last_cell.row)).end(
-            'up').row
+        last_row = self.excelProcessor.get_last_row()
 
         if last_row < 2:
             return "📊 База порожня."
@@ -436,7 +642,7 @@ class ExcelReporter:
         birth_idx = self.excelProcessor.header.get(COLUMN_BIRTHDAY) - 1
         des_date_idx = self.excelProcessor.header.get(COLUMN_DESERTION_DATE) - 1
 
-        last_row = self.excelProcessor.sheet.range((65536, 1)).end('up').row
+        last_row = self.excelProcessor.get_last_row()
         data = self.excelProcessor.sheet.range(f"A2:BB{last_row}").value
 
         # 1. Словник для збору ВСІХ записів по кожному імені
@@ -481,10 +687,7 @@ class ExcelReporter:
     def get_waiting_for_erdr_report(self, search_filter: PersonSearchFilter):
         results = []
 
-        try:
-            last_row = self.excelProcessor.sheet.range((1048576, 1)).end('up').row
-        except Exception:
-            last_row = self.excelProcessor.sheet.used_range.last_cell.row
+        last_row = self.excelProcessor.get_last_row()
 
         if last_row < 2:
             return results

@@ -241,6 +241,27 @@ def to_genitive_case(fullname: str) -> str:
 
     return f"{sur_gen} {first_gen} {pat_gen}"
 
+
+def get_year_safe(date_val) -> str:
+    if not date_val:
+        return None
+
+    # Якщо це справжній об'єкт дати (datetime або date)
+    if isinstance(date_val, (datetime, date)):
+        return str(date_val.year)
+
+    # Якщо це рядок (або щось інше, що можна перетворити на рядок)
+    date_str = str(date_val).strip()
+    if len(date_str) >= 4:
+        # Варіант 1: Формат ДД.ММ.РРРР (рік в кінці)
+        if date_str[-4:].isdigit():
+            return date_str[-4:]
+        # Варіант 2: Формат РРРР-ММ-ДД (рік на початку)
+        elif date_str[:4].isdigit():
+            return date_str[:4]
+
+    return None
+
 def is_number(s):
     try:
         float(s) # Try converting to a float

@@ -10,6 +10,7 @@ from gui.views.person import batch_search_view
 from gui.views.home_view import render_home_page
 from gui.views.documentation import support_doc_view, notif_doc_view, support_doc_list_view, dbr_doc_list_view, dbr_doc_edit_view
 from gui.views.report import subunits_report_view
+from gui.views.report import yearly_report_view
 from gui.views.report import dups_report_view
 from gui.views.report import waiting_for_erdr_report_view
 from gui.views.report.logs_view import render_logs_page
@@ -80,6 +81,13 @@ def init_nicegui(workflow_obj):
         ctx = auth_manager.get_current_context()
         menu(auth_manager, ctx, task_ctrl)
         subunits_report_view.search_page(report_ctrl, person_ctrl, ctx)
+
+    @ui.page('/report_yearly')
+    @require_access(auth_manager, 'report_general', 'read')
+    def report_units():
+        ctx = auth_manager.get_current_context()
+        menu(auth_manager, ctx, task_ctrl)
+        yearly_report_view.render_yearly_report_page(report_ctrl, ctx)
 
     @ui.page('/report_name_dups')
     @require_access(auth_manager, 'report_general', 'read')

@@ -12,6 +12,11 @@ class ReportController:
         results = self.reporter.get_subunit_desertion_stats(search_filter)
         return results
 
+    def get_yearly_desertion_report(self, ctx: RequestContext, search_filter: PersonSearchFilter):
+        self.logger.debug('UI:' + ctx.user_name + ': Генеруємо репорт: ' + str(search_filter))
+        results = self.reporter.get_yearly_desertion_stats()
+        return results
+
     def get_dupp_names_report(self, ctx: RequestContext):
         self.logger.debug('UI:' + ctx.user_name + ': Генеруємо репорт дублікатів прізвищ в системі: ')
         results = self.reporter.get_dupp_names_report()

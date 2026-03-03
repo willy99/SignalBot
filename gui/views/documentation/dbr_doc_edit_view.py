@@ -170,6 +170,12 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                         return
 
                     for p in results:
+                        # 2. Фільтруємо: якщо номер є, він не порожній, не '0' і не 'None'
+                        raw_dbr = getattr(p, 'dbr_num', '')
+                        dbr_num = str(raw_dbr).strip() if raw_dbr else ''
+                        if dbr_num and dbr_num != '0' and dbr_num.lower() != 'none':
+                            continue  # Пропускаємо цю особу, бо вона вже має номер ДБР
+
                         id_num = f"{p.rnokpp}_{p.name}_{p.desertion_date}"
                         state['current_search_results'][id_num] = {
                             'rnokpp': p.rnokpp,
@@ -185,6 +191,13 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                             'review_status': getattr(p, 'review_status', '')
                         }
                         options[id_num] = f"{p.name} (РНОКПП: {p.rnokpp} СЗЧ: {p.desertion_date})"
+
+                    # 3. ПЕРЕВІРКА ПІСЛЯ ФІЛЬТРАЦІЇ
+                    if not options:
+                        ui.notify('Всі знайдені особи вже мають вихідний номер на ДБР!', type='warning')
+                        person_select.visible = False
+                        person_details_container.set_visibility(False)
+                        return
 
                     person_select.options = options
                     person_select.visible = True

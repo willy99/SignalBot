@@ -56,8 +56,8 @@ class ExcelProcessor:
             self.logger.error("❌ Помилка: Не знайдено колонку №")
             return
 
-        last_used_row = self.sheet.used_range.last_cell.row
-        last_row_with_data = self.sheet.range((last_used_row, id_col_idx)).end('up').row
+        last_row_with_data = self.get_last_row()
+
         target_insert_row = last_row_with_data + 1
 
         last_val = self.sheet.range((last_row_with_data, id_col_idx)).value
@@ -69,11 +69,6 @@ class ExcelProcessor:
             else:
                 current_id = 0
         except (ValueError, TypeError):
-            # self.logger.warning(f'--- ⚠️ Помилка отримання поточного ID. Останнє значення: {last_val}')
-            print('>>>> target row: ' + str(target_insert_row))
-            print('>>>> last_val: ' + str(last_val))
-            print('>>>> last_used_row: ' + str(last_used_row))
-            print('>>>> last_row_with_data: ' + str(last_row_with_data))
             raise ValueError(f'--- ⚠️ Помилка отримання поточного ID. Останнє значення: {last_val}')
 
         self.logger.debug(f'--- Визначено останній ID: {current_id} (з рядка {last_row_with_data})')
@@ -159,10 +154,7 @@ class ExcelProcessor:
 
         self.logger.debug(f'--- 🔎: Пошук в базі: {pib} || {dob} || {rnokpp}')
 
-        try:
-            last_row = self.sheet.range((1048576, id_col)).end('up').row
-        except Exception:
-            last_row = self.sheet.used_range.last_cell.row
+        last_row = self.get_last_row()
 
         if last_row < 2:
             return None
@@ -271,7 +263,8 @@ class ExcelProcessor:
         header_to_idx = {name: i for i, name in enumerate(headers)}
 
         # 2. Визначаємо межі даних (остання заповнена строка)
-        last_row = self.sheet.range('A' + str(self.sheet.cells.last_cell.row)).end('up').row
+        # last_row = self.sheet.range('A' + str(self.sheet.cells.last_cell.row)).end('up').row
+        last_row = self.get_last_row()
 
         if last_row < 2:
             return {col: [] for col in columns_to_gather}
@@ -368,7 +361,7 @@ class ExcelProcessor:
         self.switch_to_sheet(DESERTER_TAB_NAME, silent=True)
 
         results = []
-        last_row = self.sheet.range((1048576, 1)).end('up').row
+        last_row = self.get_last_row()
 
         data = self.sheet.range(f"A2:BB{last_row}").value
         if data is None:
@@ -468,7 +461,7 @@ class ExcelProcessor:
     def find_person(self, key: PersonKey) -> dict:
         # self.switch_to_sheet(DESERTER_TAB_NAME, silent=True)
 
-        last_row = self.sheet.range((1048576, 1)).end('up').row
+        last_row = self.get_last_row()
         data = self.sheet.range(f"A2:BB{last_row}").value
 
         print('find, last row = ' + str(last_row))
@@ -577,11 +570,7 @@ class ExcelProcessor:
             self.logger.error(f"❌ Не знайдено колонку {COLUMN_NAME} для масового пошуку")
             return []
 
-        # 2. Визначаємо останній рядок
-        try:
-            last_row = self.sheet.range((1048576, pib_col_idx)).end('up').row
-        except Exception:
-            last_row = self.sheet.used_range.last_cell.row
+        last_row = self.get_last_row()
 
         # 3. Забираємо всю колонку з бази ОДНИМ запитом
         if last_row < 2:
@@ -616,3 +605,11 @@ class ExcelProcessor:
         results.sort(key=lambda x: x['found'])
 
         return results
+
+    def get_last_row(self):
+        last_row = self.sheet.used_range.last_cell
+        try:
+            data = self.sheet.range(f"A{last_row}:B{last_row}").value
+        except Exception as e:
+            last_row = self.sheet.range('A' + str(self.sheet.cells.last_cell.row)).end('up').row
+        return last_row
