@@ -157,34 +157,6 @@ def test_process_doc_two_persons(processor_factory):
         assert "НЕГОЛЮК" in field[COLUMN_DESERT_CONDITIONS]
         assert field[COLUMN_EXECUTOR] == 'БЕЗКРОВНИЙ Володимир Володимирович'
 
-
-def test_10_refusal(processor_factory):
-    filename = "10_02.03.2026  відмова ДУМБЄКОВ С.А. 8 дшр 2 дшб.doc"
-    processor = processor_factory(filename)
-    result = processor.process()
-    assert isinstance(result, list)
-    assert len(result) == 1
-
-    # --- ПЕРЕВІРКА ПЕРШОЇ ОСОБИ (ІВОНЧАК) ---
-    person = result[0]
-    assert person[COLUMN_NAME] == 'ДУМБЄКОВ Сергій Анатолійович'
-    assert person[COLUMN_TITLE] == 'солдат'
-    assert person[COLUMN_ID_NUMBER] == '2111111119'
-    assert person[COLUMN_BIRTHDAY] == '03.02.1979'
-    assert person[COLUMN_SUBUNIT] == '2 дшб'
-    assert person[COLUMN_SUBUNIT2] == '8 дшр'
-    assert person[COLUMN_SERVICE_TYPE] == 'призивом'
-    assert person[COLUMN_PHONE] == '0951111111'
-    assert person[COLUMN_ADDRESS] == "Миколаївська область м. Первомайськ, вул. Громова 11."
-    assert person[COLUMN_TZK] == 'Первомайським РТЦК та СП м. Первомайськ Миколаївська область'
-    assert person[COLUMN_TZK_REGION] == "Миколаївська область"
-    assert person[COLUMN_ENLISTMENT_DATE] == '09.12.2025'
-    assert person[COLUMN_SERVICE_DAYS] == 78
-    assert person[COLUMN_DESERTION_PLACE] == 'РВБЗ'
-    assert person[COLUMN_DESERTION_TYPE] == 'відмова'
-    assert person[COLUMN_CC_ARTICLE] == '402'
-
-
 def test_process_doc_tzk_is_full(processor_factory):
     # перевірка, що тцк розпарсився правильно та повно. матьйїхйоп
     filename = "05_05.02.2026 СЗЧ з РВБЗ (Гавнов В.М.) рбс 3 дшб_tzk.doc"
@@ -258,6 +230,63 @@ def test_desertion_date_is_correct(processor_factory):
 
     assert person[COLUMN_RETURN_DATE] is None
     assert person[COLUMN_DESERTION_DATE] == '13.02.2026'  # винно бути не 15.02.2026!
+
+
+def test_402_refusal(processor_factory):
+    filename = "10_02.03.2026  відмова ДУМБЄКОВ С.А. 8 дшр 2 дшб.doc"
+    processor = processor_factory(filename)
+    result = processor.process()
+    assert isinstance(result, list)
+    assert len(result) == 1
+
+    # --- ПЕРЕВІРКА ПЕРШОЇ ОСОБИ (ІВОНЧАК) ---
+    person = result[0]
+    assert person[COLUMN_NAME] == 'ДУМБЄКОВ Сергій Анатолійович'
+    assert person[COLUMN_TITLE] == 'солдат'
+    assert person[COLUMN_ID_NUMBER] == '2111111119'
+    assert person[COLUMN_BIRTHDAY] == '03.02.1979'
+    assert person[COLUMN_SUBUNIT] == '2 дшб'
+    assert person[COLUMN_SUBUNIT2] == '8 дшр'
+    assert person[COLUMN_SERVICE_TYPE] == 'призивом'
+    assert person[COLUMN_PHONE] == '0951111111'
+    assert person[COLUMN_ADDRESS] == "Миколаївська область м. Первомайськ, вул. Громова 11."
+    assert person[COLUMN_TZK] == 'Первомайським РТЦК та СП м. Первомайськ Миколаївська область'
+    assert person[COLUMN_TZK_REGION] == "Миколаївська область"
+    assert person[COLUMN_ENLISTMENT_DATE] == '09.12.2025'
+    assert person[COLUMN_SERVICE_DAYS] == 78
+    assert person[COLUMN_DESERTION_PLACE] == 'РВБЗ'
+    assert person[COLUMN_DESERTION_TYPE] == 'відмова'
+    assert person[COLUMN_CC_ARTICLE] == '402'
+
+
+def test_return_data_is_correct(processor_factory):
+    filename = "11_03.03.2026  повернення БУЙКО Д.В Танкова рота.docx"
+    processor = processor_factory(filename)
+    result = processor.process()
+    assert isinstance(result, list)
+    assert len(result) == 1
+    person = result[0]
+
+    assert person[COLUMN_RETURN_DATE] == '03.03.2026'
+    assert person[COLUMN_DESERTION_DATE] == NA
+    assert person[COLUMN_DESERTION_PLACE] == NA
+    assert person[COLUMN_DESERTION_REGION] == NA
+
+def test_return_data_is_correct_2(processor_factory):
+    filename = "12_27.02.2026  повернення БУЙКО Д.В. 8 дшр 2 дшб.doc"
+    #filename = "27.02.2026  повернення ЧАБАН Д.В. 8 дшр 2 дшб.doc"
+    processor = processor_factory(filename)
+    result = processor.process()
+    assert isinstance(result, list)
+    assert len(result) == 1
+    person = result[0]
+    print(str(result))
+
+    assert person[COLUMN_NAME] == 'БУЙКО Дмитро Володимирович'
+    assert person[COLUMN_RETURN_DATE] == '27.02.2026'
+    assert person[COLUMN_DESERTION_DATE] == NA
+    assert person[COLUMN_DESERTION_PLACE] == NA
+    assert person[COLUMN_DESERTION_REGION] == NA
 
 
 
@@ -419,6 +448,10 @@ def test_rtzk_extraction(processor_factory):
     text = "батальйону військової частини А0224, зарахований до списків військової частини А0224 15.06.2025, 09.03.1995 року народження, українець, освіта професійно-технічна, неодружений. Призваний 1-відділом Ізмаїльського РТЦК та СП м. Ізмаїл Одеської області, 14.06.2025 року. "
     res = processor._extract_rtzk(text)
     assert res == "1-відділом Ізмаїльського РТЦК та СП м. Ізмаїл Одеської області"
+
+    text = "забезпечення батареї перехоплювачів безпілотних літальних апаратів зенітного ракетного дивізіону військової частини А0224, 04.05.2000 року народження, українець, освіта середня-технічна, неодружений. Призваний Горішньоплавнінським ОМВК Полтавської області 26.08.2020. РНОКПП 3611111111. Паспорт (НЕ 711111). Номер мобільного телефону "
+    res = processor._extract_rtzk(text)
+    assert res == "Горішньоплавнінським ОМВК Полтавської області"
 
 
 def test_rtzk_region_extraction(processor_factory):

@@ -128,8 +128,19 @@ class TaskService:
 
     def get_task_counts_for_user(self, user_id) -> tuple[int, int]:
         try:
-            query = f"SELECT task_status, COUNT(*) FROM {DB_TABLE_TASK} WHERE assignee = ? and task_status IN ('{TASK_STATUS_NEW}', '{TASK_STATUS_IN_PROGRESS}') GROUP BY task_status"
-            rows = self.db.__execute_fetchall__(query, (user_id,))
+            now = datetime.now()
+            params = []
+            query = f"SELECT task_status, COUNT(*) FROM {DB_TABLE_TASK} WHERE assignee = ? and task_status IN ('{TASK_STATUS_NEW}', '{TASK_STATUS_IN_PROGRESS}') "
+
+            minus_7_str = (now - timedelta(days=7)).strftime('%Y-%m-%d 00:00:00')
+            plus_3_str = (now + timedelta(days=3)).strftime('%Y-%m-%d 23:59:59')
+            query += " AND (task_deadline IS NULL OR (task_deadline >= ? AND task_deadline <= ?))"
+            query += " GROUP BY task_status "
+
+            params.extend([user_id, minus_7_str, plus_3_str])
+
+            rows = self.db.__execute_fetchall__(query, tuple(params))
+
             new_c, prog_c = 0, 0
             for r in rows:
                 if r[0] == 'NEW':

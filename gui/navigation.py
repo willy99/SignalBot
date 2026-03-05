@@ -150,6 +150,13 @@ def init_nicegui(workflow_obj):
         menu(auth_manager, ctx, task_ctrl)
         task_list_view.render_task_list_page(task_ctrl, ctx)
 
+    @ui.page('/tasks/today')
+    @require_access(auth_manager, 'search', 'read')
+    def task_list():
+        ctx = auth_manager.get_current_context()
+        menu(auth_manager, ctx, task_ctrl)
+        task_list_view.render_tasks_today(task_ctrl, ctx)
+
     @ui.page('/tasks/edit/{task_id}')
     # @require_access(...)
     def edit_task_page(task_id: str = 'new'):

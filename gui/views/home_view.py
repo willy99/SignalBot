@@ -64,6 +64,9 @@ def render_home_page(auth_manager):
                 if can_report_units:
                     create_nav_card('Звіт по підрозділам', 'Статистика СЗЧ по підрозділах (Додаток 2)', 'bar_chart',
                                     '/report_units', 'purple')
+                if can_report_units:
+                    create_nav_card('Звіт по рокам', 'Статистика СЗЧ, загальна по роках', 'calendar_today',
+                                        '/report_yearly', 'purple')
                 if can_report_general:
                     create_nav_card('Дублікати прізвищ', 'Звіт по прізвищам, які дублюються в системі', 'people_outline',
                                     '/report_name_dups', 'purple')

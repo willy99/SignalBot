@@ -15,7 +15,8 @@ DEF_ACT, DEF_EXPL, DEF_CHAR = 4, 4, 2
 DEF_MED, DEF_CARD, DEF_SET_DOCS, DEF_MOVE, DEF_OTHER = 1, 2, 2, 1, 0
 
 
-def render_document_page(controller: SupportController, person_controller: PersonController, file_cache_manager:FileCacheManager, ctx: RequestContext, draft_id: int = None):
+def render_document_page(controller: SupportController, person_controller: PersonController,
+                         file_cache_manager: FileCacheManager, ctx: RequestContext, draft_id: int = None):
     ui.label('Масове створення супровідних листів').classes('w-full text-center text-2xl font-bold mb-8')
 
     state = {
@@ -41,18 +42,34 @@ def render_document_page(controller: SupportController, person_controller: Perso
                 supp_date_input = date_input('Дата формування', state, 'support_date', blur_handler=fix_date).classes(
                     'flex-1')
 
-            #with ui.row().classes('w-full items-center gap-4 mb-4'):
-                #ui.label('Пошук військовослужбовця').classes('text-lg font-bold text-gray-700')
             with ui.row().classes('w-full gap-2 items-center'):
-                search_input = ui.input('Пошук військовослужбовця. Введіть прізвище...').classes('flex-grow').props('clearable autofocus')
+                search_input = ui.input('Пошук військовослужбовця. Введіть прізвище...').classes('flex-grow').props(
+                    'clearable autofocus')
                 search_btn = ui.button('Шукати', icon='search').props('elevated color="primary"')
+
+            def update_review_badge(status_val):
+                """Оновлює колір та текст бейджа статусу"""
+                if not status_val:
+                    review_status_badge.set_visibility(False)
+                    return
+                review_status_badge.set_text(f"Статус: {status_val}")
+                if status_val.strip().upper() == 'ЄРДР':
+                    review_status_badge.props('color="red"')
+                else:
+                    review_status_badge.props('color="green"')
+                review_status_badge.set_visibility(True)
 
             def on_person_change(e):
                 # Коли користувач обирає іншу людину зі списку, автоматично оновлюємо родовий відмінок
                 selected_id = e.value
                 if selected_id and selected_id in state['current_search_results']:
-                    real_name = state['current_search_results'][selected_id]['name']
+                    person_data = state['current_search_results'][selected_id]
+                    real_name = person_data['name']
                     name_gen_input.value = to_genitive_case(real_name)
+                    # Оновлюємо статус ЄРДР
+                    update_review_badge(person_data.get('review_status', ''))
+                else:
+                    update_review_badge('')
 
             with ui.row().classes('w-full items-center gap-4 mb-4'):
                 person_select = ui.select(
@@ -62,8 +79,12 @@ def render_document_page(controller: SupportController, person_controller: Perso
                 ).classes('flex-1')
                 person_select.visible = False
 
-                name_gen_input = ui.input('ПІБ (Родовий відмінок)').classes('flex-1 text-blue-800 font-bold')  # Займе 50% ширини
+                name_gen_input = ui.input('ПІБ (Родовий відмінок)').classes('flex-1 text-blue-800 font-bold')
                 name_gen_input.visible = False
+
+                # Додаємо бейдж статусу сюди ж, щоб він був помітний
+                review_status_badge = ui.badge('', color='green').classes('text-xs font-bold px-2 py-1 shadow-sm mt-3')
+                review_status_badge.set_visibility(False)
 
             async def perform_search(e=None):
                 query = search_input.value
@@ -79,13 +100,19 @@ def render_document_page(controller: SupportController, person_controller: Perso
                     options = {}
 
                     for person in results:
-                        id_num = f"{person.rnokpp}_{person.name}_{person.desertion_date}"
+                        des_date_val = getattr(person, 'desertion_date', 'Невідомо')
+                        if not des_date_val:
+                            des_date_val = 'Невідомо'
+
+                        id_num = f"{person.rnokpp}_{person.name}_{des_date_val}"
                         state['current_search_results'][id_num] = {
                             'name': person.name,
                             'rnokpp': person.rnokpp,
-                            'id_number': id_num  # Зберігаємо ключ
+                            'desertion_date': des_date_val,
+                            'review_status': getattr(person, 'review_status', ''),
+                            'id_number': id_num
                         }
-                        options[id_num] = f"{person.name} (РНОКПП: {person.rnokpp} СЗЧ: {person.desertion_date})"
+                        options[id_num] = f"{person.name} (РНОКПП: {person.rnokpp} СЗЧ: {des_date_val})"
 
                     person_select.options = options
                     person_select.visible = True
@@ -98,6 +125,7 @@ def render_document_page(controller: SupportController, person_controller: Perso
                     else:
                         ui.notify('За цим запитом нікого не знайдено', type='warning')
                         person_select.visible = False
+                        update_review_badge('')
 
                 except Exception as ex:
                     ui.notify(f'Помилка пошуку: {ex}', type='negative')
@@ -153,7 +181,8 @@ def render_document_page(controller: SupportController, person_controller: Perso
                 person_select.visible = False
                 name_gen_input.value = ''
                 name_gen_input.visible = False
-                total_input.value = 0
+                update_review_badge('')  # Очищуємо бейдж
+
                 total_input.value = 0
 
                 notif.value = DEF_NOTIF
@@ -196,9 +225,12 @@ def render_document_page(controller: SupportController, person_controller: Perso
                     return
 
                 raw_data = {
-                    'id_number': selected_id,  # Наш комбінований ключ
+                    'id_number': selected_id,
                     'name': name_val,
                     'name_gen': name_gen_input.value.strip(),
+                    'rnokpp': selected_person.get('rnokpp', ''),
+                    'desertion_date': selected_person.get('desertion_date', ''),
+                    'review_status': selected_person.get('review_status', ''),
                     'total': total_val,
                     'notif': int(notif.value or DEF_NOTIF),
                     'assign': int(assign.value or DEF_ASSIGN),
@@ -253,12 +285,19 @@ def render_document_page(controller: SupportController, person_controller: Perso
                 id_num = doc['id_number']
                 search_input.value = doc['name']
 
-                state['current_search_results'][id_num] = {'name': doc['name'], 'id_number': id_num}
-                person_select.options = {id_num: f"{doc['name']} (РНОКПП: {id_num})"}
+                # Відновлюємо дані
+                state['current_search_results'][id_num] = doc
+                rnokpp_str = doc.get('rnokpp', 'Невідомо')
+                des_date_str = doc.get('desertion_date', 'Невідомо')
+
+                person_select.options = {id_num: f"{doc['name']} (РНОКПП: {rnokpp_str} СЗЧ: {des_date_str})"}
                 person_select.value = id_num
                 person_select.visible = True
                 name_gen_input.value = doc.get('name_gen', to_genitive_case(doc['name']))
                 name_gen_input.visible = True
+
+                # Відновлюємо бейдж
+                update_review_badge(doc.get('review_status', ''))
 
                 total_input.value = doc['total']
                 notif.value = doc['notif']
@@ -286,14 +325,21 @@ def render_document_page(controller: SupportController, person_controller: Perso
                     else:
                         for i, doc in enumerate(buffer_data):
                             with ui.row().classes(
-                                    'w-full justify-between items-center bg-white p-2 border rounded shadow-sm'):
-                                ui.label(f"{i + 1}. {doc['name']} ({doc['total']} стор.)").classes(
-                                    'font-medium text-sm truncate w-2/3')
+                                    'w-full justify-between items-center bg-white p-2 border rounded shadow-sm hover:bg-gray-100 transition-colors'):
+                                with ui.column().classes('gap-0 w-3/4'):
+                                    ui.label(f"{i + 1}. {doc['name']} ({doc['total']} стор.)").classes(
+                                        'font-medium text-sm truncate w-full')
+                                    # Виводимо бейдж ЄРДР прямо в списку для наочності
+                                    if doc.get('review_status') == 'ЄРДР':
+                                        ui.badge('ЄРДР', color='red').classes('text-[10px] px-1 py-0 mt-1 w-min')
+
                                 with ui.row().classes('gap-1'):
                                     edit_button = ui.button(icon='edit', color='blue',
-                                              on_click=lambda idx=i: on_edit_click(idx)).props('flat dense size=sm')
+                                                            on_click=lambda idx=i: on_edit_click(idx)).props(
+                                        'flat dense size=sm')
                                     delete_button = ui.button(icon='delete', color='red',
-                                              on_click=lambda idx=i: on_remove_click(idx)).props('flat dense size=sm')
+                                                              on_click=lambda idx=i: on_remove_click(idx)).props(
+                                        'flat dense size=sm')
                                     if state['status'] == DOC_STATUS_COMPLETED:
                                         edit_button.disable()
                                         delete_button.disable()
@@ -469,13 +515,12 @@ def date_input(label: str, state, field: str, blur_handler=None):
 
     return inp
 
+
 def fix_date(e):
     val = e.sender.value
     if not val:
         return
     parts = val.split('.')
-    # Якщо введено "ДД.ММ" (наприклад, 12.06)
     if len(parts) == 2:
         current_year = datetime.now().year
-        # Оновлюємо значення в полі
         e.sender.value = f"{val}.{current_year}"

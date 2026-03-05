@@ -7,14 +7,27 @@ import io
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from openpyxl.utils import get_column_letter
-
+import random
 
 def render_yearly_report_page(report_ctrl, ctx: RequestContext):
     state = {'rows': [], 'columns': []}
 
     with ui.column().classes('w-full items-center p-4'):
-        ui.label('Звіт: Статистика СЗЧ по роках').classes('text-h4 mb-4')
+        with ui.row().classes('w-full justify-center items-center gap-8 mb-6'):
+            ui.label('Звіт: Статистика СЗЧ по роках').classes('text-h4 m-0')
+            if report_ctrl.is_admin():
+                # --- ШУТКОВИЙ СЛАЙДЕР ---
+                with ui.row().classes(
+                        'items-center gap-2 px-4 py-1 rounded-full bg-orange-50 border border-orange-200 shadow-sm'):
+                    ui.icon('auto_fix_high', color='orange', size='sm')
+                    ui.label('Коефіцієнт 3.14здежа:').classes('text-orange-900 font-bold text-sm')
 
+                    # Зменшили ширину слайдера (w-24)
+                    lie_slider = ui.slider(min=0, max=100, value=0).classes('w-24').props('color="orange" dense')
+
+                    ui.label().bind_text_from(lie_slider, 'value', backward=lambda v: f"{v}%").classes(
+                        'font-bold text-orange-900 w-10 text-sm')
+        # ------------------------
         with ui.row().classes('w-full max-w-4xl justify-center items-center gap-4 mb-6'):
             generate_btn = ui.button('Сформувати звіт', icon='analytics', on_click=lambda: do_report()) \
                 .props('elevated size="lg" color="primary"')
@@ -44,6 +57,27 @@ def render_yearly_report_page(report_ctrl, ctx: RequestContext):
             if not data:
                 ui.notify('Немає даних для побудови звіту.', type='warning')
                 return
+
+             # ========================================================
+            # 🪄 МАГІЯ: ЗАСТОСУВАННЯ "КОЕФІЦІЄНТУ БРЕХНІ"
+            # ========================================================
+            if lie_slider:
+                lie_percent = lie_slider.value
+                if lie_percent > 0:
+                    variance = lie_percent / 100.0  # від 0.01 до 1.0
+
+                    for year, year_data in data.items():
+                        for rank, rank_data in year_data.items():
+                            for metric, val in rank_data.items():
+                                if isinstance(val, int) and val > 0:
+                                    # "Гарні" показники (повернення) командир завжди завищує
+                                    if 'ret' in metric or 'closed' in metric:
+                                        multiplier = random.uniform(1.0, 1.0 + (variance * 2))  # Множимо в плюс
+                                    # А "погані" показники (СЗЧ) - занижує
+                                    else:
+                                        multiplier = random.uniform(1.0 - variance, 1.0)  # Множимо в мінус
+
+                                    rank_data[metric] = max(0, int(val * multiplier))
 
             # Малюємо таблицю
             with results_container:

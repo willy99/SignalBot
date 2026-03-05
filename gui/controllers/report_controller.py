@@ -26,3 +26,6 @@ class ReportController:
         self.logger.debug('UI:' + ctx.user_name + ': Генеруємо репорт - справи очікуючі ЄРДР: ')
         results = self.reporter.get_waiting_for_erdr_report(search_filter)
         return results
+
+    def is_admin(self):
+        return self.auth_manager.has_access('admin_panel', 'read')

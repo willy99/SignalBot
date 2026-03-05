@@ -99,6 +99,7 @@ class DocProcessor:
                 fields[col.COLUMN_DESERTION_DATE] = NA
                 fields[col.COLUMN_DESERTION_REGION] = NA
                 fields[col.COLUMN_DESERTION_PLACE] = NA
+                # fields[col.COLUMN_DESERTION_TYPE] = fields[col.COLUMN_DESERTION_PLACE]
             self.logger.debug('--- ' + COLUMN_RETURN_DATE + ':' + str(fields[col.COLUMN_RETURN_DATE]))
 
         text = text_pieces[self.__PIECE_3]
@@ -180,7 +181,7 @@ class DocProcessor:
 
             person_data = doc_piece_3[start_idx:end_idx].strip()
 
-            if len(person_data) > 20:
+            if len(person_data) > 100:
                 persons.append(person_data)
                 self.logger.debug('... 🏃‍♂️ПЕРСОНА: ' + self._extract_name(person_data))
 
@@ -360,20 +361,19 @@ class DocProcessor:
 
         return NA
 
-    @staticmethod
-    def _extract_return_date(text):
+    def _extract_return_date(self, text):
         clean_txt = re.sub(r'\s+', ' ', text).lower()
-        if not any(marker in clean_txt for marker in PATTERN_RETURN_MARKERS):
+
+        match = re.search(PATTERN_RETURN_MARKERS, clean_txt, re.IGNORECASE)
+        if not match:
             return None
+
         match = re.search(PATTERN_RETURN_DATE, text, re.IGNORECASE)
         if match:
             return format_to_excel_date(match.group(1))
 
-        fallback_with_presence = re.search(PATTERN_DATE, text)
-        if fallback_with_presence:
-            return format_to_excel_date(fallback_with_presence.group(1))
-
-        return None
+        fallback_with_presence = self._extract_desertion_date(text)
+        return fallback_with_presence
 
     def _extract_desertion_region(self, text):
         # Навчальний центр - одразу житомір!

@@ -56,9 +56,27 @@ class BackupData:
                         zip_file.write(self.source_file, arcname=source_file_name)
                     # Додаємо Лог
                     if os.path.exists(log_path):
-                        # Важливо: використовуємо копіювання вмісту,
-                        # щоб уникнути конфліктів доступу (якщо файл відкритий)
                         zip_file.write(log_path, arcname=os.path.basename(log_path))
+
+                    # 3. ДОДАЄМО БАЗУ ДАНИХ ТА ЇЇ СУПУТНІ ФАЙЛИ
+                    db_path = config.DB_NAME
+
+                    # Формуємо список всіх необхідних файлів БД
+                    db_files_to_backup = [
+                        db_path,  # bot_data.db
+                        f"{db_path}-wal",  # bot_data.db-wal
+                        f"{db_path}-shm"  # bot_data.db-shm
+                    ]
+
+                    # Додаємо файл проекту DB Browser (.sqbpro), якщо розширення .db
+                    if db_path.endswith('.db'):
+                        db_files_to_backup.append(db_path.replace('.db', '.sqbpro'))
+
+                    # Проходимо по списку і додаємо в архів ті, що існують
+                    for db_file in db_files_to_backup:
+                        if os.path.exists(db_file):
+                            # arcname кладе файл в корінь архіву з його оригінальним ім'ям
+                            zip_file.write(db_file, arcname=os.path.basename(db_file))
 
                 # Тепер створюємо папки (smb_client.makedirs працює чисто)
                 client.make_dirs(target_path)

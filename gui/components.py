@@ -26,7 +26,7 @@ def menu(auth_manager, ctx: RequestContext, task_controller):
                     pass
 
             # --- 2. ІКОНКА ЗАДАЧ (Персональна) ---
-            with ui.button(icon='assignment', on_click=lambda: ui.navigate.to('/tasks')).props(
+            with ui.button(icon='assignment', on_click=lambda: ui.navigate.to('/tasks/today')).props(
                     'flat color=white text-color=gray-7'):
 
                 # Створюємо елементи (поки порожні/сховані)
@@ -71,7 +71,7 @@ def menu(auth_manager, ctx: RequestContext, task_controller):
                                     f"⏰ Просрачено!\nЗадача: {alarm['subject']}",
                                     type='negative',
                                     position='top',
-                                    timeout=60000,
+                                    timeout=0,
                                     multi_line=True,
                                     close_button='Отримати догану'
                                 )
@@ -137,12 +137,12 @@ def menu(auth_manager, ctx: RequestContext, task_controller):
             if can_doc_support or can_doc_notif:
                 with ui.button('Документація', icon='folder_copy').props('flat text-white icon-right="expand_more"'):
                     with ui.menu():
-                        if can_doc_dbr:
-                            make_menu_item('Відправка На ДБР', 'gavel', '/doc_dbr')
                         if can_doc_notif:
                             make_menu_item('Формування Довідок', 'description', '/doc_notif')
                         if can_doc_support:
                             make_menu_item('Формування Супроводів', 'drive_file_move', '/doc_support')
+                        if can_doc_dbr:
+                            make_menu_item('Відправка На ДБР', 'gavel', '/doc_dbr')
 
             # 4. Звіти
             can_report_units = auth_manager.has_access('report_units', 'read')

@@ -1,6 +1,6 @@
 from nicegui import ui
 from gui.services.request_context import RequestContext
-
+from service.constants import DOC_STATUS_COMPLETED, DOC_STATUS_DRAFT
 
 def render_drafts_list_page(controller, ctx: RequestContext):
     ui.label('Список пакетів супроводів').classes('w-full text-center text-3xl font-bold mb-8')

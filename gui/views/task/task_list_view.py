@@ -51,8 +51,19 @@ async def delete_task_with_confirm(task_id: int, controller: TaskController, ctx
         except Exception as e:
             ui.notify(f'Помилка видалення: {e}', type='negative')
 
+def render_tasks_today(controller: TaskController, ctx: RequestContext):
+    override_state = {
+        'search_query': '',
+        'assignee_id': ctx.user_id,
+        'task_type_filter': 'all',
+        'period_filter': 'today',
+        'created_year': None,
+        'created_from': None,
+        'created_to': None,
+    }
+    render_task_list_page(controller, ctx, override_state=override_state)
 
-def render_task_list_page(controller: TaskController, ctx: RequestContext):
+def render_task_list_page(controller: TaskController, ctx: RequestContext, override_state=None):
     # Отримуємо список юзерів і робимо зручний словник {id: "Ім'я"}
     users_list = controller.get_available_users()
     users_map = {}
@@ -90,13 +101,16 @@ def render_task_list_page(controller: TaskController, ctx: RequestContext):
         'search_query': '',
         'assignee_id': ctx.user_id,
         'task_type_filter': 'all',
-        'period_filter': 'all',
+        'period_filter': 'today',
         'created_year': None,
         'created_from': None,
         'created_to': None,
     }
 
     state = app.storage.user.get('task_board_filters', default_state)
+
+    if override_state is not None:
+        state = override_state
 
     # Захист: якщо збереженого юзера раптом видалили з бази
     if state.get('assignee_id') not in assignee_options:

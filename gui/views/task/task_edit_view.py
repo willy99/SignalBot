@@ -18,7 +18,7 @@ def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_
         'task_subject': '',
         'task_details': '',
         'task_type': 'Документація',
-        'assignee': None,
+        'assignee': ctx.user_id,
         'task_deadline': '',
         'task_status': TASK_STATUS_NEW  # За замовчуванням
     }

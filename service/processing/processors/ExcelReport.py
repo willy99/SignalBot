@@ -11,7 +11,6 @@ from domain.person_filter import PersonSearchFilter
 
 class ExcelReporter:
     def __init__(self, excelProcessor, log_manager: LoggerManager):
-        # Завантажуємо файл у режимі read_only для швидкості
         self.excelProcessor = excelProcessor
         self.logger = log_manager.get_logger()
 
@@ -20,8 +19,6 @@ class ExcelReporter:
         """Збирає повну статистику по підрозділах, званнях та термінах СЗЧ."""
         self.excelProcessor.switch_to_sheet(DESERTER_TAB_NAME)
         try:
-            # Ініціалізуємо вкладений словник (автоматично створює гілки)
-
             def get_stats_template():
                 return {
                     'under_3': 0, 'over_3': 0,
@@ -81,11 +78,8 @@ class ExcelReporter:
             des_type_idx: Final[int] = self.excelProcessor.header.get(COLUMN_DESERTION_TYPE) - 1
             article_idx: Final[int] = self.excelProcessor.header.get(COLUMN_CC_ARTICLE) - 1
 
-            # Читаємо весь заповнений діапазон
-
             last_row = self.excelProcessor.get_last_row()
             data = self.excelProcessor.sheet.range(f"A2:BB{last_row}").value
-            print('last row ' + str(last_row))
 
             people_history = defaultdict(list)
 
@@ -134,11 +128,31 @@ class ExcelReporter:
                     continue
 
                 match_des_year = True
+                des_year_less_equal = True
+
                 if q_des_year:
                     if isinstance(q_des_year, list):
                         match_des_year = (des_date_year in q_des_year)
                     else:
                         match_des_year = (des_date_year == str(q_des_year))
+
+                    if str(des_date_year).isdigit():
+                        row_year_int = int(des_date_year)
+
+                        if isinstance(q_des_year, list) and q_des_year:
+                            valid_filter_years = [int(y) for y in q_des_year if str(y).isdigit()]
+                            if valid_filter_years:
+                                max_filter_year = max(valid_filter_years)
+                                des_year_less_equal = (row_year_int <= max_filter_year)
+                            else:
+                                des_year_less_equal = False
+                        else:
+                            if str(q_des_year).isdigit():
+                                des_year_less_equal = (row_year_int <= int(q_des_year))
+                            else:
+                                des_year_less_equal = False
+                    else:
+                        des_year_less_equal = False
 
                 match_des_year_from = True
                 match_des_year_to = True
@@ -163,7 +177,6 @@ class ExcelReporter:
                     else:
                         match_des_year_from = False
                         match_des_year_to = False
-
                 match_period = match_des_year and match_des_year_from and match_des_year_to
 
                 # duplicates for subunits
@@ -174,15 +187,16 @@ class ExcelReporter:
                 review_status = str(row[exp_review_idx]).strip().lower()
 
                 rank_separated_key = 'офіцер' if is_officer else 'сержант' if is_sergeant else 'рядовий'  # для класифіц. звіту
-                people_history[name_key].append({
-                    'des_date': des_date,  # дата СЗЧ
-                    'ret_mu_date': ret_mu_date,  # дата повернення
-                    'ret_res_date': ret_res_date,  # дата повернення в брез
-                    'unit': unit,
-                    'sub_unit': sub_unit,
-                    'rank': rank_separated_key,
-                    'service_type': service_type
-                })
+                if des_year_less_equal:
+                    people_history[name_key].append({
+                        'des_date': des_date,  # дата СЗЧ
+                        'ret_mu_date': ret_mu_date,  # дата повернення
+                        'ret_res_date': ret_res_date,  # дата повернення в брез
+                        'unit': unit,
+                        'sub_unit': sub_unit,
+                        'rank': rank_separated_key,
+                        'service_type': service_type
+                    })
 
                 if match_period:
 
@@ -299,12 +313,8 @@ class ExcelReporter:
                     unit = last_case['unit']
                     sub_unit = last_case['sub_unit']
                     rank = last_case['rank']
-                    service_type = last_case['service_type']
 
-                    if last_case['ret_mu_date'] is None or last_case['ret_res_date'] == "":
-                        stats[unit][sub_unit][rank]['un_des'] += 1
-                    else:
-                        stats[unit][sub_unit][rank]['un_ret'] += 1
+                    service_type = last_case['service_type']
 
                     if len(cases) > 1:
                         stats[unit][sub_unit][rank]['dupl'] += 1
@@ -315,6 +325,12 @@ class ExcelReporter:
                         }
                         service_key = service_map.get(service_type, 'st_term')
                         stats[unit][sub_unit]['all'][service_key] += 1
+
+                        # unique cases
+                        stats[unit][sub_unit][rank]['un_des'] += 1
+                        if last_case['ret_mu_date'] or last_case['ret_res_date']:
+                            stats[unit][sub_unit][rank]['un_ret'] += 1
+
 
             return stats
         except Exception as e:
@@ -488,35 +504,68 @@ class ExcelReporter:
             # =======================================================
             for name_key, cases in people_history.items():
                 valid_cases = [c for c in cases if c['des_date'] and isinstance(c['des_date'], (datetime, date))]
+
+                # Якщо дат СЗЧ взагалі немає - рахуємо як один випадок у "Невідомо"
                 if not valid_cases:
-                    valid_cases = cases
-                else:
-                    valid_cases.sort(key=lambda x: x['des_date'])
+                    last_case = cases[-1]
+                    rank = last_case['rank']
+                    service_type = last_case['service_type']
+                    has_ret_mu = bool(str(last_case['ret_mu_date'] or "").strip() and str(
+                        last_case['ret_mu_date'] or "").strip() != 'None')
+                    has_ret_res = bool(str(last_case['ret_res_date'] or "").strip() and str(
+                        last_case['ret_res_date'] or "").strip() != 'None')
 
-                last_case = valid_cases[-1]
-                last_des_date_year = get_year_safe(last_case['des_date']) or "Невідомо"
+                    if len(cases) > 1:
+                        stats["Невідомо"][rank]['dupl'] += 1
+                    else:
+                        service_map = {'призивом': 'st_call', 'контрактом': 'st_contr'}
+                        stats["Невідомо"]['all'][service_map.get(service_type, 'st_term')] += 1
+                        if not (has_ret_mu or has_ret_res):
+                            stats["Невідомо"][rank]['un_des'] += 1
+                        else:
+                            stats["Невідомо"][rank]['un_ret'] += 1
+                    continue
 
-                rank = last_case['rank']
-                service_type = last_case['service_type']
+                # Сортуємо всі випадки людини хронологічно
+                valid_cases.sort(key=lambda x: x['des_date'])
 
-                has_ret_mu = bool(str(last_case['ret_mu_date'] or "").strip() and str(
-                    last_case['ret_mu_date'] or "").strip() != 'None')
-                has_ret_res = bool(str(last_case['ret_res_date'] or "").strip() and str(
-                    last_case['ret_res_date'] or "").strip() != 'None')
+                # Групуємо історію людини по роках
+                cases_by_year = {}
+                for i, case in enumerate(valid_cases):
+                    des_year = get_year_safe(case['des_date'])
+                    if des_year not in cases_by_year:
+                        cases_by_year[des_year] = []
+                    # Зберігаємо ПОРЯДКОВИЙ НОМЕР СЗЧ у житті людини (i + 1) та саму справу
+                    cases_by_year[des_year].append((i + 1, case))
 
-                # Якщо немає ОБИДВОХ дат повернення -> це СЗЧ
-                if not has_ret_mu and not has_ret_res:
-                    stats[last_des_date_year][rank]['un_des'] += 1
-                # Якщо є ХОЧА Б ОДНА з дат -> людина повернулася
-                else:
-                    stats[last_des_date_year][rank]['un_ret'] += 1
+                # Тепер оцінюємо статус людини у КОЖНОМУ році, коли вона скоювала СЗЧ
+                for des_year, year_cases in cases_by_year.items():
 
-                if len(cases) > 1:
-                    stats[last_des_date_year][rank]['dupl'] += 1
-                else:
-                    service_map = {'призивом': 'st_call', 'контрактом': 'st_contr'}
-                    service_key = service_map.get(service_type, 'st_term')
-                    stats[last_des_date_year]['all'][service_key] += 1
+                    # Беремо ОСТАННЮ справу людини в межах цього конкретного року
+                    historical_count, last_case_of_year = year_cases[-1]
+
+                    rank = last_case_of_year['rank']
+                    service_type = last_case_of_year['service_type']
+
+                    has_ret_mu = bool(str(last_case_of_year['ret_mu_date'] or "").strip() and str(
+                        last_case_of_year['ret_mu_date'] or "").strip() != 'None')
+                    has_ret_res = bool(str(last_case_of_year['ret_res_date'] or "").strip() and str(
+                        last_case_of_year['ret_res_date'] or "").strip() != 'None')
+                    has_any_return = has_ret_mu or has_ret_res
+
+                    # Якщо на момент цього року це вже НЕ ПЕРШЕ СЗЧ в її житті
+                    if historical_count > 1:
+                        stats[des_year][rank]['dupl'] += 1
+                    else:
+                        # Якщо це справді перше СЗЧ у житті (рахується як унікальне)
+                        service_map = {'призивом': 'st_call', 'контрактом': 'st_contr'}
+                        service_key = service_map.get(service_type, 'st_term')
+                        stats[des_year]['all'][service_key] += 1
+
+                        #if not has_any_return:
+                        stats[des_year][rank]['un_des'] += 1
+                        if has_any_return:
+                            stats[des_year][rank]['un_ret'] += 1
 
             return stats
         except Exception as e:

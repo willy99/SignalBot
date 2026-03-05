@@ -11,7 +11,6 @@ class DocOldParser(BaseFileParser):
         if not text or self._is_garbage(text):
             self.logger.warning("⚠️ textutil не впорався, пробуємо antiword...")
             text = self._try_antiword()
-
         return text
 
     def _try_textutil(self):

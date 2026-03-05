@@ -607,9 +607,24 @@ class ExcelProcessor:
         return results
 
     def get_last_row(self):
-        last_row = self.sheet.used_range.last_cell
-        try:
-            data = self.sheet.range(f"A{last_row}:B{last_row}").value
-        except Exception as e:
-            last_row = self.sheet.range('A' + str(self.sheet.cells.last_cell.row)).end('up').row
+        last_row = self.sheet.used_range.last_cell.row
+
+        # Читаємо ВЕСЬ стовпець 'A' в пам'ять (це миттєво)
+        col_a_values = self.sheet.range(f"A1:A{last_row}").value
+
+        # Захист: якщо таблиця складається лише з 1 рядка, xlwings може повернути просто значення, а не список
+        if not isinstance(col_a_values, list):
+            col_a_values = [col_a_values]
+
+        # Йдемо циклом ЗНИЗУ ВГОРУ по отриманих значеннях
+        # len(col_a_values) - 1 — це останній індекс списку
+        for i in range(len(col_a_values) - 1, -1, -1):
+            val = col_a_values[i]
+
+            # Якщо знайшли клітинку, яка не None і не порожній рядок
+            if val is not None and str(val).strip() != '':
+                last_row = i + 1  # +1, бо індекси масивів починаються з 0, а рядки в Excel з 1
+                break
+
+        print('>>> last row :: ' + str(last_row))
         return last_row
