@@ -63,14 +63,14 @@ class FileCacheManager:
 
                     # === СМАРТ-ПАРСИНГ: Обробляємо тільки Word-документи ===
                     # Ігноруємо системні файли macOS (._) та відкриті тимчасові файли Word (~$)
-                    if filename.lower().endswith(('.doc', '.docx')) and not filename.startswith(('._', '~$')):
+                    if filename.lower().endswith(('.doc', '.docx', '.pdf')) and not filename.startswith(('._', '~$')):
                         temp_local_path = None
                         try:
                             # 1. Читаємо файл з мережі через ваш SMBFileClient у пам'ять
                             file_buffer = self.client.get_file_buffer(full_path_win)
 
                             # 2. Створюємо тимчасовий локальний файл із правильним розширенням
-                            ext = '.docx' if filename.lower().endswith('.docx') else '.doc'
+                            ext = '.docx' if filename.lower().endswith('.docx') else '.pdf' if filename.lower().endswith('.pdf') else '.doc'
                             with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as temp_file:
                                 temp_file.write(file_buffer.read())
                                 temp_file.flush()  # ВАЖЛИВО! Примусово скидаємо дані на диск

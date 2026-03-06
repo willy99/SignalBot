@@ -61,15 +61,13 @@ python3 [bot.py](http://bot.py/)
 
 Additional packages
 
-python-docx (1.2.0)
-xlwings
-PyMUPdf
-spacy
-zipp
+Робите python -m venv .venv -> source .venv/bin/activate -> pip install -r requirements.txt.
 
-```jsx
-python3 -m pip install python-docx
-```
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+python -m spacy download uk_core_news_sm
+
 
 Щоб ця хрінь заработала нормально, треба мати номер мобільного для того, щоб використовувати його під Бот.
 

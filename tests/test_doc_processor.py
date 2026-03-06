@@ -274,7 +274,6 @@ def test_return_data_is_correct(processor_factory):
 
 def test_return_data_is_correct_2(processor_factory):
     filename = "12_27.02.2026  повернення БУЙКО Д.В. 8 дшр 2 дшб.doc"
-    #filename = "27.02.2026  повернення ЧАБАН Д.В. 8 дшр 2 дшб.doc"
     processor = processor_factory(filename)
     result = processor.process()
     assert isinstance(result, list)
@@ -288,6 +287,25 @@ def test_return_data_is_correct_2(processor_factory):
     assert person[COLUMN_DESERTION_PLACE] == NA
     assert person[COLUMN_DESERTION_REGION] == NA
 
+def test_processing_imaged_pdf_ocr(processor_factory):
+    filename = '13_09.01.2025 СЗЧ з А2900 зап рота МУРАХОВСЬКИЙ Володимир Олегович.PDF'
+    processor = processor_factory(filename)
+    result = processor.process()
+    print(str(result))
+    assert isinstance(result, list)
+    assert len(result) == 1
+    person = result[0]
+
+    assert person[COLUMN_NAME] == 'МУРАХОВСЬКИЙ Володимир Олегович'
+    assert person[COLUMN_MIL_UNIT] == 'А2900'
+    assert person[COLUMN_DESERTION_DATE] == '09.01.2025'
+    assert person[COLUMN_ID_NUMBER] == '3212723839'
+    assert person[COLUMN_PHONE] == '0667056181'
+    assert person[COLUMN_BIRTHDAY] == '17.12.1987'
+    assert person[COLUMN_TITLE] == 'солдат'
+    assert person[COLUMN_SUBUNIT] == 'Зап рота'
+    assert person[COLUMN_SERVICE_TYPE] == 'призивом'
+    assert person[COLUMN_ADDRESS] == 'Одеська обл., Беляєвський р-н, с. Дослідне, вул. Каштанова, буд. 18'
 
 
 #################### загальне модульне тестування регекспів ##############################
