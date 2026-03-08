@@ -1,4 +1,7 @@
 from typing import List
+
+from engineio.async_client import task_reference_holder
+
 from domain.task import *
 from gui.services.request_context import RequestContext
 from service.connection.MyDataBase import MyDataBase
@@ -30,9 +33,11 @@ class TaskService:
         else:
             # СТВОРЕННЯ НОВОЇ ЗАДАЧІ
             data_to_save['created_by'] = self.ctx.user_id  # Примусово ставимо автора з контексту
-            data_to_save['task_status'] = TASK_STATUS_NEW
+            data_to_save['task_status'] = TASK_STATUS_NEW if not task.task_status else task.task_status
             data_to_save['created_date'] = current_time
             data_to_save['updated_date'] = current_time
+
+            print(str(data_to_save))
             return self.db.insert_record(DB_TABLE_TASK, data_to_save)
 
     def get_all_tasks(self, search_filter: dict) -> List[Task]:
@@ -89,31 +94,40 @@ class TaskService:
             now = datetime.now()
             now_str = now.strftime('%Y-%m-%d %H:%M:%S')
 
-            # Логічно: якщо ми шукаємо "прострочені" чи "на сьогодні",
-            # нас цікавлять тільки АКТИВНІ задачі. Завершені ми відкидаємо.
-            query += f" AND task_status != '{TASK_STATUS_COMPLETED}'"
+            # Початок і кінець поточного дня
+            today_morning_str = now.strftime('%Y-%m-%d 00:00:00')
+            today_evening_str = now.strftime('%Y-%m-%d 23:59:59')
 
-            if period == 'overdue':
-                # 🔥 Прострочені: є дедлайн і він у минулому
-                query += " AND task_deadline IS NOT NULL AND task_deadline < ?"
-                params.append(now_str)
-
-            elif period == 'today':
-                # ⚡ На сьогодні: від -7 днів до +3 днів, АБО безстрокові
+            if period == 'today':
+                # ⚡ На сьогодні:
+                # (Активні задачі: без дедлайну АБО з дедлайном від -7 до +3 днів)
+                # АБО
+                # (Завершені задачі: оновлені саме сьогодні)
                 minus_7_str = (now - timedelta(days=7)).strftime('%Y-%m-%d 00:00:00')
                 plus_3_str = (now + timedelta(days=3)).strftime('%Y-%m-%d 23:59:59')
-                query += " AND (task_deadline IS NULL OR (task_deadline >= ? AND task_deadline <= ?))"
-                params.extend([minus_7_str, plus_3_str])
+
+                query += f""" AND (
+                    (task_status != '{TASK_STATUS_COMPLETED}' AND (task_deadline IS NULL OR (task_deadline >= ? AND task_deadline <= ?)))
+                    OR 
+                    (task_status = '{TASK_STATUS_COMPLETED}' AND updated_date >= ? AND updated_date <= ?)
+                )"""
+                params.extend([minus_7_str, plus_3_str, today_morning_str, today_evening_str])
+
+            elif period == 'overdue':
+                # 🔥 Прострочені: тільки активні, де є дедлайн і він у минулому
+                query += f" AND (task_status != '{TASK_STATUS_COMPLETED}' AND task_deadline IS NOT NULL AND task_deadline < ?)"
+                params.append(now_str)
 
             elif period == 'future':
-                # 📅 Майбутні: дедлайн більший за зараз, АБО безстрокові
-                query += " AND (task_deadline IS NULL OR task_deadline >= ?)"
+                # 📅 Майбутні: тільки активні, дедлайн більший за зараз АБО безстрокові
+                query += f" AND (task_status != '{TASK_STATUS_COMPLETED}' AND (task_deadline IS NULL OR task_deadline >= ?))"
                 params.append(now_str)
 
         # Сортуємо: найсвіжіші зміни — зверху
         query += " ORDER BY updated_date DESC"
 
         # Виконуємо запит
+        # print('query: ' + str(query))
         rows = self.db.__execute_fetchall__(query, tuple(params))
         return [self._map_row_to_task(r) for r in rows]
 

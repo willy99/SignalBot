@@ -48,7 +48,7 @@ def render_home_page(auth_manager):
                     create_nav_card('Супровідні листи', 'Масова генерація пакетів супровідних документів',
                                     'mark_email_unread', '/doc_support', 'green')
                 if can_doc_notif:
-                    create_nav_card('Довідки', 'Формування довідок та витягів (В розробці)', 'description',
+                    create_nav_card('Довідки', 'Формування повідомлень та витягів (В розробці)', 'description',
                                     '/doc_notif', 'green')
                 if can_doc_dbr:
                     create_nav_card('На ДБР', 'Відправка справ на ДБР і очікування  ЄРДР', 'gavel', '/doc_dbr', 'orange')

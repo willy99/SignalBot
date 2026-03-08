@@ -23,7 +23,7 @@ DOC_DIR : Final[str] = "exchange\\ДД"
 BACKUP_DIR: Final[str] = 'exchange\\projekt407\\backups'
 
 DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_copy_pasha.xlsx"
-# DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_1.xlsx"
+#DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_1.xlsx"
 # DESERTER_XLSX: Final = "Тестовий Майданчик - не чипати.xlsx"
 
 DESERTER_TAB_NAME : Final = "А0224"
@@ -60,6 +60,7 @@ EXCEL_DATE_FORMATS_REPORT = ["%m/%d/%y", "%d.%m.%Y", "%-m/%-d/%y", "%#m/%#d/%y",
 EXCEL_CHUNK_SIZE = 2000 # reading data by chunks for stability
 
 EXCEL_BLUE_COLOR: Final[str] = 'bdd7ee'
+EXCEL_SUPPORT_COLOR: Final[str] = 'e8fffe'
 
 CHECK_INBOX_EVERY_SEC: Final[float] = 60.0 # перевіряти інбокс кожні ? секунд
 

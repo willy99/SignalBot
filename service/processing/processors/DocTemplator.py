@@ -69,7 +69,8 @@ class DocTemplator:
             formatted_doc = {
                 'SUPP_NUMBER': supp_number,
                 'SUPP_DATE': supp_date,
-                'INCREMENTAL': idx + 1,
+                'INCREMENTAL': raw.get('seq_num', 0),
+                'TITLE': raw.get('title_gen', ''),
                 'NAME': self.format_name(raw.get('name_gen', '')),
                 'TOTAL_PAGES': self.format_pages(raw.get('total', 0)),
                 'NOTIF_PAGES': self.format_pages(raw.get('notif', 0)),

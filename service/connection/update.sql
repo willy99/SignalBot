@@ -27,3 +27,6 @@ CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
 
 CREATE INDEX IF NOT EXISTS idx_dbr_docs_created_by ON dbr_docs(created_by);
 CREATE INDEX IF NOT EXISTS idx_dbr_docs_status ON dbr_docs(status);
+
+CREATE INDEX IF NOT EXISTS idx_notif_docs_created_by ON notif_docs(created_by);
+CREATE INDEX IF NOT EXISTS idx_notif_docs_status ON notif_docs(status);

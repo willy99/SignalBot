@@ -1,14 +1,18 @@
+from config import EXCEL_SUPPORT_COLOR
 from gui.services.request_context import RequestContext
 from domain.person_filter import PersonSearchFilter
 from domain.person import Person
 from typing import List, Optional, Dict, Any
 from service.docworkflow.DocSupportService import DocSupportService
 from gui.controllers.person_controller import PersonController
+from service.processing.MyWorkFlow import MyWorkFlow
+from service.processing.processors.DocTemplator import DocTemplator
 from utils.utils import get_person_key_from_str
 from dics.deserter_xls_dic import COLUMN_INCREMEMTAL
+from gui.services.auth_manager import AuthManager
 
 class SupportController:
-    def __init__(self, doc_processor, worklow, auth_manager):
+    def __init__(self, doc_processor: DocTemplator, worklow: MyWorkFlow, auth_manager: AuthManager):
         self.doc_processor = doc_processor
         self.workflow = worklow
         self.db = worklow.db
@@ -79,7 +83,7 @@ class SupportController:
 
             row_key = get_person_key_from_str(doc.get('id_number'))
             found_person_data = person_ctrl.find_person(ctx, row_key)
-
+            row_seq_num = doc.get('seq_num')
             if not found_person_data:
                 self.logger.warning(
                     f"Пропущено: не знайдено людину за ключем {row_key}")
@@ -91,16 +95,15 @@ class SupportController:
             print(f'Знайдено логічний ID: {logical_id}')
 
             if logical_id is not None:
-                # Тепер ми передаємо правильний ID, за яким процесор зможе знайти рядок
                 p = Person(
                     id=logical_id,
                     dbr_date=support_date,
-                    dbr_num=support_number
+                    dbr_num=support_number + '/' + str(row_seq_num)
                 )
                 persons_to_update.append(p)
 
         if persons_to_update:
-            success = person_ctrl.save_persons(ctx, persons_to_update, paint_color="E2EFDA", partial_update=True)
+            success = person_ctrl.save_persons(ctx, persons_to_update, paint_color=EXCEL_SUPPORT_COLOR, partial_update=True)
             if not success:
                 raise Exception("Не вдалося оновити дані в Excel. Статус чернетки НЕ змінено.")
 

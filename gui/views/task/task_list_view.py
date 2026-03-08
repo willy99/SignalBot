@@ -63,6 +63,18 @@ def render_tasks_today(controller: TaskController, ctx: RequestContext):
     }
     render_task_list_page(controller, ctx, override_state=override_state)
 
+def render_tasks_all(controller: TaskController, ctx: RequestContext):
+    override_state = {
+        'search_query': '',
+        'assignee_id': None,
+        'task_type_filter': 'all',
+        'period_filter': 'all',
+        'created_year': None,
+        'created_from': None,
+        'created_to': None,
+    }
+    render_task_list_page(controller, ctx, override_state=override_state)
+
 def render_task_list_page(controller: TaskController, ctx: RequestContext, override_state=None):
     # Отримуємо список юзерів і робимо зручний словник {id: "Ім'я"}
     users_list = controller.get_available_users()

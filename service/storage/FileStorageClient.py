@@ -3,8 +3,10 @@ from abc import ABC, abstractmethod
 import datetime
 import config
 import os
+import threading
 
 class FileStorageClient(ABC):
+    _smb_lock = threading.Lock()
 
     @abstractmethod
     def get_separator(self):
@@ -35,7 +37,11 @@ class FileStorageClient(ABC):
         """Спільний метод для копіювання файлів"""
         pass
 
-    def list_files(self, path: str, silent: bool = False) -> list:
+    @abstractmethod
+    def move_file(self, source_path: str, dest_path: str):
+        pass
+
+    def list_files(self, path: str, silent: bool = False, exclude_dirs: bool = False) -> list:
         pass
 
     @abstractmethod

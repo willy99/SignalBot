@@ -55,10 +55,22 @@ class LocalFileClient(FileStorageClient):
             self.logger.error(f"❌ Помилка локального копіювання: {e}")
             raise
 
-    def list_files(self, path: str, silent: bool = False) -> list:
+    def move_file(self, source_path: str, dest_path: str):
+        try:
+            shutil.move(source_path, dest_path)
+            self.logger.debug(f"🚚 Файл скопійовано локально: {dest_path}")
+        except Exception as e:
+            self.logger.error(f"❌ Помилка локального копіювання: {e}")
+            raise
+
+    def list_files(self, path: str, silent: bool = False, exclude_dirs: bool = False) -> list:
         try:
             if os.path.exists(path) and os.path.isdir(path):
-                return os.listdir(path)
+                files = []
+                for entry in os.scandir(path):
+                    if entry.is_file():
+                        files.append(entry.name)
+                return files
             else:
                 self.logger.warning(f"⚠️ Шлях {path} не існує або не є директорією.")
                 return []

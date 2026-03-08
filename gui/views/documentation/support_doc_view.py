@@ -1,6 +1,8 @@
 from nicegui import ui, run
+
+from dics.deserter_xls_dic import PATTERN_DOC_NUM
 from gui.services.request_context import RequestContext
-from utils.utils import to_genitive_case
+from utils.utils import to_genitive_case, to_genitive_title, is_valid_doc_number
 from config import UI_DATE_FORMAT, OUTBOX_DIR_PATH
 from datetime import datetime
 from service.storage.FileCacher import FileCacheManager
@@ -8,6 +10,7 @@ import io
 from gui.controllers.person_controller import PersonController
 from gui.controllers.support_controller import SupportController
 from service.constants import DOC_STATUS_COMPLETED, DOC_STATUS_DRAFT
+import re
 
 # --- КОНСТАНТИ ДЕФОЛТНИХ ЗНАЧЕНЬ СТОРІНОК ---
 DEF_NOTIF, DEF_ASSIGN, DEF_RESULT = 1, 3, 3
@@ -25,7 +28,8 @@ def render_document_page(controller: SupportController, person_controller: Perso
         'edit_idx': None,
         'buffer': [],
         'current_search_results': {},
-        'current_support_doc_id': draft_id
+        'current_support_doc_id': draft_id,
+        'next_seq_num': 1
     }
 
     with ui.grid(columns=12).classes('w-full gap-6 items-start'):
@@ -38,7 +42,9 @@ def render_document_page(controller: SupportController, person_controller: Perso
                     ui.label('Статус:').classes('text-gray-500 font-medium')
                     status_badge = ui.badge(status_text, color=badge_color).classes('text-sm px-2 py-1')
                 city = ui.radio(['Миколаїв', 'Дніпро', 'Донецьк'], value='Миколаїв').props('inline')
-                supp_number_input = ui.input('Загальний номер супроводу').classes('flex-1')
+                supp_number_input = ui.input('Загальний номер супроводу', placeholder='Наприклад: 642/123', validation={
+                   'Формат має бути 642/ХХХХ (до 4 цифр)': lambda v: bool(re.match(PATTERN_DOC_NUM, v.strip())) if v else True
+                }).classes('flex-1')
                 supp_date_input = date_input('Дата формування', state, 'support_date', blur_handler=fix_date).classes(
                     'flex-1')
 
@@ -105,11 +111,14 @@ def render_document_page(controller: SupportController, person_controller: Perso
                             des_date_val = 'Невідомо'
 
                         id_num = f"{person.rnokpp}_{person.name}_{des_date_val}"
+                        title_val = getattr(person, 'title', '')
+
                         state['current_search_results'][id_num] = {
                             'name': person.name,
                             'rnokpp': person.rnokpp,
                             'desertion_date': des_date_val,
                             'review_status': getattr(person, 'review_status', ''),
+                            'title': title_val,
                             'id_number': id_num
                         }
                         options[id_num] = f"{person.name} (РНОКПП: {person.rnokpp} СЗЧ: {des_date_val})"
@@ -216,6 +225,9 @@ def render_document_page(controller: SupportController, person_controller: Perso
                 selected_person = state['current_search_results'].get(selected_id, {})
                 name_val = selected_person.get('name', 'Невідоме ПІБ')
 
+                title_val = selected_person.get('title', '')
+                title_gen_val = to_genitive_title(title_val)
+
                 total_val = int(total_input.value or 0)
                 fields = [notif, assign, result, act, expl, char, med, card, set_docs, move, other]
                 calculated_sum = sum([int(f.value or 0) for f in fields])
@@ -223,11 +235,21 @@ def render_document_page(controller: SupportController, person_controller: Perso
                 if calculated_sum != total_val:
                     ui.notify(f'Помилка! Загальна ({total_val}) != Сумі ({calculated_sum})', type='negative')
                     return
+                if edit_idx is not None:
+                    # Якщо це редагування, зберігаємо старий номер
+                    assigned_seq_num = buffer_data[edit_idx].get('seq_num', edit_idx + 1)
+                else:
+                    # Якщо нова особа - беремо з лічильника і одразу збільшуємо його для наступного
+                    assigned_seq_num = state['next_seq_num']
+                    state['next_seq_num'] += 1
 
                 raw_data = {
                     'id_number': selected_id,
+                    'seq_num': assigned_seq_num,
                     'name': name_val,
                     'name_gen': name_gen_input.value.strip(),
+                    'title': title_val,
+                    'title_gen': title_gen_val,
                     'rnokpp': selected_person.get('rnokpp', ''),
                     'desertion_date': selected_person.get('desertion_date', ''),
                     'review_status': selected_person.get('review_status', ''),
@@ -327,6 +349,8 @@ def render_document_page(controller: SupportController, person_controller: Perso
                             with ui.row().classes(
                                     'w-full justify-between items-center bg-white p-2 border rounded shadow-sm hover:bg-gray-100 transition-colors'):
                                 with ui.column().classes('gap-0 w-3/4'):
+                                    seq = doc.get('seq_num', i + 1)
+
                                     ui.label(f"{i + 1}. {doc['name']} ({doc['total']} стор.)").classes(
                                         'font-medium text-sm truncate w-full')
                                     # Виводимо бейдж ЄРДР прямо в списку для наочності
@@ -353,6 +377,13 @@ def render_document_page(controller: SupportController, person_controller: Perso
                         ui.notify('Непогано б заповнити дату та номер супроводу!', type='warning')
                         return
 
+                    supp_num = supp_number_input.value.strip()
+                    if not is_valid_doc_number(supp_num):
+                        ui.notify('❌ Увага! Невірний формат номера супроводу. Має бути 642/ХХХХ', type='negative')
+                        return
+
+                    # save the draft
+                    await on_save_draft_click()
                     file_bytes, file_name = controller.generate_support_document(
                         ctx, city.value, supp_number_input.value, supp_date_input.value, state['buffer']
                     )
@@ -378,6 +409,12 @@ def render_document_page(controller: SupportController, person_controller: Perso
                 if not supp_number_input.value or not supp_date_input.value:
                     ui.notify('Непогано б заповнити дату та номер супроводу!', type='warning')
                     return
+
+                supp_num = supp_number_input.value.strip()
+                if not is_valid_doc_number(supp_num):
+                    ui.notify('❌ Увага! Невірний формат номера супроводу. Має бути 642/ХХХХ', type='negative')
+                    return
+                await on_save_draft_click()
 
                 # Захист: чи є в нас взагалі ID чернетки?
                 current_id = state.get('current_support_doc_id')
@@ -486,6 +523,11 @@ def render_document_page(controller: SupportController, person_controller: Perso
 
                     state['buffer'] = draft.get('payload', [])
                     state['status'] = draft.get('status', DOC_STATUS_DRAFT)
+                    if state['buffer']:
+                        max_seq = max([doc.get('seq_num', i + 1) for i, doc in enumerate(state['buffer'])])
+                        state['next_seq_num'] = max_seq + 1
+                    else:
+                        state['next_seq_num'] = 1
 
                     refresh_status_ui()
 

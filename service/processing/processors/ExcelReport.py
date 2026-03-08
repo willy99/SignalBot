@@ -8,12 +8,36 @@ from service.storage.LoggerManager import LoggerManager
 from config import DESERTER_TAB_NAME, EXCEL_DATE_FORMAT
 from utils.utils import get_strint_fromfloat, get_year_safe, is_number
 from domain.person_filter import PersonSearchFilter
+import re
+import os
 
 class ExcelReporter:
     def __init__(self, excelProcessor, log_manager: LoggerManager):
         self.excelProcessor = excelProcessor
         self.logger = log_manager.get_logger()
+        self.log_manager = log_manager
 
+
+
+    def _is_today(self, cell_value: Any, today_date: datetime.date) -> bool:
+        """Перевіряє, чи збігається дата в клітинці з сьогоднішньою."""
+        dt_obj = self._parse_date(cell_value)
+        return dt_obj.date() == today_date if dt_obj else False
+
+    def _parse_date(self, cell_value: Any) -> Optional[datetime]:
+        """Універсальний парсер дати на основі форматів з конфігу."""
+        if isinstance(cell_value, datetime):
+            return cell_value
+
+        if isinstance(cell_value, str):
+            # Прибираємо зайві пробіли
+            clean_val = cell_value.strip()
+            for fmt in config.EXCEL_DATE_FORMATS_REPORT:
+                try:
+                    return datetime.strptime(clean_val, fmt)
+                except ValueError:
+                    continue
+        return None
 
     def get_subunit_desertion_stats(self, search_filter: PersonSearchFilter):
         """Збирає повну статистику по підрозділах, званнях та термінах СЗЧ."""
@@ -574,115 +598,160 @@ class ExcelReporter:
             return {}
 
 
-    def get_summary_report(self) -> str:
-        """Генерує текстовий звіт по СЗЧ за допомогою xlwings."""
-        total_count = 0
-        today_count = 0
-        today = datetime.now().date()
+    def get_daily_report(self, target_date: date = None) -> List[Dict[str, Any]]:
+        # Якщо дату не передали, беремо сьогоднішню
+        if target_date is None:
+            target_date = datetime.now().date()
 
-        # В xlwings індекси стовпців часто базуються на 1 (як в Excel),
-        # тому для роботи зі списками Python нам знадобиться (index - 1)
-        pib_idx = self.excelProcessor.column_map.get(COLUMN_NAME.lower())
-        date_added_idx = self.excelProcessor.column_map.get(COLUMN_INSERT_DATE.lower())
-        id_idx = self.excelProcessor.column_map.get(COLUMN_INCREMEMTAL.lower())
+        id_idx = self.excelProcessor.header.get(COLUMN_INCREMEMTAL, 1) - 1
+        name_idx = self.excelProcessor.header.get(COLUMN_NAME, 1) - 1
+        ins_date_idx = self.excelProcessor.header.get(COLUMN_INSERT_DATE, 1) - 1
+        des_date_idx = self.excelProcessor.header.get(COLUMN_DESERTION_DATE, 1) - 1
+        title_idx = self.excelProcessor.header.get(COLUMN_TITLE_2, 1) - 1
+        subunit_idx = self.excelProcessor.header.get(COLUMN_SUBUNIT, 1) - 1
+        call_idx = self.excelProcessor.header.get(COLUMN_ENLISTMENT_DATE, 1) - 1
+        days_idx = self.excelProcessor.header.get(COLUMN_SERVICE_DAYS, 1) - 1
 
-        if not all([id_idx, pib_idx, date_added_idx]):
-            return "❌ Помилка: Не знайдено необхідні стовпці для звіту."
+        results = []
+        target_sheets = ['А0224', 'А7018']  # Назви ваших аркушів в Excel
+        for sheet_name in target_sheets:
+            try:
+                # Звертаємося до конкретного аркуша через книгу (book)
+                sheet = self.excelProcessor.sheet.book.sheets[sheet_name]
+                # Шукаємо останній заповнений рядок саме на цьому аркуші
+                last_row = sheet.range('A' + str(sheet.cells.last_cell.row)).end('up').row
+                data = sheet.range(f"A2:BB{last_row}").value
+            except Exception as e:
+                print(f"Помилка читання аркуша {sheet_name}: {e}")
+                continue
+            if not data:
+                return results
 
-        # Отримуємо останній рядок
+            for row in data:
+                if not row:
+                    continue
+
+                # 1. Безпечно дістаємо сирі значення з перевіркою довжини рядка
+                raw_ins = row[ins_date_idx] if len(row) > ins_date_idx else None
+                raw_des = row[des_date_idx] if len(row) > des_date_idx else None
+                raw_call = row[call_idx] if len(row) > call_idx else None
+
+                # 2. Пробуємо розпізнати (якщо не вийде - функція поверне None)
+                parsed_ins = self._parse_date(raw_ins) if raw_ins else None
+                parsed_des = self._parse_date(raw_des) if raw_des else None
+                parsed_call = self._parse_date(raw_call) if raw_call else None
+
+                # 3. Беремо .date() тільки там, де парсинг пройшов успішно
+                ins_date = parsed_ins.date() if parsed_ins else None
+                des_date = parsed_des.date() if parsed_des else None
+                call_date = parsed_call.date() if parsed_call else None
+                term_days = row[days_idx]
+
+                # Якщо дата знайдена і вона збігається з цільовою (наприклад, сьогоднішньою)
+                if ins_date == target_date:
+                    results.append({
+                        'sheet_name': sheet_name,
+                        'ins_date': ins_date,
+                        'des_date': des_date,
+                        'name': row[name_idx] if len(row) > name_idx else 'Невідомо',
+                        'title': row[title_idx] if len(row) > title_idx else 'Не вказано',
+                        'subunit': row[subunit_idx] if len(row) > subunit_idx else 'Не вказано',
+                        'call_date': call_date,
+                        'term_days': get_strint_fromfloat(term_days)
+                    })
+
+        return results
+
+    def get_daily_returns_report(self, target_date: date, exclude_names: List[str] = None) -> List[Dict[str, Any]]:
+        if exclude_names is None:
+            exclude_names = []
+
+        # Форматуємо дату так, як вона записана в логах на початку рядка (напр. "2026-03-04")
+        log_date_prefix = target_date.strftime('%Y-%m-%d')
+
+        log_path = self.log_manager.get_log_path()
+        unique_returns = {}
+        if os.path.exists(log_path):
+            with open(log_path, 'r', encoding='utf-8') as f:
+                current_person = {}
+
+                for line in f:
+                    if not line.startswith(log_date_prefix):
+                        continue
+                    match_name = re.search(r'ПЕРСОНА:\s*(.*)', line)
+                    if match_name:
+                        current_person = {'name': match_name.group(1).strip(), 'is_return': False}
+                    if 'ВИЯВЛЕНО ПОВЕРНЕННЯ' in line and current_person:
+                        current_person['is_return'] = True
+
+                    match_ret_date = re.search(r'Дата повернення до в/частини:\s*(.*)', line)
+                    if match_ret_date and current_person:
+                        date_str = match_ret_date.group(1).strip()
+                        current_person['ret_date'] = date_str if date_str else "Не вказано"
+
+                    match_id = re.search(r'\(ID:(\d+)(?:\.\d+)?\)', line)
+                    if match_id and current_person and current_person.get('is_return'):
+                        person_id = str(match_id.group(1))  # Беремо тільки цифри, відкидаємо .0
+                        current_person['id'] = person_id
+
+                        last_name = current_person['name'].split()[0].lower()
+                        if not any(last_name in excl_name.lower() for excl_name in exclude_names):
+                            unique_returns[person_id] = current_person
+
+                        current_person = {}  # Очищуємо для наступного запису
+        else:
+            self.logger.error(f"Файл логів не знайдено за шляхом {log_path}")
+
+        returns_from_logs = list(unique_returns.values())
+
+        if not returns_from_logs:
+            return []
+
+        # ---------------------------------------------------------
+        # 2. ЗБАГАЧУЄМО ДАНИМИ З EXCEL (Звання, Підрозділ, Дата СЗЧ)
+        # ---------------------------------------------------------
+        id_idx = self.excelProcessor.header.get(COLUMN_ID_NUMBER, 1) - 1
+        title_idx = self.excelProcessor.header.get(COLUMN_TITLE_2, 1) - 1
+        subunit_idx = self.excelProcessor.header.get(COLUMN_SUBUNIT, 1) - 1
+        des_date_idx = self.excelProcessor.header.get(COLUMN_DESERTION_DATE, 1) - 1
+
         last_row = self.excelProcessor.get_last_row()
+        data = self.excelProcessor.sheet.range(f"A2:BB{last_row}").value
 
-        if last_row < 2:
-            return "📊 База порожня."
+        excel_dict = {}
+        if data:
+            for row in data:
+                if not row or len(row) <= id_idx: continue
 
-        # Зчитуємо всі дані одним махом (це значно швидше, ніж ітерація по клітинках)
-        # Зверни увагу: ми беремо діапазон від 2-го рядка до останнього
-        data = self.excelProcessor.sheet.range((2, 1),
-                                               (last_row, self.excelProcessor.sheet.used_range.columns.count)).value
+                row_id = str(row[id_idx]).replace('.0', '').strip()
+                if row_id:
+                    excel_dict[row_id] = row
 
-        # Якщо в таблиці лише один рядок даних, xlwings поверне список, а не список списків.
-        # Робимо перевірку, щоб завжди працювати з матрицею.
-        if last_row == 2:
-            data = [data]
+        final_returns = []
+        for ret in returns_from_logs:
+            person_id = ret.get('id')
+            excel_row = excel_dict.get(person_id, [])
 
-        for row in data:
-            # В xlwings індекси у списку data відповідають (index - 1)
-            pib_value = row[pib_idx - 1]
-            date_val = row[date_added_idx - 1]
+            title = excel_row[title_idx] if len(excel_row) > title_idx else 'Не вказано'
+            subunit = excel_row[subunit_idx] if len(excel_row) > subunit_idx else 'Не вказано'
 
-            # 1. Рахуємо загальну кількість (якщо є ПІБ)
-            if pib_value and str(pib_value).strip():
-                total_count += 1
+            raw_des_date = excel_row[des_date_idx] if len(excel_row) > des_date_idx else None
+            des_date_str = "Невідомо"
+            if isinstance(raw_des_date, datetime):
+                des_date_str = raw_des_date.strftime('%d.%m.%Y')
+            elif isinstance(raw_des_date, str):
+                des_date_str = raw_des_date.strip()
 
-                # 2. Рахуємо кількість за сьогодні
-                # xlwings автоматично конвертує дати Excel в об'єкти datetime Python
-                if date_val:
-                    if self._is_today(date_val, today):
-                        today_count += 1
+            final_returns.append({
+                'name': ret['name'],
+                'id_number': person_id,
+                'title': title,
+                'subunit': subunit,
+                'des_date': des_date_str,
+                'ret_date': ret.get('ret_date', 'Не вказано')
+            })
 
-        return (
-            "📊 *ЩОДЕННИЙ ЗВІТ ПО БАЗІ СЗЧ*\n"
-            "━━━━━━━━━━━━━━━\n"
-            f"📈 Всього записів у базі: *{total_count}*\n"
-            f"📅 Внесено за сьогодні: *{today_count}*\n"
-            "━━━━━━━━━━━━━━━\n"
-            f"🕒 Дата звіту: {today.strftime(config.EXCEL_DATE_FORMAT)}"
-        )
-
-    def get_montly_report(self) -> str:
-        """Генерує текстовий звіт по СЗЧ із групуванням по місяцях."""
-        total_count = 0
-        today_count = 0
-        # Словник для статистики: {"2026-02": 10, "2026-01": 25}
-        monthly_stats = defaultdict(int)
-
-        today = datetime.now().date()
-
-        pib_idx = self.excelProcessor.column_map.get(COLUMN_NAME.lower())
-        date_added_idx = self.excelProcessor.column_map.get(COLUMN_INSERT_DATE.lower())
-        id_idx = self.excelProcessor.column_map.get(COLUMN_INCREMEMTAL.lower())
-
-        if not id_idx or not pib_idx or not date_added_idx:
-            return "❌ Помилка: Не знайдено необхідні стовпці для звіту."
-
-        for row in self.excelProcessor.sheet.iter_rows(min_row=2, values_only=True):
-            pib_value = row[pib_idx - 1]
-            date_val = row[date_added_idx - 1]
-
-            if pib_value and str(pib_value).strip():
-                total_count += 1
-
-                if date_val:
-                    # Перетворюємо значення в об'єкт datetime
-                    dt_obj = self._parse_date(date_val)
-                    if dt_obj:
-                        # 1. Перевірка на сьогодні
-                        if dt_obj.date() == today:
-                            today_count += 1
-
-                        # 2. Групування YYYY-MM
-                        month_key = dt_obj.strftime("%Y-%m")
-                        monthly_stats[month_key] += 1
-
-        # Формуємо блок статистики по місяцях
-        monthly_report_lines = []
-        # Сортуємо ключі, щоб найновіші місяці були зверху
-        for m_key in sorted(monthly_stats.keys(), reverse=True):
-            monthly_report_lines.append(f"🗓 {m_key}: *{monthly_stats[m_key]}*")
-
-        monthly_block = "\n".join(monthly_report_lines)
-
-        return (
-            "📊 *ЗВІТ ПО БАЗІ СЗЧ*\n"
-            "━━━━━━━━━━━━━━━\n"
-            f"📈 Всього записів: *{total_count}*\n"
-            f"📅 Внесено за сьогодні: *{today_count}*\n"
-            "━━━━━━━━━━━━━━━\n"
-            "*Статистика по місяцях:*\n"
-            f"{monthly_block}\n"
-            "━━━━━━━━━━━━━━━\n"
-            f"🕒 Дата звіту: {today.strftime('%d.%m.%Y')}"
-        )
+        return final_returns
 
     def get_dupp_names_report(self) -> Dict[str, List[Dict[str, Any]]]:
         # Отримуємо індекси колонок (переконайтеся, що константи імпортовані)
@@ -842,25 +911,3 @@ class ExcelReporter:
             })
 
         return results
-
-    @staticmethod
-    def _is_today(cell_value: Any, today_date: datetime.date) -> bool:
-        """Перевіряє, чи збігається дата в клітинці з сьогоднішньою."""
-        dt_obj = ExcelReporter._parse_date(cell_value)
-        return dt_obj.date() == today_date if dt_obj else False
-
-    @staticmethod
-    def _parse_date(cell_value: Any) -> Optional[datetime]:
-        """Універсальний парсер дати на основі форматів з конфігу."""
-        if isinstance(cell_value, datetime):
-            return cell_value
-
-        if isinstance(cell_value, str):
-            # Прибираємо зайві пробіли
-            clean_val = cell_value.strip()
-            for fmt in config.EXCEL_DATE_FORMATS_REPORT:
-                try:
-                    return datetime.strptime(clean_val, fmt)
-                except ValueError:
-                    continue
-        return None

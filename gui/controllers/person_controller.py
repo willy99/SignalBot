@@ -5,10 +5,12 @@ from domain.person import Person
 from domain.person_filter import PersonSearchFilter
 from domain.person_key import PersonKey
 from gui.services.request_context import RequestContext
-from utils.utils import get_person_key_from_str
+from gui.services.auth_manager import AuthManager
+from service.processing.MyWorkFlow import MyWorkFlow
+
 
 class PersonController:
-    def __init__(self, worklow, auth_manager):
+    def __init__(self, worklow: MyWorkFlow, auth_manager: AuthManager):
         self.processor = worklow.excelProcessor
         self.auth_manager = auth_manager
         self.logger = worklow.log_manager.get_logger()

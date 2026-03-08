@@ -28,7 +28,7 @@ class MyWorkFlow:
         self.excelProcessor = None
         self.wordProcessor = None
         self.reporter = None
-        self.attachmentHandler = AttachmentHandler(self)
+        self.attachmentHandler = None
         self.client = SignalClient()
         self.db = MyDataBase()
         self.stats = Stat()  # Створюємо об'єкт статистики
@@ -74,6 +74,7 @@ class MyWorkFlow:
                         filename = att.get("filename")
 
                         self.logger.debug(f"📎 Отримано файл: {filename} (ID: {att_id})")
+                        self.attachmentHandler = AttachmentHandler(self)
                         file_saved = self.attachmentHandler.handle_attachment(att_id, filename)
                         self.client.send_reaction(
                             group_id,
@@ -124,7 +125,7 @@ class MyWorkFlow:
         self.logger.debug(f"DEBUG: User={user_id}, State={current_state}, Text='{text}'")
         main_menu = "Ви у Головному меню:\n1. Різна обробка\n2. Статистика\n3. Вихід"
         process_menu = "ОБРОБКА MENU:\n1. Batch обробка файлів\n2. Конвертація полів\n3. Вихід"
-        stat_menu = ":\n1. Статистика і звіти \n2. Звіт по СЗЧ - monthly\n3. Призвіща\n0. Вихід"
+        stat_menu = ":\n1. Статистика і звіти \n0. Вихід"
         menu_prompt = "Напишіть 'меню' для початку роботи."
 
         if text == "меню" or text == "start" or text == "menu":
@@ -162,12 +163,6 @@ class MyWorkFlow:
             if text == "0":
                 user_service.set_user_state(user_id, "MAIN_MENU")
                 return main_menu
-            if text == "1":
-                return self.stats.get_full_report()
-            if text == "2":
-                return self.reporter.get_summary_report()
-            if text == "3":
-                return self.reporter.get_all_names_report()
             else:
                 return "Фігня-цифра"
 

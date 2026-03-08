@@ -2,7 +2,7 @@ from nicegui import ui, run
 
 from dics.deserter_xls_dic import COLUMN_ORDER_ASSIGNMENT_NUMBER, COLUMN_ORDER_ASSIGNMENT_DATE, \
     COLUMN_ORDER_RESULT_NUMBER, COLUMN_ORDER_RESULT_DATE, COLUMN_KPP_NUMBER, COLUMN_KPP_DATE, COLUMN_DBR_NUMBER, \
-    COLUMN_DBR_DATE, PATTERN_DOC_NUM
+    COLUMN_DBR_DATE
 from gui.controllers.dbr_controller import DbrController
 from gui.controllers.person_controller import PersonController
 from service.storage.FileCacher import FileCacheManager
@@ -11,8 +11,8 @@ from domain.person_filter import PersonSearchFilter
 from config import UI_DATE_FORMAT
 from datetime import datetime, date
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
-from utils.utils import is_number, format_to_excel_date, is_valid_doc_number
-import re
+from utils.utils import is_number, format_to_excel_date
+
 
 def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file_cache_manager: FileCacheManager,
                     ctx: RequestContext, dbr_doc_id: int = None):
@@ -53,12 +53,11 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                     ui.label('Статус:').classes('text-gray-500 font-medium')
                     status_badge = ui.badge(status_text, color=badge_color).classes('text-sm px-2 py-1')
 
-                out_number_input = ui.input('Загальний вих. номер (СЕДО)', placeholder='Наприклад: 642/123', validation={
-                   'Формат має бути 642/ХХХХ (до 4 цифр)': lambda v: bool(re.match(PATTERN_DOC_NUM, v.strip())) if v else True
-                    }) \
+                out_number_input = ui.input('Загальний вих. номер (СЕДО)') \
                     .bind_value(state, 'out_number') \
-                    .on_value_change(lambda e: state['current_person'].update({'dbr_num': e.value + '/'})) \
+                    .on_value_change(lambda e: state['current_person'].update({'dbr_num': e.value})) \
                     .classes('flex-1')
+
                 out_date_input = date_input(
                     'Дата відправки', state, 'out_date',
                     blur_handler=fix_date,
@@ -409,12 +408,6 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
 
 
             async def on_send_dbr_click():
-
-                out_num = out_number_input.value.strip()
-                if not is_valid_doc_number(out_num):
-                    ui.notify('❌ Увага! Невірний формат вихідного номера. Має бути 642/ХХХХ', type='negative')
-                    return
-                await on_save_draft_click()
 
                 complete_btn.disable()
                 complete_btn.props('loading')

@@ -1,187 +1,250 @@
-from nicegui import ui, app, run
-from gui.auth_routes import logout
-from datetime import datetime
+from nicegui import ui, app
 import urllib.parse
-from gui.services.request_context import RequestContext
+
+from gui.controllers.inbox_controller import InboxController
+from gui.controllers.task_controller import TaskController
 from config import CHECK_INBOX_EVERY_SEC
+from gui.services.auth_manager import AuthManager
 
 if not hasattr(app, 'alarmed_tasks'):
     app.alarmed_tasks = set()
 
-def menu(auth_manager, ctx: RequestContext, task_controller):
-    ui.add_head_html('<link rel="stylesheet" href="/static/style.css">')
-    user_role = app.storage.user.get('user_info', {}).get('role', '')
+from nicegui import ui, app, run
+from gui.auth_routes import logout
+from datetime import datetime
+from gui.services.request_context import RequestContext
+import config
 
-    with ui.header().classes('bg-slate-800 items-center justify-between'):
-        with ui.row().classes('items-center gap-2'):
-            ui.button('А0224, 🏃‍♂️ВТІКАЧІ 👨‍🚀', on_click=lambda: ui.navigate.to('/')) \
-                .props('flat').classes('font-bold text-xl text-white normal-case')
 
-            # 🌟 ІКОНКА INBOX
-            with ui.button(icon='mail').props('flat round color="white"') \
-                    .bind_visibility_from(app.inbox_state, 'count', backward=lambda x: x > 0) as inbox_btn:
-                ui.badge().props('color="red" floating') \
-                    .bind_text_from(app.inbox_state, 'count').classes('text-xs')
-                with ui.menu().classes('w-80 max-h-96 overflow-y-auto') as inbox_menu:
-                    pass
+class AppMenu:
+    def __init__(self, auth_manager: AuthManager, task_controller: TaskController, inbox_controller: InboxController):
+        # Ініціалізуємо один раз при старті сервера
+        self.auth_manager = auth_manager
+        self.task_ctrl = task_controller
+        self.inbox_ctrl = inbox_controller
 
-            # --- 2. ІКОНКА ЗАДАЧ (Персональна) ---
-            with ui.button(icon='assignment', on_click=lambda: ui.navigate.to('/tasks/today')).props(
-                    'flat color=white text-color=gray-7'):
+    def render(self, ctx: RequestContext):
+        """Цей метод викликається на кожній сторінці для малювання меню"""
+        ui.add_head_html('<link rel="stylesheet" href="/static/style.css">')
 
-                # Створюємо елементи (поки порожні/сховані)
-                # Додаємо props('floating') та text-xs, як у Inbox
-                task_badge = ui.badge(color='red').props('floating').classes('text-xs')
-                task_badge.set_visibility(False)
+        # Отримуємо дані юзера
+        user_info = app.storage.user.get('user_info', {})
+        user_role = user_info.get('role', '')
 
-                with ui.tooltip().classes('bg-gray-800 text-white text-sm'):
-                    with ui.column().classes('gap-0'):
-                        lbl_new = ui.label('Нових задач: 0')
-                        lbl_prog = ui.label('В роботі: 0')
+        with ui.header().classes('bg-slate-800 items-center justify-between'):
+            with ui.row().classes('items-center gap-2'):
+                ui.button('А0224, 🏃‍♂️ВТІКАЧІ 👨‍🚀', on_click=lambda: ui.navigate.to('/')) \
+                    .props('flat').classes('font-bold text-xl text-white normal-case')
 
-                # Функція, яка буде викликатись кожні X секунд ДЛЯ ЦЬОГО ЮЗЕРА
-                async def update_my_tasks():
-                    try:
-                        # Робимо запит до БД в окремому потоці, щоб не блокувати UI
-                        new_c, prog_c = await run.io_bound(task_controller.get_my_task_counts, ctx)
+                # ==========================================
+                # 🌟 1. ІКОНКА INBOX (Нова логіка)
+                # ==========================================
+                with ui.button(icon='mail', on_click=lambda: ui.navigate.to('/inbox')).props('flat round color="white"') as inbox_btn:
+                    # Червоний бейдж (персональні)
+                    badge_personal = ui.badge(color='red').props('floating rounded').classes('text-xs font-bold')
+                    badge_personal.set_visibility(False)
 
-                        if new_c > 0:
-                            task_badge.set_text(str(new_c))
-                            task_badge.set_visibility(True)
-                        else:
-                            task_badge.set_visibility(False)
+                    # Сірий бейдж (спільні)
+                    badge_root = ui.badge(color='grey-5').props('floating rounded').classes(
+                        'text-xs font-bold text-gray-800').style('top: auto; bottom: -4px;')
+                    badge_root.set_visibility(False)
 
-                        # Оновлюємо тултип
-                        lbl_new.set_text(f'Нових задач: {new_c}')
-                        lbl_prog.set_text(f'В роботі: {prog_c}')
+                    with ui.menu().classes('w-80 max-h-96 overflow-y-auto') as inbox_menu:
+                        pass
 
-                        # ==========================================
-                        # 2. ЛОГІКА БУДИЛЬНИКА (ALARM)
-                        # ==========================================
-                        alarms = await run.io_bound(task_controller.get_my_alarms, ctx)
+                    # Асинхронна функція оновлення Інбоксу для конкретного юзера
+                    async def update_inbox():
+                        try:
+                            # Викликаємо контролер через self.inbox_ctrl
+                            inbox_data = await run.io_bound(self.inbox_ctrl.get_user_inbox_messages, ctx)
+                            # inbox_data = {'personal_files': [], 'root_files':[]}
+                            p_count = len(inbox_data['personal_files'])
+                            r_count = len(inbox_data['root_files'])
 
-                        for alarm in alarms:
-                            task_id = alarm['id']
-                            # Якщо ми ще не "дзвонили" по цій задачі після перезапуску сервера
-                            if task_id not in app.alarmed_tasks:
-                                app.alarmed_tasks.add(task_id)  # Записуємо, що вже продзвеніли
+                            if p_count > 0:
+                                badge_personal.set_text(str(p_count))
+                                badge_personal.set_visibility(True)
+                            else:
+                                badge_personal.set_visibility(False)
 
-                                # Показуємо велике вікно по центру екрану
-                                ui.notify(
-                                    f"⏰ Просрачено!\nЗадача: {alarm['subject']}",
-                                    type='negative',
-                                    position='top',
-                                    timeout=0,
-                                    multi_line=True,
-                                    close_button='Отримати догану'
-                                )
+                            if r_count > 0:
+                                badge_root.set_text(str(r_count))
+                                badge_root.set_visibility(True)
+                            else:
+                                badge_root.set_visibility(False)
 
-                                # (Опціонально) Відтворюємо звук системного будильника через JS
-                                ui.run_javascript(
-                                    "new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg').play().catch(e => console.log('Автовідтворення заблоковано браузером'));")
-                    except Exception as e:
-                        print(f"Помилка оновлення задач для юзера {ctx.user_login}: {e}")
+                            inbox_btn.set_visibility(p_count > 0 or r_count > 0)
+                        except Exception as e:
+                            print(f"Помилка оновлення Inbox для {ctx.user_login}: {e}")
 
-                # Запускаємо таймер тільки для цієї сесії (наприклад, раз на 15 секунд)
-                ui.timer(CHECK_INBOX_EVERY_SEC, update_my_tasks)
+                    # Таймери оновлення
+                    ui.timer(config.CHECK_INBOX_EVERY_SEC, update_inbox)
+                    ui.timer(0.1, update_inbox, once=True)
 
-                # Викликаємо функцію відразу при завантаженні сторінки, щоб не чекати 15 сек
-                ui.timer(0.1, update_my_tasks, once=True)
 
-            def update_inbox_menu():
-                inbox_menu.clear()
-                with inbox_menu:
-                    ui.label('Очікують в Inbox:').classes('font-bold text-gray-700 px-3 py-2 border-b w-full')
+                # --- 2. ІКОНКА ЗАДАЧ (Персональна) ---
+                with ui.button(icon='assignment', on_click=lambda: ui.navigate.to('/tasks/today')).props(
+                        'flat color=white text-color=gray-7'):
 
-                    files = app.inbox_state.get('files', [])
-                    if not files:
-                        ui.label('Папка порожня').classes('text-gray-500 italic p-3')
-                    else:
-                        for f in files:
-                            with ui.row().classes(
-                                    'items-center gap-2 px-3 py-2 w-full hover:bg-gray-50 border-b border-gray-100 last:border-0'):
-                                ui.icon('description', size='sm', color='gray-400')
-                                ui.label(f).classes('text-sm text-gray-600 truncate').style('max-width: 240px;')
-            inbox_btn.on('click', update_inbox_menu)
+                    # 1. Бейдж для НОВИХ задач (стандартний floating - правий верхній кут)
+                    badge_new = ui.badge(color='red').props('floating rounded').classes('text-xs font-bold')
+                    badge_new.set_visibility(False)
 
-        def make_menu_item(title: str, icon_name: str, route: str):
-            """Створює пункт меню з іконкою зліва та текстом."""
-            with ui.menu_item(on_click=lambda: ui.navigate.to(route)):
-                with ui.row().classes('items-center gap-3 w-full'):
-                    ui.icon(icon_name, size='sm').classes('text-gray-500')
-                    ui.label(title).classes('text-gray-800 font-medium')
+                    # 2. Бейдж для задач В РОБОТІ (помаранчевий)
+                    # Перебиваємо стандартний 'top' і прив'язуємо до 'bottom', щоб він висів знизу праворуч
+                    badge_prog = ui.badge(color='orange-8').props('floating rounded').classes('text-xs font-bold').style(
+                        'top: auto; bottom: -4px;')
+                    badge_prog.set_visibility(False)
 
-        with ui.row():
+                    with ui.tooltip().classes('bg-gray-800 text-white text-sm'):
+                        with ui.column().classes('gap-0'):
+                            lbl_new = ui.label('Нових задач: 0')
+                            lbl_prog = ui.label('В роботі: 0')
 
-            # 🛡 Отримуємо дані поточного користувача з сесії
-            user_info = app.storage.user.get('user_info', {})
-            user_role = user_info.get('role', '')
-            # Якщо є ПІБ - показуємо його, інакше показуємо логін, інакше "Гість"
-            user_name = user_info.get('full_name') or user_info.get('username') or 'Гість'
-            can_doc_support = auth_manager.has_access('doc_support', 'read')
-            can_doc_dbr = auth_manager.has_access('doc_dbr', 'read')
-            can_doc_notif = auth_manager.has_access('doc_notif', 'read')
-            can_search_person = auth_manager.has_access('person', 'read')
+                    # Функція, яка буде викликатись кожні X секунд ДЛЯ ЦЬОГО ЮЗЕРА
+                    async def update_my_tasks():
+                        try:
+                            # Робимо запит до БД в окремому потоці, щоб не блокувати UI
+                            new_count, prog_count = await run.io_bound(self.task_ctrl.get_my_task_counts, ctx)
 
-            # 1. Пошук
-            if can_search_person:
-                # Іконка лупи зліва, стрілочка вниз справа
-                with ui.button('Пошук', icon='search').props('flat text-white icon-right="expand_more"'):
+                            if new_count > 0:
+                                badge_new.set_text(str(new_count))
+                                badge_new.set_visibility(True)
+                            else:
+                                badge_new.set_visibility(False)
+
+                            # Оновлюємо в роботі (помаранчевий бейдж)
+                            if prog_count > 0:
+                                badge_prog.set_text(str(prog_count))
+                                badge_prog.set_visibility(True)
+                            else:
+                                badge_prog.set_visibility(False)
+
+                            # Оновлюємо тултип
+                            lbl_new.set_text(f'Нових задач: {new_count}')
+                            lbl_prog.set_text(f'В роботі: {prog_count}')
+
+                            # ==========================================
+                            # 2. ЛОГІКА БУДИЛЬНИКА (ALARM)
+                            # ==========================================
+                            alarms = await run.io_bound(self.task_ctrl.get_my_alarms, ctx)
+
+                            for alarm in alarms:
+                                task_id = alarm['id']
+                                # Якщо ми ще не "дзвонили" по цій задачі після перезапуску сервера
+                                if task_id not in app.alarmed_tasks:
+                                    app.alarmed_tasks.add(task_id)  # Записуємо, що вже продзвеніли
+
+                                    # Показуємо велике вікно по центру екрану
+                                    ui.notify(
+                                        f"⏰ Просрачено!\nЗадача: {alarm['subject']}",
+                                        type='negative',
+                                        position='top',
+                                        timeout=0,
+                                        multi_line=True,
+                                        close_button='Отримати догану'
+                                    )
+
+                                    # (Опціонально) Відтворюємо звук системного будильника через JS
+                                    ui.run_javascript(
+                                        "new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg').play().catch(e => console.log('Автовідтворення заблоковано браузером'));")
+                        except Exception as e:
+                            print(f"Помилка оновлення задач для юзера {ctx.user_login}: {e}")
+
+                    # Запускаємо таймер тільки для цієї сесії (наприклад, раз на 15 секунд)
+                    ui.timer(CHECK_INBOX_EVERY_SEC, update_my_tasks)
+
+                    # Викликаємо функцію відразу при завантаженні сторінки, щоб не чекати 15 сек
+                    ui.timer(0.1, update_my_tasks, once=True)
+
+            def make_menu_item(title: str, icon_name: str, route: str):
+                """Створює пункт меню з іконкою зліва та текстом."""
+                with ui.menu_item(on_click=lambda: ui.navigate.to(route)):
+                    with ui.row().classes('items-center gap-3 w-full'):
+                        ui.icon(icon_name, size='sm').classes('text-gray-500')
+                        ui.label(title).classes('text-gray-800 font-medium')
+
+            with ui.row():
+
+                # 🛡 Отримуємо дані поточного користувача з сесії
+                user_info = app.storage.user.get('user_info', {})
+                user_role = user_info.get('role', '')
+                # Якщо є ПІБ - показуємо його, інакше показуємо логін, інакше "Гість"
+                user_name = user_info.get('full_name') or user_info.get('username') or 'Гість'
+                can_doc_support = self.auth_manager.has_access('doc_support', 'read')
+                can_doc_dbr = self.auth_manager.has_access('doc_dbr', 'read')
+                can_doc_notif = self.auth_manager.has_access('doc_notif', 'read')
+                can_search_person = self.auth_manager.has_access('person', 'read')
+
+                # 1. Пошук
+                if can_search_person:
+                    # Іконка лупи зліва, стрілочка вниз справа
+                    with ui.button('Пошук', icon='search').props('flat text-white icon-right="expand_more"'):
+                        with ui.menu():
+                            make_menu_item('Пошук подій', 'search', '/search')
+                            make_menu_item('Батч пошук людей', 'manage_search', '/batch_search')
+                            if can_doc_support:
+                                make_menu_item('Швидкий пошук документів', 'find_in_page', '/doc_files')
+
+                # 2. Плани (Задачі та Календар)
+                with ui.button('Плани', icon='follow_the_signs').props('flat text-white icon-right="expand_more"'):
                     with ui.menu():
-                        make_menu_item('Пошук подій', 'search', '/search')
-                        make_menu_item('Батч пошук людей', 'manage_search', '/batch_search')
-                        if can_doc_support:
-                            make_menu_item('Швидкий пошук документів', 'find_in_page', '/doc_files')
+                        make_menu_item('Мої задачі', 'person_pin', '/tasks/today')
+                        make_menu_item('Всі задачі', 'assignment', '/tasks/all')
+                        make_menu_item('Календар', 'calendar_month', '/calendar')
 
-            # 2. Документація
-            if can_doc_support or can_doc_notif:
-                with ui.button('Документація', icon='folder_copy').props('flat text-white icon-right="expand_more"'):
-                    with ui.menu():
-                        if can_doc_notif:
-                            make_menu_item('Формування Довідок', 'description', '/doc_notif')
-                        if can_doc_support:
-                            make_menu_item('Формування Супроводів', 'drive_file_move', '/doc_support')
-                        if can_doc_dbr:
-                            make_menu_item('Відправка На ДБР', 'gavel', '/doc_dbr')
+                # 2. Документація
+                if can_doc_support or can_doc_notif:
+                    with ui.button('Документація', icon='folder_copy').props('flat text-white icon-right="expand_more"'):
+                        with ui.menu():
+                            if can_doc_notif:
+                                make_menu_item('Формування Повідомлень', 'description', '/doc_notif')
+                            if can_doc_support:
+                                make_menu_item('Формування Супроводів', 'drive_file_move', '/doc_support')
+                            if can_doc_dbr:
+                                make_menu_item('Відправка На ДБР', 'gavel', '/doc_dbr')
 
-            # 4. Звіти
-            can_report_units = auth_manager.has_access('report_units', 'read')
-            can_report_general = auth_manager.has_access('report_general', 'read')
-            if can_report_units or can_report_general:
-                with ui.button('Звіти', icon='analytics').props('flat text-white icon-right="expand_more"'):
-                    with ui.menu():
-                        if can_report_units:
-                            make_menu_item('Звіт по підрозділам', 'bar_chart', '/report_units')
-                        if can_report_general:
-                            make_menu_item('Звіт по рокам', 'calendar_today', '/report_yearly')
-                        if can_report_general:
-                            make_menu_item('Дублікати прізвищ', 'people_outline', '/report_name_dups')
-                        if can_report_general:
-                            make_menu_item('Чекаємо на ЄРДР', 'pending_actions', '/report_waiting_erdr')
 
-            # 5. Адмінка
-            if auth_manager.has_access('admin_panel', 'read'):
-                # Іконка щита переїхала наліво, а стрілочка вниз тепер справа
-                with ui.button('Адмінка', icon='admin_panel_settings').props(
-                        'flat text-yellow-400 font-bold icon-right="expand_more"'):
-                    with ui.menu():
-                        make_menu_item('Права доступу', 'vpn_key', '/admin/permissions')
-                        make_menu_item('Користувачі', 'manage_accounts', '/admin/users')
-                        make_menu_item('Логи', 'history', '/logs')
+                # 4. Звіти
+                can_report_units = self.auth_manager.has_access('report_units', 'read')
+                can_report_general = self.auth_manager.has_access('report_general', 'read')
+                if can_report_units or can_report_general:
+                    with ui.button('Звіти', icon='analytics').props('flat text-white icon-right="expand_more"'):
+                        with ui.menu():
+                            if can_report_units:
+                                make_menu_item('Звіт по підрозділам', 'bar_chart', '/report_units')
+                            if can_report_general:
+                                make_menu_item('Звіт по рокам', 'event_note', '/report_yearly')
+                            if can_report_general:
+                                make_menu_item('Дублікати прізвищ', 'people_outline', '/report_name_dups')
+                            if can_report_general:
+                                make_menu_item('Чекаємо на ЄРДР', 'pending_actions', '/report_waiting_erdr')
+                            if can_report_general:
+                                make_menu_item('Щоденний звіт', 'event_available', '/report_daily')
 
-            # === ПРОФІЛЬ ТА ВИХІД ===
-            ui.separator().props('vertical dark').classes('mx-2 h-8')
+                # 5. Адмінка
+                if self.auth_manager.has_access('admin_panel', 'read'):
+                    # Іконка щита переїхала наліво, а стрілочка вниз тепер справа
+                    with ui.button('Адмінка', icon='admin_panel_settings').props(
+                            'flat text-yellow-400 font-bold icon-right="expand_more"'):
+                        with ui.menu():
+                            make_menu_item('Права доступу', 'vpn_key', '/admin/permissions')
+                            make_menu_item('Користувачі', 'manage_accounts', '/admin/users')
+                            make_menu_item('Логи', 'history', '/logs')
 
-            user_info = app.storage.user.get('user_info', {})
-            user_name = user_info.get('full_name') or user_info.get('username') or 'Гість'
+                # === ПРОФІЛЬ ТА ВИХІД ===
+                ui.separator().props('vertical dark').classes('mx-2 h-8')
 
-            with ui.row().classes('items-center gap-2 mr-2'):
-                ui.icon('account_circle', color='gray-300', size='sm')
-                ui.label(user_name).classes('text-white font-medium')
+                user_info = app.storage.user.get('user_info', {})
+                user_name = user_info.get('full_name') or user_info.get('username') or 'Гість'
 
-            ui.button(icon='logout', on_click=logout).props('flat round color="red-400"').tooltip('Вийти з системи')
+                with ui.row().classes('items-center gap-2 mr-2'):
+                    ui.icon('account_circle', color='gray-300', size='sm')
+                    ui.label(user_name).classes('text-white font-medium')
 
-    inject_watermark()
+                ui.button(icon='logout', on_click=logout).props('flat round color="red-400"').tooltip('Вийти з системи')
+
+        inject_watermark()
 
 def inject_watermark():
     """Створює захисний водяний знак поверх всього екрану."""

@@ -70,3 +70,16 @@ CREATE TABLE IF NOT EXISTS dbr_docs (
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS notif_docs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_by INTEGER NOT NULL,
+    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status TEXT DEFAULT 'DRAFT',        -- 'DRAFT' або 'COMPLETED'
+    out_number TEXT,                    -- Вихідний номер
+    out_date TEXT,                      -- Дата відправки
+    payload TEXT,                       -- JSON масив з обраними особами
+
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+);
+
+

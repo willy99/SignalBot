@@ -5,7 +5,6 @@ from service.processing.processors.DocProcessor import DocProcessor
 from service.storage.LoggerManager import LoggerManager
 import tempfile
 import os
-import traceback
 
 class MockWorkflow:
     """Заглушка для workflow, щоб збирати статистику без бота"""

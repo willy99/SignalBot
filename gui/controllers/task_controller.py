@@ -49,3 +49,7 @@ class TaskController:
     def get_my_alarms(self, ctx: RequestContext):
         service = TaskService(self.db, ctx)
         return service.get_triggered_alarms(ctx.user_id)
+
+    def create_task(self, ctx: RequestContext, task: Task):
+        service = TaskService(self.db, ctx)
+        return service.save_task(task)

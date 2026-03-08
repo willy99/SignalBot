@@ -4,9 +4,9 @@ from datetime import datetime, date
 import config
 import os
 from typing import Any, Tuple, Dict
-from dics.deserter_xls_dic import NA
+from dics.deserter_xls_dic import NA, PATTERN_DOC_NUM
 from domain.person_key import PersonKey
-
+import re
 
 def clean_text(text):
     if text is None: return None
@@ -157,6 +157,45 @@ def get_person_key_from_str(glued_key: str) -> PersonKey:
     return key
 
 
+def to_genitive_title(title: str) -> str:
+    """Перетворює військове звання у родовий відмінок (кого/чого)."""
+    if not title:
+        return ""
+
+    words = title.strip().split()
+    res = []
+
+    for w in words:
+        lw = w.lower()
+        # 1. Специфічні слова та прикметники
+        if lw == "старший":
+            res.append("старшого" if w.islower() else "Старшого")
+        elif lw == "молодший":
+            res.append("молодшого" if w.islower() else "Молодшого")
+        elif lw == "головний":
+            res.append("головного" if w.islower() else "Головного")
+        elif lw == "старшина":
+            res.append("старшини" if w.islower() else "Старшини")
+
+        # 2. Загальні правила для прикметників (на -ий)
+        elif lw.endswith("ий"):
+            res.append(w[:-2] + "ого")
+
+        # 3. Загальні правила для іменників жіночого роду (на -а)
+        elif lw.endswith("а"):
+            res.append(w[:-1] + "и")
+
+        # 4. Найпоширеніше правило: іменник на приголосний (солдат, лейтенант, майор, офіцер)
+        # Додаємо "а" в кінці. (Враховує також складені звання на кшталт "штаб-сержант" -> "штаб-сержанта")
+        elif lw[-1] in "бвгґджзклмнпрстфхцчшщ":
+            res.append(w + "а")
+
+        # 5. Якщо нічого не підійшло (fallback)
+        else:
+            res.append(w)
+
+    return " ".join(res)
+
 def to_genitive_case(fullname: str) -> str:
     """
     Перетворює ПІБ (Називний) у ПІБ (Родовий відмінок).
@@ -268,3 +307,14 @@ def is_number(s):
         return True
     except ValueError:
         return False
+
+
+def is_valid_doc_number(number_str: str) -> bool:
+    """
+    Перевіряє, чи відповідає номер супроводу формату 642/XXXX,
+    де X - від 1 до 4 цифр.
+    """
+    if not number_str:
+        return False
+
+    return bool(re.match(PATTERN_DOC_NUM, str(number_str).strip()))
