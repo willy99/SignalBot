@@ -58,7 +58,7 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                     }) \
                     .bind_value(state, 'out_number') \
                     .on_value_change(lambda e: state['current_person'].update({'dbr_num': e.value + '/'})) \
-                    .classes('flex-1')
+                    .classes('flex-1').props('hide-bottom-space')
                 out_date_input = date_input(
                     'Дата відправки', state, 'out_date',
                     blur_handler=fix_date,

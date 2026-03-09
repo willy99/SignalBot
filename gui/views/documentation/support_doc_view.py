@@ -44,7 +44,7 @@ def render_document_page(controller: SupportController, person_controller: Perso
                 city = ui.radio(['Миколаїв', 'Дніпро', 'Донецьк'], value='Миколаїв').props('inline')
                 supp_number_input = ui.input('Загальний номер супроводу', placeholder='Наприклад: 642/123', validation={
                    'Формат має бути 642/ХХХХ (до 4 цифр)': lambda v: bool(re.match(PATTERN_DOC_NUM, v.strip())) if v else True
-                }).classes('flex-1')
+                }).classes('flex-1').props('hide-bottom-space')
                 supp_date_input = date_input('Дата формування', state, 'support_date', blur_handler=fix_date).classes(
                     'flex-1')
 

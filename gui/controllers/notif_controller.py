@@ -1,17 +1,23 @@
+from domain.person_filter import PersonSearchFilter
 from service.docworkflow.NotifService import NotifService
 from gui.services.auth_manager import AuthManager
 from gui.services.request_context import RequestContext
 from service.processing.MyWorkFlow import MyWorkFlow
+from service.processing.processors.DocTemplator import DocTemplator
 from utils.utils import get_person_key_from_str
 from domain.person import Person
 from dics.deserter_xls_dic import *
-from config import EXCEL_BLUE_COLOR
+from config import EXCEL_LIGHT_GRAY_COLOR
+
 
 class NotifController:
-    def __init__(self, workflow:MyWorkFlow, auth_manager: AuthManager):
+    def __init__(self, doc_templator: DocTemplator, workflow:MyWorkFlow, auth_manager: AuthManager):
         self.db = workflow.db
+        self.excel_processor = workflow.excelProcessor
         self.log_manager = workflow.log_manager
         self.logger = self.log_manager.get_logger()
+        self.doc_templator = doc_templator
+
 
     def get_all_drafts(self, ctx: RequestContext):
         dservice = NotifService(self.db, ctx)
@@ -31,6 +37,17 @@ class NotifController:
         service = NotifService(self.db, ctx)
         return service.get_doc_by_id(doc_id)
 
+    def generate_document(self, ctx: RequestContext, region: str, out_number: str, out_date: str, buffer_data: list) -> tuple[bytes, str]:
+        self.logger.debug('UI:' + ctx.user_name + ': Генеруємо доповідь: ' + str(region) + ', number:' + out_number + ':' + str(buffer_data))
+
+        if not buffer_data:
+            raise ValueError("Буфер порожній. Додайте хоча б один запис.")
+        if not out_number:
+            raise ValueError("Будь ласка, введіть загальний вихідний номер.")
+
+        # Викликаємо процесор для генерації
+        return self.doc_templator.generate_notif_batch(region, out_number, out_date, buffer_data)
+
     def mark_as_completed(self, ctx: RequestContext, doc_id: int, payload: list, out_number: str, out_date: str,
                           person_controller=None) -> bool:
 
@@ -46,14 +63,8 @@ class NotifController:
 
             row_key = get_person_key_from_str(doc.get('id_number'))
             found_person_data = person_controller.find_person(ctx, row_key)
-            dbr_out_number = doc.get('dbr_num')
-            dbr_out_date = doc.get('dbr_date')
             kpp_number = doc.get('kpp_num')
             kpp_date = doc.get('kpp_date')
-            o_ass_num = doc.get('o_ass_num')
-            o_ass_date = doc.get('o_ass_date')
-            o_res_num = doc.get('o_res_num')
-            o_res_date = doc.get('o_res_date')
 
             if not found_person_data:
                 self.logger.warning(
@@ -66,23 +77,16 @@ class NotifController:
             print(f'Знайдено логічний ID: {logical_id}')
 
             if logical_id is not None:
-                # Тепер ми передаємо правильний ID, за яким процесор зможе знайти рядок
                 p = Person(
                     id=logical_id,
                     kpp_num=kpp_number,
                     kpp_date=kpp_date,
-                    dbr_date=dbr_out_date,
-                    dbr_num=dbr_out_number,
-                    o_ass_num=o_ass_num,
-                    o_ass_date=o_ass_date,
-                    o_res_num=o_res_num,
-                    o_res_date=o_res_date,
-                    review_status=REVIEW_STATUS_WAITING
+                    # review_status=REVIEW_STATUS_WAITING
                 )
                 persons_to_update.append(p)
 
         if persons_to_update:
-            success = person_controller.save_persons(ctx, persons_to_update, paint_color=EXCEL_BLUE_COLOR, partial_update=True)
+            success = person_controller.save_persons(ctx, persons_to_update, paint_color=EXCEL_LIGHT_GRAY_COLOR, partial_update=True)
             if not success:
                 raise Exception("Не вдалося оновити дані в Excel. Статус чернетки НЕ змінено.")
 

@@ -1,16 +1,24 @@
 import io
 from pathlib import Path
 from docxtpl import DocxTemplate
-from datetime import datetime
+import os
 
 class DocTemplator:
     def __init__(self, templates_dir: Path):
 
         self.templates_dir = Path(templates_dir)
+        self.support_dir = os.path.join(self.templates_dir, 'support-form')
+        self.notif_dir = os.path.join(self.templates_dir, 'notif-form')
+
         self.templates = {
-            'Миколаїв': self.templates_dir / 'Мико.docx',
-            'Дніпро': self.templates_dir / 'Дніпро.docx',
-            'Донецьк': self.templates_dir / 'Донецьк.docx'
+            'Миколаїв': self.support_dir + '/Мико.docx',
+            'Дніпро': self.support_dir + '/Дніпро.docx',
+            'Донецьк': self.support_dir + '/Донецьк.docx'
+        }
+        self.region_templates = {
+            'Миколаївська область': self.notif_dir + '/Мико.docx',
+            'Дніпро': self.notif_dir + '/Дніпро.docx',
+            'Донецьк': self.notif_dir + '/Донецьк.docx'
         }
 
     @staticmethod
@@ -95,4 +103,33 @@ class DocTemplator:
         byte_io.seek(0)
 
         file_name = f"Пакет_Супроводів_{city}_{len(formatted_docs)}шт.docx"
+        return byte_io.getvalue(), file_name
+
+
+    def generate_notif_batch(self, region: str, notif_number: str, notif_date: str, raw_documents: list) -> tuple[bytes, str]:
+        if region not in self.region_templates:
+            raise FileNotFoundError(f"Шаблон для регіону {region} не знайдено.")
+
+        template_path = self.templates[region]
+        doc = DocxTemplate(str(template_path))
+
+        formatted_docs = []
+        for idx, raw in enumerate(raw_documents):
+            # Формуємо словник саме так, як очікує шаблон Word
+            formatted_doc = {
+                'NOTIF_NUMBER': notif_number,
+                'NOTIF_DATE': notif_date,
+                'INCREMENTAL': raw.get('seq_num', 0),
+                'NOTIF_CONDITIONS': raw.get('conditions', ''),
+            }
+            formatted_docs.append(formatted_doc)
+
+        context = {'documents': formatted_docs}
+        doc.render(context)
+
+        byte_io = io.BytesIO()
+        doc.save(byte_io)
+        byte_io.seek(0)
+
+        file_name = f"Пакет_Повідомлень_{region}_{len(formatted_docs)}шт.docx"
         return byte_io.getvalue(), file_name

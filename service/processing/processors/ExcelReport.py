@@ -828,6 +828,9 @@ class ExcelReporter:
         erdr_num_idx = header.get(COLUMN_ERDR_NOTATION, 1) - 1
 
         q_des_year = search_filter.des_year
+        q_des_year = search_filter.des_year
+        q_des_date_from = date.fromisoformat(search_filter.des_date_from) if search_filter.des_date_from else None
+        q_des_date_to = date.fromisoformat(search_filter.des_date_to) if search_filter.des_date_to else None
 
         for row in data:
             if not row or not row[pib_idx]:
@@ -882,7 +885,32 @@ class ExcelReporter:
                     match_des_year = (des_date_year == str(q_des_year))
                     match_dbr_year = (dbr_date_year == str(q_des_year))
 
-            if not match_des_year or not match_dbr_year or not match_erdr_date:
+            match_des_year_from = True
+            match_des_year_to = True
+
+            if q_des_date_from or q_des_date_to:
+                if des_date_val:
+                    if isinstance(des_date_val, datetime):
+                        row_des_date = des_date_val.date()
+                    elif isinstance(des_date_val, date):
+                        row_des_date = des_date_val
+                    else:
+                        row_des_date = None
+
+                    if row_des_date:
+                        if q_des_date_from:
+                            match_des_year_from = (row_des_date >= q_des_date_from)
+                        if q_des_date_to:
+                            match_des_year_to = (row_des_date <= q_des_date_to)
+                    else:
+                        match_des_year_from = False
+                        match_des_year_to = False  # Додано скидання для дати "До"
+                else:
+                    match_des_year_from = False
+                    match_des_year_to = False
+            match_period = match_des_year and match_des_year_from and match_des_year_to
+
+            if not match_period or not match_dbr_year or not match_erdr_date:
                 continue
 
             dob_val = row[dob_idx]

@@ -3,8 +3,8 @@ import os
 import sys
 
 import warnings
-
-from config import DESERTER_TAB_NAME, EXCEL_CHUNK_SIZE
+from domain.person_filter import YES
+from config import DESERTER_TAB_NAME, EXCEL_CHUNK_SIZE, EXCEL_DATE_FORMAT
 from dics.deserter_xls_dic import *
 from dics.deserter_xls_dic import NA
 from typing import List, Dict, Any
@@ -369,8 +369,8 @@ class ExcelProcessor:
 
         q_text = (filter_obj.query or "").lower().strip()
         q_des_year = filter_obj.des_year
-        q_des_date_from = date.fromisoformat(filter_obj.des_date_from) if filter_obj.des_date_from else None
-        q_des_date_to = date.fromisoformat(filter_obj.des_date_to) if filter_obj.des_date_to else None
+        q_des_date_from = datetime.strptime(filter_obj.des_date_from,EXCEL_DATE_FORMAT).date() if filter_obj.des_date_from else None
+        q_des_date_to = datetime.strptime(filter_obj.des_date_to, EXCEL_DATE_FORMAT).date() if filter_obj.des_date_to else None
 
         q_order = filter_obj.o_ass_num
         q_title2 = filter_obj.title2
@@ -381,6 +381,10 @@ class ExcelProcessor:
         o_ass_num_idx = self.header.get(COLUMN_ORDER_ASSIGNMENT_NUMBER, 1) - 1
         title2_idx = self.header.get(COLUMN_TITLE_2, 1) - 1
         service_idx = self.header.get(COLUMN_SERVICE_TYPE, 1) - 1
+        kpp_num_idx = self.header.get(COLUMN_KPP_NUMBER, 1) - 1
+        review_status_idx = self.header.get(COLUMN_REVIEW_STATUS, 1) - 1
+        des_region_idx = self.header.get(COLUMN_DESERTION_REGION, 1) - 1
+
 
         for i, row in enumerate(data):
             if not row[pib_idx]: continue
@@ -446,7 +450,24 @@ class ExcelProcessor:
                 row_service = str(row[service_idx]) if row[service_idx] else ""
                 match_service = (row_service == q_service)
 
-            if match_text and match_des_year and match_des_year_from and match_des_year_to and match_order and match_title2 and match_service:
+            match_kpp = True
+            if filter_obj.empty_kpp == YES:
+                kpp_num = str(row[kpp_num_idx])
+                safe_val = str(kpp_num).strip().lower()
+                match_kpp = safe_val in ['none', 'nan', 'null', '', '0', '0.0']
+
+            match_status = True
+            if filter_obj.review_statuses:
+                review_status = str(row[review_status_idx]).strip()
+                match_status = review_status in filter_obj.review_statuses
+
+            match_des_region = True
+            if filter_obj.desertion_region:
+                desertion_region = str(row[des_region_idx]).strip().lower() if row[des_region_idx] else ''
+                match_des_region = desertion_region == filter_obj.desertion_region.lower()
+
+            if (match_text and match_des_year and match_des_year_from and match_des_year_to and
+                    match_order and match_title2 and match_service and match_kpp and match_status and match_des_region):
                 serialized_row = []
                 for cell in row:
                     self._transform_cell(cell, serialized_row)

@@ -12,7 +12,7 @@ from gui.controllers.inbox_controller import InboxController
 from gui.views.person import search_view
 from gui.views.person import batch_search_view
 from gui.views.home_view import render_home_page
-from gui.views.documentation import support_doc_view, notif_doc_edit_view, support_doc_list_view, dbr_doc_list_view, dbr_doc_edit_view
+from gui.views.documentation import support_doc_view, notif_doc_list_view, notif_doc_edit_view, support_doc_list_view, dbr_doc_list_view, dbr_doc_edit_view
 from gui.views.report import subunits_report_view
 from gui.views.report import yearly_report_view
 from gui.views.report import dups_report_view
@@ -24,7 +24,7 @@ from gui.views.task import task_list_view, task_edit_view
 from gui.views.calendar import calendar_view
 from gui.views.admin.admin_permissions_view import render_permissions_page
 from gui.views.admin.admin_users_view import render_users_page
-
+from gui.views import in_progress_view
 from gui.auth_routes import create_login_page, require_access
 from gui.views.documentation.file_search_view import render_file_search_page
 from pathlib import Path
@@ -43,7 +43,7 @@ def init_nicegui(workflow_obj):
 
     app.add_static_files('/static', str(static_dir))
     app.add_static_files('/templates', str(templates_form))
-    support_templates_dir = current_dir / '../resources/templates/support-form'
+    support_templates_dir = current_dir / '../resources/templates'
     doc_templator = DocTemplator(support_templates_dir)
     auth_manager = AuthManager(workflow_obj.db)
     create_login_page(auth_manager, workflow_obj.log_manager)
@@ -54,6 +54,7 @@ def init_nicegui(workflow_obj):
     task_ctrl = TaskController(workflow_obj, auth_manager)
     dbr_ctrl = DbrController(workflow_obj, auth_manager)
     inbox_ctrl = InboxController(workflow_obj, auth_manager)
+    notif_ctrl = NotifController(doc_templator, workflow_obj, auth_manager)
 
     app_menu = AppMenu(auth_manager, task_ctrl, inbox_ctrl)
 
@@ -134,7 +135,7 @@ def init_nicegui(workflow_obj):
 
     @ui.page('/doc_support')
     @require_access(auth_manager, 'doc_support', 'read')
-    def support_doc():
+    def support_doc_list():
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
         support_doc_list_view.render_drafts_list_page(support_ctrl, ctx)
@@ -142,17 +143,25 @@ def init_nicegui(workflow_obj):
     @ui.page('/doc_support/create')
     @ui.page('/doc_support/edit/{draft_id}')
     @require_access(auth_manager, 'doc_support', 'read')
-    def support_doc(draft_id: int = None):
+    def support_doc_edit(draft_id: int = None):
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
         support_doc_view.render_document_page(support_ctrl, person_ctrl, file_manager, ctx, draft_id)
 
     @ui.page('/doc_notif')
     @require_access(auth_manager, 'doc_notif', 'read')
-    def notif_doc():
+    def notif_doc_list():
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
-        notif_doc_view.notif_view_doc()
+        notif_doc_list_view.render_notif_drafts_list_page(notif_ctrl, ctx)
+
+    @ui.page('/doc_notif/create')
+    @ui.page('/doc_notif/edit/{draft_id}')
+    @require_access(auth_manager, 'doc_notif', 'read')
+    def notif_doc_edit(draft_id: int = None):
+        ctx = auth_manager.get_current_context()
+        app_menu.render(ctx)
+        notif_doc_edit_view.render_notif_page(notif_ctrl, person_ctrl, ctx, draft_id)
 
 
     @ui.page('/tasks')
@@ -203,7 +212,7 @@ def init_nicegui(workflow_obj):
     def settings_doc():
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
-        notif_doc_view.notif_view_doc()  # Поки що показуємо заглушку "В розробці"
+        in_progress_view.render_in_progress()
 
     @ui.page('/logs')
     @require_access(auth_manager, 'admin_panel', 'read')

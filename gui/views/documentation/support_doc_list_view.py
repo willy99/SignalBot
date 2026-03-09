@@ -73,16 +73,24 @@ def render_drafts_list_page(controller, ctx: RequestContext):
             draft_id = e.args
             ui.navigate.to(f'/doc_support/edit/{draft_id}')
 
-        def on_delete(e):
+        async def on_delete(e):
             draft_id = e.args
-            # Видаляємо з бази даних
-            controller.delete_draft(ctx, draft_id)
 
-            # Оновлюємо таблицю (залишаємо всі рядки, крім видаленого)
-            table.rows = [row for row in table.rows if row['id'] != draft_id]
-            table.update()
+            dialog = ui.dialog()
+            with dialog, ui.card().classes('p-6 min-w-[300px]'):
+                ui.label('Увага!').classes('text-xl font-bold text-red-600 mb-2')
+                ui.label(f'Ви дійсно хочете видалити пакет №{draft_id}?').classes('text-gray-600 mb-6')
 
-            ui.notify(f'Пакет супроводів №{draft_id} видалено', type='negative')
+                with ui.row().classes('w-full justify-end gap-2'):
+                    ui.button('Скасувати', on_click=lambda: dialog.submit(False)).props('flat color="gray"')
+                    ui.button('Видалити', on_click=lambda: dialog.submit(True)).props('color="red"')
+
+            result = await dialog
+            if result:
+                controller.delete_draft(ctx, draft_id)
+                table.rows = [row for row in table.rows if row['id'] != draft_id]
+                table.update()
+                ui.notify(f'Пакет супроводів №{draft_id} видалено', type='negative')
 
         # Прив'язуємо події з Vue/Quasar до наших Python функцій
         table.on('edit', on_edit)

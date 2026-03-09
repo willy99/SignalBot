@@ -59,6 +59,7 @@ UI_DATE_FORMAT : Final = "DD.MM.YYYY"
 EXCEL_DATE_FORMATS_REPORT = ["%m/%d/%y", "%d.%m.%Y", "%-m/%-d/%y", "%#m/%#d/%y", "%Y-%m-%d"]
 EXCEL_CHUNK_SIZE = 2000 # reading data by chunks for stability
 
+EXCEL_LIGHT_GRAY_COLOR: Final[str] = 'EEEEEE'
 EXCEL_BLUE_COLOR: Final[str] = 'bdd7ee'
 EXCEL_SUPPORT_COLOR: Final[str] = 'e8fffe'
 

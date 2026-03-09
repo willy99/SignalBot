@@ -12,8 +12,8 @@ from dics.deserter_xls_dic import COLUMN_INCREMEMTAL
 from gui.services.auth_manager import AuthManager
 
 class SupportController:
-    def __init__(self, doc_processor: DocTemplator, worklow: MyWorkFlow, auth_manager: AuthManager):
-        self.doc_processor = doc_processor
+    def __init__(self, doc_templator: DocTemplator, worklow: MyWorkFlow, auth_manager: AuthManager):
+        self.doc_templator = doc_templator
         self.workflow = worklow
         self.db = worklow.db
         self.excel_processor = worklow.excelProcessor
@@ -29,11 +29,11 @@ class SupportController:
             raise ValueError("Будь ласка, введіть загальний номер супроводу.")
 
         # Викликаємо процесор для генерації
-        return self.doc_processor.generate_support_batch(city, supp_number, supp_date, buffer_data)
+        return self.doc_templator.generate_support_batch(city, supp_number, supp_date, buffer_data)
 
     def generate_logs(self, ctx: RequestContext, city: str, supp_number: str, supp_date: str, buffer_data: list) -> str:
         self.logger.debug('UI:' + ctx.user_name + ': Генеруємо супровід: ' + str(city) + ', number:' + supp_number + ':' + str(buffer_data))
-        log_text = self.doc_processor.generate_support_logs(city, supp_number, supp_date, buffer_data)
+        log_text = self.doc_templator.generate_support_logs(city, supp_number, supp_date, buffer_data)
         print(str(log_text))
         return log_text
 

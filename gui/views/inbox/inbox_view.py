@@ -226,7 +226,7 @@ def render_inbox_page(inbox_ctrl, task_ctrl, auth_manager, ctx: RequestContext):
         if await dialog:
             try:
                 for fname in list(selected_set):
-                    await run.io_bound(inbox_ctrl.delete_personal_file, ctx, fname)
+                    await run.io_bound(inbox_ctrl.delete_file, ctx, fname)
                 ui.notify(f'{len(selected_set)} файлів успішно видалено', type='positive')
                 await load_data()
             except Exception as e:
@@ -279,7 +279,7 @@ def render_inbox_page(inbox_ctrl, task_ctrl, auth_manager, ctx: RequestContext):
                 ui.button('Так', on_click=lambda: dialog.submit(True)).props('color="red"')
 
         if await dialog:
-            await run.io_bound(inbox_ctrl.delete_personal_file, ctx, filename)
+            await run.io_bound(inbox_ctrl.delete_file, ctx, filename)
             await load_data()
 
     ui.timer(0.1, load_data, once=True)

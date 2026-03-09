@@ -1,5 +1,9 @@
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Optional, Union, Final
+
+# options for topic search
+YES: Final[str] = 'Yes'
+NO: Final[str] = 'No'
 
 @dataclass
 class PersonSearchFilter:
@@ -16,3 +20,9 @@ class PersonSearchFilter:
 
     # Дата внесення (Рік)
     ins_year: Optional[Union[str, list]] = None
+
+    # for dbr, support topic search
+    empty_kpp:[str] = None #Yes/No
+    review_statuses: Optional[list] = None
+
+    desertion_region:[str] = None

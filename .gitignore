@@ -4,6 +4,7 @@ logs/
 bot_data.db
 
 .env
+.venv
 __pycache__/
 .DS_Store
 /service/ml/output_model/

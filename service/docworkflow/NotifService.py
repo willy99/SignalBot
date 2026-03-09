@@ -3,6 +3,7 @@ from service.constants import DB_TABLE_NOTIF_DOC
 from service.constants import DOC_STATUS_COMPLETED, DOC_STATUS_DRAFT
 from typing import List, Dict, Any, Optional
 
+
 class NotifService:
     def __init__(self, db, ctx):
         self.db = db
@@ -84,5 +85,5 @@ class NotifService:
         return self.db.update_record(DB_TABLE_NOTIF_DOC, dbr_doc_id, {'status': DOC_STATUS_COMPLETED, 'out_number': out_number, 'out_date': out_date})
 
 
-    def delete_dbr_doc(self, dbr_doc_id: int):
-        self.db.delete_record(DB_TABLE_NOTIF_DOC, dbr_doc_id)
+    def delete_doc(self, doc_id: int):
+        self.db.delete_record(DB_TABLE_NOTIF_DOC, doc_id)
