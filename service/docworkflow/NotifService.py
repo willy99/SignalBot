@@ -39,7 +39,7 @@ class NotifService:
         return drafts
 
 
-    def save_doc(self, out_number: str, out_date: str, payload: list, doc_id: int = None) -> int:
+    def save_doc(self, region: str, out_number: str, out_date: str, payload: list, doc_id: int = None) -> int:
         """Зберігає або оновлює чернетку."""
         payload_json = json.dumps(payload, ensure_ascii=False)
 

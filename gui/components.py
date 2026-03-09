@@ -73,7 +73,7 @@ class AppMenu:
                             else:
                                 badge_root.set_visibility(False)
 
-                            inbox_btn.set_visibility(p_count > 0 or r_count > 0)
+                            inbox_btn.set_visibility(True) # p_count > 0 or r_count > 0)
                         except Exception as e:
                             print(f"Помилка оновлення Inbox для {ctx.user_login}: {e}")
 

@@ -22,16 +22,13 @@ EXCEL_DIR: Final[str] = 'exchange\\projekt407'
 DOC_DIR : Final[str] = "exchange\\ДД"
 BACKUP_DIR: Final[str] = 'exchange\\projekt407\\backups'
 
-DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_copy_pasha.xlsx"
-#DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_1.xlsx"
+#DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_copy_pasha.xlsx"
+DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_1.xlsx"
 # DESERTER_XLSX: Final = "Тестовий Майданчик - не чипати.xlsx"
 
 DESERTER_TAB_NAME : Final = "А0224"
 DESERTER_RESERVE_TAB_NAME : Final = "А7018"
 
-# DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025.xlsx"
-
-#DESERTER_XLSX_FILE_PATH:Final = f"\\\\{NET_SERVER_IP}\\{EXCEL_DIR}\\{DESERTER_XLSX}" # if using openpyxl (deprecated)
 DESERTER_XLSX_FILE_PATH:Final = f"/Volumes/exchange/projekt407/{DESERTER_XLSX}" # if using xlwings, actual one
 ROOT_STORAGE_PATH: Final = f"\\\\{NET_SERVER_IP}"
 DOCUMENT_STORAGE_PATH: Final = f"\\\\{NET_SERVER_IP}\\{DOC_DIR}"

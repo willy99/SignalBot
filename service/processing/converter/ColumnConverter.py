@@ -2,15 +2,15 @@ import xlwings as xw
 import traceback
 from dics.deserter_xls_dic import *
 from service.processing.processors.DocProcessor import DocProcessor
+from service.storage.LoggerManager import LoggerManager
 from utils.utils import format_ukr_date
 from datetime import datetime, timedelta
 
 class ColumnConverter:
-    def __init__(self, excel_file_path, workflow):
+    def __init__(self, excel_file_path, log_manager: LoggerManager):
         self.file_path = excel_file_path
-        self.workflow = workflow
         # Ініціалізуємо DocProcessor (без прив'язки до файлу, просто як двигун)
-        self.docProcessor = DocProcessor(workflow, None, None)
+        self.docProcessor = DocProcessor(log_manager, None, None)
         self.app = None
         self.wb = None
 

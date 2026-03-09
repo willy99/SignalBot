@@ -23,10 +23,10 @@ class NotifController:
         dservice = NotifService(self.db, ctx)
         return dservice.get_all_docs()
 
-    def save_doc(self, ctx: RequestContext, out_number: str, out_date: str, payload: list,
+    def save_doc(self, ctx: RequestContext, region, out_number: str, out_date: str, payload: list,
                    doc_id: int = None) -> int:
         service = NotifService(self.db, ctx)
-        return service.save_doc(out_number, out_date, payload, doc_id)
+        return service.save_doc(region, out_number, out_date, payload, doc_id)
 
     def delete_doc(self, ctx: RequestContext, doc_id: int):
         self.logger.debug('UI:' + ctx.user_name + ': Видаляємо пакет супроводів: ' + str(doc_id))

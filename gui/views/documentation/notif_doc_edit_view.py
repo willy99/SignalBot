@@ -1,22 +1,23 @@
 from nicegui import ui, run
-
+from gui.tools.validation import fix_date
 from gui.controllers.notif_controller import NotifController
 from gui.services.request_context import RequestContext
 from gui.controllers.person_controller import PersonController
 from domain.person_filter import PersonSearchFilter, YES
 from config import UI_DATE_FORMAT, EXCEL_DATE_FORMAT
 from datetime import datetime, timedelta
-from dics.deserter_xls_dic import COLUMN_TITLE_2, PATTERN_DOC_NUM, COLUMN_INSERT_DATE, REVIEW_STATUS_MAP, \
+from dics.deserter_xls_dic import COLUMN_TITLE_2, VALID_PATTERN_DOC_NUM, COLUMN_INSERT_DATE, REVIEW_STATUS_MAP, \
     REVIEW_STATUS_NON_ERDR, COLUMN_REVIEW_STATUS, COLUMN_DESERTION_DATE, COLUMN_NAME, COLUMN_DESERTION_REGION
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
-from utils.utils import is_valid_doc_number, format_to_excel_date
+from utils.utils import format_to_excel_date
+from gui.tools.validation import is_valid_doc_number
 import re
 
 
 def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController,
                       ctx: RequestContext, notif_doc_id: int = None):
 
-    with ui.row().classes('w-full max-w-7xl mx-auto items-center justify-between mb-6'):
+    with ui.row().classes('w-full px-4 items-center justify-between mb-6'):
         # Заголовок ліворуч (прибрали w-full та text-center)
         ui.label('Масове повідомлення на КПП').classes('text-3xl font-bold')
 
@@ -53,7 +54,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
         'selected_candidates': set()  # Множина id_number вибраних людей
     }
 
-    with ui.grid(columns=12).classes('w-full gap-6 items-start max-w-7xl mx-auto'):
+    with ui.grid(columns=12).classes('w-full px-4 gap-6 items-start'):
 
         # ==========================================
         # ЛІВА ЧАСТИНА: ФІЛЬТРИ ТА СПИСОК КАНДИДАТІВ
@@ -70,7 +71,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                     status_badge = ui.badge(status_text, color=badge_color).classes('text-sm px-2 py-1')
 
                 out_number_input = ui.input('Вихідний номер на КПП', placeholder='Наприклад: 642/123', validation={
-                    'Формат має бути 642/ХХХХ': lambda v: bool(re.match(PATTERN_DOC_NUM, v.strip())) if v else True
+                    'Формат має бути 642/ХХХХ': lambda v: bool(re.match(VALID_PATTERN_DOC_NUM, v.strip())) if v else True
                 }).bind_value(state, 'out_number').classes('flex-1').props('hide-bottom-space')
 
                 out_date_input = date_input(
@@ -109,6 +110,10 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
 
             # --- Логіка пошуку ---
             async def perform_search():
+                des_region_val = state.get('filter_des_region')
+                if not des_region_val:
+                    ui.notify('❌ Обов\'язково оберіть регіон СЗЧ перед пошуком!', type='warning')
+                    return
                 search_btn.disable()
                 search_results_container.clear()
                 state['search_results'].clear()
@@ -156,24 +161,23 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                     with search_results_container:
                         # Заголовок таблиці
                         with ui.row().classes(
-                                'w-full items-center justify-between border-b border-gray-300 pb-2 mb-2 font-bold text-sm text-gray-600'):
-                            with ui.row().classes('items-center gap-2 w-3/4'):
-                                def toggle_all(e):
-                                    state['selected_candidates'].clear()
-                                    if e.value:
-                                        for p in state['search_results']:
-                                            id_num = f"{p.rnokpp}_{p.name}_{p.desertion_date}"
-                                            state['selected_candidates'].add(id_num)
-                                    # Оновлюємо UI чекбоксів (це тригерне їх on_change автоматично)
-                                    for cb in candidate_checkboxes.values():
-                                        cb.value = e.value
-                                    update_selection_ui()
+                                'w-full items-center border-b border-gray-300 pb-2 mb-2 font-bold text-sm text-gray-600 flex-nowrap gap-2'):
 
-                                ui.checkbox(on_change=toggle_all)
-                                ui.label(COLUMN_NAME).classes('w-1/2')
-                                ui.label(COLUMN_TITLE_2).classes('w-1/4')
-                                ui.label(COLUMN_DESERTION_DATE).classes('w-1/4')
-                                ui.label(COLUMN_REVIEW_STATUS).classes('w-1/4')
+                            def toggle_all(e):
+                                state['selected_candidates'].clear()
+                                if e.value:
+                                    for p in state['search_results']:
+                                        id_num = f"{p.rnokpp}_{p.name}_{p.desertion_date}"
+                                        state['selected_candidates'].add(id_num)
+                                for cb in candidate_checkboxes.values():
+                                    cb.value = e.value
+                                update_selection_ui()
+
+                            ui.checkbox(on_change=toggle_all)
+                            ui.label(COLUMN_NAME).classes('flex-1')  # Займає весь вільний простір
+                            ui.label(COLUMN_TITLE_2).classes('w-32 shrink-0')  # Фіксована ширина
+                            ui.label(COLUMN_DESERTION_DATE).classes('w-24 shrink-0 text-center')
+                            ui.label(COLUMN_REVIEW_STATUS).classes('w-24 shrink-0 text-center')
 
                         # Список знайдених
                         candidate_checkboxes = {}
@@ -190,7 +194,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                             # Перевіряємо, чи ця людина вже є в буфері праворуч
                             is_in_buffer = any(doc['id_number'] == id_num for doc in state['buffer'])
 
-                            row_class = 'w-full items-center justify-between py-1 border-b border-gray-100 hover:bg-gray-100'
+                            row_class = 'w-full items-center py-1 border-b border-gray-100 hover:bg-gray-100 flex-nowrap gap-2'
                             if is_in_buffer:
                                 row_class += ' opacity-50 bg-gray-50'
 
@@ -202,14 +206,15 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                                         cb.tooltip('Вже додано до чернетки праворуч')
                                     candidate_checkboxes[id_num] = cb
 
-                                    with ui.column().classes('gap-0 w-1/2'):
-                                        ui.label(p.name).classes('font-bold text-sm')
-                                        ui.label(str(p.rnokpp)).classes('text-xs text-gray-500')
+                                    with ui.column().classes('gap-0 flex-1 overflow-hidden'):
+                                        ui.label(p.name).classes('font-bold text-sm truncate w-full')
+                                        ui.label(str(p.rnokpp)).classes('text-xs text-gray-500 truncate w-full')
 
-                                    ui.label(getattr(p, 'title', '')).classes('w-1/4 text-sm')
+                                    ui.label(getattr(p, 'title', '')).classes('w-32 shrink-0 text-sm truncate')
                                     ui.label(format_to_excel_date(p.desertion_date)).classes(
-                                        'w-1/4 text-sm text-red-600')
-                                    ui.label(getattr(p, 'review_status', '')).classes('w-1/4 text-sm')
+                                        'w-24 shrink-0 text-sm text-red-600 text-center')
+                                    ui.label(getattr(p, 'review_status', '')).classes(
+                                        'w-24 shrink-0 text-sm text-center truncate')
 
                     ui.notify(f'Знайдено {len(results)} кандидатів', type='info')
 
@@ -242,6 +247,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                         if not any(doc['id_number'] == id_num for doc in buffer_data):
                             raw_data = {
                                 'id_number': id_num,
+                                'seq_num': 0,
                                 'rnokpp': p.rnokpp,
                                 'name': p.name,
                                 'title': getattr(p, 'title', ''),
@@ -292,6 +298,8 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
 
             def refresh_buffer_ui():
                 buffer_data = state['buffer']
+                for index, doc in enumerate(buffer_data):
+                    doc['seq_num'] = index + 1
 
                 # 1. БЕЗПЕЧНА ЗОНА: Оновлюємо стан комбобокса ДО очищення контейнера
                 if buffer_data:
@@ -313,7 +321,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                             with ui.row().classes(
                                     'w-full justify-between items-center bg-white p-2 border rounded shadow-sm hover:bg-gray-100 transition-colors'):
                                 with ui.column().classes('gap-0 w-3/4'):
-                                    ui.label(f"{i + 1}. {p['name']}").classes('font-bold text-sm truncate w-full')
+                                    ui.label(f"{p['seq_num']}. {p['name']}").classes('font-bold text-sm truncate w-full')
                                     info_str = f"РНОКПП: {p.get('rnokpp', '—')} | СЗЧ: {p.get('desertion_date', '—')}"
                                     ui.label(info_str).classes('text-xs text-gray-500')
 
@@ -336,6 +344,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                     notif_doc_id = await run.io_bound(
                         notif_ctrl.save_doc,
                         ctx,
+                        state.get('filter_des_region', ''),
                         state['out_number'],
                         state['out_date'],
                         state['buffer'],
@@ -440,6 +449,13 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                         state['out_date'] = draft.get('out_date', '')
                         state['buffer'] = draft.get('payload', [])
                         state['status'] = draft.get('status', DOC_STATUS_DRAFT)
+                        saved_region = draft.get('region', '')
+                        if saved_region:
+                            state['filter_des_region'] = saved_region
+                        elif state['buffer']:
+                            # Фолбек для старих драфтів: беремо з першої людини
+                            state['filter_des_region'] = state['buffer'][0].get('desertion_region', '')
+
                         if state['buffer']:
                             first_person_region = state['buffer'][0].get('desertion_region', '')
                             state['filter_des_region'] = first_person_region
@@ -464,11 +480,3 @@ def date_input(label: str, state, field: str, blur_handler=None):
         with ui.menu():
             ui.date().bind_value(state, field).props(f'mask="{UI_DATE_FORMAT}"')
     return inp
-
-
-def fix_date(e):
-    val = e.sender.value
-    if not val: return
-    parts = val.split('.')
-    if len(parts) == 2:
-        e.sender.value = f"{val}.{datetime.now().year}"

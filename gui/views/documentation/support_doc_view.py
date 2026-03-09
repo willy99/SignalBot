@@ -1,10 +1,11 @@
 from nicegui import ui, run
 
-from dics.deserter_xls_dic import PATTERN_DOC_NUM
+from dics.deserter_xls_dic import VALID_PATTERN_DOC_NUM
 from gui.services.request_context import RequestContext
-from utils.utils import to_genitive_case, to_genitive_title, is_valid_doc_number
+from utils.utils import to_genitive_case, to_genitive_title
+from gui.tools.validation import is_valid_doc_number
 from config import UI_DATE_FORMAT, OUTBOX_DIR_PATH
-from datetime import datetime
+from gui.tools.validation import fix_date
 from service.storage.FileCacher import FileCacheManager
 import io
 from gui.controllers.person_controller import PersonController
@@ -43,7 +44,7 @@ def render_document_page(controller: SupportController, person_controller: Perso
                     status_badge = ui.badge(status_text, color=badge_color).classes('text-sm px-2 py-1')
                 city = ui.radio(['Миколаїв', 'Дніпро', 'Донецьк'], value='Миколаїв').props('inline')
                 supp_number_input = ui.input('Загальний номер супроводу', placeholder='Наприклад: 642/123', validation={
-                   'Формат має бути 642/ХХХХ (до 4 цифр)': lambda v: bool(re.match(PATTERN_DOC_NUM, v.strip())) if v else True
+                   'Формат має бути 642/ХХХХ (до 4 цифр)': lambda v: bool(re.match(VALID_PATTERN_DOC_NUM, v.strip())) if v else True
                 }).classes('flex-1').props('hide-bottom-space')
                 supp_date_input = date_input('Дата формування', state, 'support_date', blur_handler=fix_date).classes(
                     'flex-1')
@@ -236,7 +237,6 @@ def render_document_page(controller: SupportController, person_controller: Perso
                     ui.notify(f'Помилка! Загальна ({total_val}) != Сумі ({calculated_sum})', type='negative')
                     return
                 if edit_idx is not None:
-                    # Якщо це редагування, зберігаємо старий номер
                     assigned_seq_num = buffer_data[edit_idx].get('seq_num', edit_idx + 1)
                 else:
                     # Якщо нова особа - беремо з лічильника і одразу збільшуємо його для наступного
@@ -556,13 +556,3 @@ def date_input(label: str, state, field: str, blur_handler=None):
             ui.date().bind_value(state, field).props(f'mask="{UI_DATE_FORMAT}"')
 
     return inp
-
-
-def fix_date(e):
-    val = e.sender.value
-    if not val:
-        return
-    parts = val.split('.')
-    if len(parts) == 2:
-        current_year = datetime.now().year
-        e.sender.value = f"{val}.{current_year}"

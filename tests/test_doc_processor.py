@@ -6,18 +6,6 @@ from service.processing.parsers.MLParser import MLParser
 import config
 from service.storage.LoggerManager import LoggerManager
 
-class MockWorkflow:
-    """Заглушка для workflow, щоб збирати статистику без бота"""
-
-    def __init__(self):
-        self.log_manager = LoggerManager()
-        self.stats = type('Stats', (), {
-            'attachmentWordProcessed': 0,
-            'attachmentPDFProcessed': 0,
-            'doc_names': []
-        })
-
-
 @pytest.fixture
 def processor_factory():
     """Фабрика для створення процесора з різними файлами"""
@@ -25,8 +13,7 @@ def processor_factory():
     def _create_processor(file_name):
         # Шлях до тестових файлів у папці tests/data
         base_path = Path(__file__).parent / "data" / file_name
-        workflow = MockWorkflow()
-        return DocProcessor(workflow, str(base_path), file_name)
+        return DocProcessor(LoggerManager(), str(base_path), file_name)
 
     return _create_processor
 

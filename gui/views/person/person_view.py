@@ -3,28 +3,15 @@ from dics.deserter_xls_dic import *
 from domain.person import Person
 import asyncio
 from config import UI_DATE_FORMAT, EXCEL_BLUE_COLOR
-from datetime import datetime
 from gui.services.request_context import RequestContext
-
-def fix_date(e):
-    val = e.sender.value
-    if not val:
-        return
-    parts = val.split('.')
-    # Якщо введено "ДД.ММ" (наприклад, 12.06)
-    if len(parts) == 2:
-        current_year = datetime.now().year
-        # Оновлюємо значення в полі
-        e.sender.value = f"{val}.{current_year}"
-
-
-# ==========================================
-# 🛠 UI ХЕЛПЕРИ (Компоненти)
-# ==========================================
+from gui.tools.validation import fix_date
+import re
 
 def date_input(label: str, person: Person, field: str, blur_handler=None):
     """Створює поле для вводу дати зі спливаючим календарем (іконкою)"""
-    inp = ui.input(label=label)
+    inp = ui.input(label=label, placeholder='dd.mm.YYYY', validation={
+                                'Формат має бути dd.mm.YYYY': lambda v: bool(re.match(VALID_PATTERN_DATE, str(v))) if v else True
+                            })
     inp.bind_value(person, field)
 
     if blur_handler:
@@ -37,10 +24,8 @@ def date_input(label: str, person: Person, field: str, blur_handler=None):
 
     return inp
 
-
 def search_select(options: list, label: str, person: Person, field: str):
     """Створює випадаючий список із можливістю пошуку"""
-    # dict.get(KEY, []) захищає від помилок, якщо ключа раптом немає в ui_options
     sel = ui.select(options=options, label=label, with_input=False)
     sel.bind_value(person, field).props('use-input fill-input hide-selected')
     return sel
@@ -53,109 +38,129 @@ def search_select(options: list, label: str, person: Person, field: str):
 def edit_person(person: Person, person_ctrl, ctx: RequestContext, on_close=None):
     ui_options = person_ctrl.get_column_options()
 
-    with ui.dialog() as dialog, ui.card().classes('w-[1000px] max-w-none p-0 gap-0'):
-        with ui.row().classes('w-full justify-between items-center bg-blue-600 text-white p-4 m-0 rounded-t-lg'):
-            ui.label(f"Картка: {person.name}").classes('text-xl font-bold')
+    with ui.dialog().props('maximized') as dialog, ui.card().classes(
+            'w-full h-full max-w-none p-0 gap-0 flex flex-col bg-gray-50'):
+        # ШАПКА (Фіксована)
+        with ui.row().classes(
+                'w-full justify-between items-center bg-blue-700 text-white p-4 m-0 shrink-0 shadow-md z-10'):
+            with ui.row().classes('items-center gap-3'):
+                ui.icon('person', size='md')
+                ui.label(f"Картка: {person.name}").classes('text-2xl font-bold')
             ui.button(icon='close', on_click=dialog.close).props('flat round text-white')
 
-        with ui.column().classes('w-full p-4'):
-            with ui.tabs().classes('w-full text-black') as tabs:
+        # ТІЛО З ТАБАМИ (Скролиться)
+        with ui.column().classes('w-full flex-grow overflow-hidden p-0 gap-0'):
+            with ui.tabs().classes('w-full text-black bg-white border-b border-gray-200 shrink-0') as tabs:
                 main_tab = ui.tab('Основна інформація', icon='contact_mail')
                 tzk_tab = ui.tab('ТЦК', icon='account_balance')
                 des_tab = ui.tab('СЗЧ та повернення', icon='directions_run')
                 bio_tab = ui.tab('Біографія', icon='history_edu')
                 erdr_tab = ui.tab('Стан розслідування', icon='gavel')
 
-            with ui.tab_panels(tabs, value=main_tab).classes('w-full'):
+            # Вміст табів (flex-grow та overflow-y-auto дозволяють скролити лише контент)
+            with ui.tab_panels(tabs, value=main_tab).classes('w-full flex-grow overflow-y-auto p-6 bg-transparent'):
                 # ПАНЕЛЬ 1: Основна інформація
                 with ui.tab_panel(main_tab):
-                    with ui.row().classes('w-full gap-4'):
-                        ui.input(COLUMN_NAME).bind_value(person, 'name').classes('flex-grow')
-                        ui.input(COLUMN_ID_NUMBER).bind_value(person, 'rnokpp').classes('w-40')
+                    with ui.card().classes('w-full max-w-5xl mx-auto p-6 shadow-sm border border-gray-200'):
+                        with ui.row().classes('w-full gap-6'):
+                            ui.input(COLUMN_NAME).bind_value(person, 'name').classes('flex-grow')
+                            ui.input(COLUMN_ID_NUMBER, placeholder='xxxxxxxxxx', validation={
+                                'Формат має бути xxxxxxxxxx': lambda v: bool(re.match(VALID_PATTERN_ID_NUMBER, str(v))) if v else True
+                            }).bind_value(person, 'rnokpp').classes('w-48')
 
-                    with ui.row().classes('w-full gap-4 mt-2'):
-                        search_select(ui_options.get(COLUMN_TITLE, []), COLUMN_TITLE, person, 'title').classes('flex-grow')
-                        search_select(ui_options.get(COLUMN_TITLE_2, []), COLUMN_TITLE_2, person, 'title2').classes(
-                            'flex-grow')
-                        search_select(ui_options.get(COLUMN_SUBUNIT, []), COLUMN_SUBUNIT, person, 'subunit').classes('w-40')
-                        search_select(ui_options.get(COLUMN_SUBUNIT2, []), COLUMN_SUBUNIT2, person, 'subunit2').classes(
-                            'w-40')
+                        with ui.row().classes('w-full gap-6 mt-4'):
+                            search_select(ui_options.get(COLUMN_TITLE, []), COLUMN_TITLE, person, 'title').classes('flex-grow')
+                            search_select(ui_options.get(COLUMN_TITLE_2, []), COLUMN_TITLE_2, person, 'title2').classes('flex-grow')
+                            search_select(ui_options.get(COLUMN_SUBUNIT, []), COLUMN_SUBUNIT, person,'subunit').classes('w-48')
+                            search_select(ui_options.get(COLUMN_SUBUNIT2, []), COLUMN_SUBUNIT2, person,'subunit2').classes('w-48')
 
-                    with ui.row().classes('w-full gap-4 mt-2'):
-                        ui.input(COLUMN_ADDRESS).bind_value(person, 'address').classes('flex-grow')
-                        ui.input(COLUMN_PHONE).bind_value(person, 'phone').classes('w-40')
+                        with ui.row().classes('w-full gap-6 mt-4'):
+                            ui.input(COLUMN_ADDRESS).bind_value(person, 'address').classes('flex-grow')
+                            ui.input(COLUMN_PHONE, placeholder='0xxxxxxxxx', validation={
+                                'Формат має бути 0xxxxxxxxx': lambda v: bool(re.match(VALID_PATTERN_PHONE, v.strip())) if v else True
+                            }).bind_value(person, 'phone').classes('w-48')
 
-                    with ui.row().classes('w-full mt-2'):
-                        date_input(COLUMN_BIRTHDAY, person, 'birthday', blur_handler=fix_date).classes('w-1/3')
+                        with ui.row().classes('w-full mt-4'):date_input(COLUMN_BIRTHDAY, person, 'birthday', blur_handler=fix_date).classes('w-1/3')
 
                 # ПАНЕЛЬ 2: ТЦК
                 with ui.tab_panel(tzk_tab):
-                    with ui.row().classes('w-full gap-4'):
-                        ui.input(COLUMN_TZK).bind_value(person, 'tzk').classes('flex-grow')
-                        date_input(COLUMN_ENLISTMENT_DATE, person, 'enlistment_date', blur_handler=fix_date).classes('w-1/3')
+                    with ui.card().classes('w-full max-w-5xl mx-auto p-6 shadow-sm border border-gray-200'):
+                        with ui.row().classes('w-full gap-6'):
+                            ui.input(COLUMN_TZK).bind_value(person, 'tzk').classes('flex-grow')
+                            date_input(COLUMN_ENLISTMENT_DATE, person, 'enlistment_date',blur_handler=fix_date).classes('w-1/3')
 
-                    with ui.row().classes('w-full gap-4 mt-2'):
-                        search_select(ui_options.get(COLUMN_TZK_REGION, []), COLUMN_TZK_REGION, person,
-                                      'tzk_region').classes('w-1/3')
+                        with ui.row().classes('w-full gap-6 mt-4'):
+                            search_select(ui_options.get(COLUMN_TZK_REGION, []), COLUMN_TZK_REGION, person,'tzk_region').classes('w-1/3')
 
                 # ПАНЕЛЬ 3: СЗЧ
                 with ui.tab_panel(des_tab):
-                    with ui.row().classes('w-full gap-4'):
-                        search_select(ui_options.get(COLUMN_DESERTION_PLACE, []), COLUMN_DESERTION_PLACE, person,
-                                      'desertion_place').classes('w-40')
-                        search_select(ui_options.get(COLUMN_DESERTION_TYPE, []), COLUMN_DESERTION_TYPE, person,
-                                      'desertion_type').classes('w-40')
-                        search_select(ui_options.get(COLUMN_DESERTION_REGION, []), COLUMN_DESERTION_REGION, person,
-                                      'desertion_region').classes('flex-grow')
+                    with ui.card().classes('w-full max-w-5xl mx-auto p-6 shadow-sm border border-gray-200'):
+                        with ui.row().classes('w-full gap-6'):
+                            search_select(ui_options.get(COLUMN_DESERTION_PLACE, []), COLUMN_DESERTION_PLACE, person,'desertion_place').classes('w-48')
+                            search_select(ui_options.get(COLUMN_DESERTION_TYPE, []), COLUMN_DESERTION_TYPE, person,'desertion_type').classes('w-48')
+                            search_select(ui_options.get(COLUMN_DESERTION_REGION, []), COLUMN_DESERTION_REGION, person,'desertion_region').classes('flex-grow')
 
-                    with ui.row().classes('w-full gap-4 mt-2'):
-                        date_input(COLUMN_DESERTION_DATE, person, 'desertion_date').classes('w-1/3')
+                        with ui.row().classes('w-full gap-6 mt-4'):
+                            date_input(COLUMN_DESERTION_DATE, person, 'desertion_date', blur_handler=fix_date).classes('w-1/3')
 
-                    with ui.row().classes('w-full mt-2'):
-                        ui.input(COLUMN_EXECUTOR).bind_value(person, 'executor').classes('flex-grow')
+                        with ui.row().classes('w-full mt-4'):
+                            ui.input(COLUMN_EXECUTOR).bind_value(person, 'executor').classes('flex-grow')
 
-                    with ui.row().classes('w-full gap-4 mt-2'):
-                        date_input(COLUMN_RETURN_DATE, person, 'return_date').classes('w-1/3')
-                        date_input(COLUMN_RETURN_TO_RESERVE_DATE, person, 'return_reserve_date', blur_handler=fix_date).classes('w-1/3')
+                        with ui.row().classes('w-full gap-6 mt-4'):
+                            date_input(COLUMN_RETURN_DATE, person, 'return_date', blur_handler=fix_date).classes('w-1/3')
+                            date_input(COLUMN_RETURN_TO_RESERVE_DATE, person, 'return_reserve_date',blur_handler=fix_date).classes('w-1/3')
 
-                    with ui.row().classes('w-full mt-2'):
-                        ui.textarea(COLUMN_DESERT_CONDITIONS).bind_value(person, 'desertion_conditions').classes('w-full')
+                        with ui.row().classes('w-full mt-4'):
+                            ui.textarea(COLUMN_DESERT_CONDITIONS).bind_value(person, 'desertion_conditions').classes('w-full')
 
                 # ПАНЕЛЬ 4: Біографія
                 with ui.tab_panel(bio_tab):
-                    ui.textarea(COLUMN_BIO).bind_value(person, 'bio').classes('w-full')
+                    with ui.card().classes('w-full max-w-5xl mx-auto p-6 shadow-sm border border-gray-200'):
+                        ui.textarea(COLUMN_BIO).bind_value(person, 'bio').classes('w-full min-h-[300px]')
 
-                # ПАНЕЛЬ 5: ЕРДР, КПП
+                # ПАНЕЛЬ 5: ЕРДР, КПП (ОНОВЛЕНО З ДВОМА КОЛОНКАМИ)
                 with ui.tab_panel(erdr_tab):
-                    with ui.row().classes('w-full gap-4 mt-2'):
-                        search_select(ui_options.get(COLUMN_REVIEW_STATUS, []), COLUMN_REVIEW_STATUS, person,
-                                      'review_status').classes('flex-grow')
-                        ui.input(COLUMN_CC_ARTICLE).bind_value(person, 'cc_article').classes('w-40')
+                    with ui.grid(columns=12).classes('w-full max-w-6xl mx-auto gap-8'):
+                        # Ліва колонка (Накази та статуси)
+                        with ui.card().classes('col-span-12 md:col-span-7 p-6 shadow-sm border border-gray-200 gap-0'):
+                            ui.label('Документальне оформлення').classes('text-xl font-bold text-gray-800 mb-4 border-b pb-2 w-full')
 
-                    with ui.row().classes('w-full gap-4 mt-2'):
-                        ui.input(COLUMN_ORDER_ASSIGNMENT_NUMBER).bind_value(person, 'o_ass_num').classes('w-1/3')
-                        date_input(COLUMN_ORDER_ASSIGNMENT_DATE, person, 'o_ass_date', blur_handler=fix_date).classes('w-1/3')
+                            with ui.row().classes('w-full gap-4'):
+                                search_select(ui_options.get(COLUMN_REVIEW_STATUS, []), COLUMN_REVIEW_STATUS, person,'review_status').classes('flex-grow')
+                                ui.input(COLUMN_CC_ARTICLE).bind_value(person, 'cc_article').classes('w-1/3')
 
-                    with ui.row().classes('w-full gap-4 mt-2'):
-                        ui.input(COLUMN_ORDER_RESULT_NUMBER).bind_value(person, 'o_res_num').classes('w-1/3')
-                        date_input(COLUMN_ORDER_RESULT_DATE, person, 'o_res_date', blur_handler=fix_date).classes('w-1/3')
+                            with ui.row().classes('w-full gap-4 mt-4'):
+                                ui.input(COLUMN_ORDER_ASSIGNMENT_NUMBER).bind_value(person, 'o_ass_num').classes('flex-grow')
+                                date_input(COLUMN_ORDER_ASSIGNMENT_DATE, person, 'o_ass_date',blur_handler=fix_date).classes('w-1/3')
 
-                    with ui.row().classes('w-full gap-4 mt-2'):
-                        ui.input(COLUMN_KPP_NUMBER).bind_value(person, 'kpp_num').classes('w-1/3')
-                        date_input(COLUMN_KPP_DATE, person, 'kpp_date', blur_handler=fix_date).classes('w-1/3')
+                            with ui.row().classes('w-full gap-4 mt-4'):
+                                ui.input(COLUMN_ORDER_RESULT_NUMBER).bind_value(person, 'o_res_num').classes('flex-grow')
+                                date_input(COLUMN_ORDER_RESULT_DATE, person, 'o_res_date',blur_handler=fix_date).classes('w-1/3')
 
-                    with ui.row().classes('w-full gap-4 mt-2'):
-                        ui.input(COLUMN_DBR_NUMBER).bind_value(person, 'dbr_num').classes('w-1/3')
-                        date_input(COLUMN_DBR_DATE, person, 'dbr_date', blur_handler=fix_date).classes('w-1/3')
+                            with ui.row().classes('w-full gap-4 mt-4'):
+                                ui.input(COLUMN_KPP_NUMBER).bind_value(person, 'kpp_num').classes('flex-grow')
+                                date_input(COLUMN_KPP_DATE, person, 'kpp_date', blur_handler=fix_date).classes('w-1/3')
 
+                            with ui.row().classes('w-full gap-4 mt-4'):
+                                ui.input(COLUMN_DBR_NUMBER).bind_value(person, 'dbr_num').classes('flex-grow')
+                                date_input(COLUMN_DBR_DATE, person, 'dbr_date', blur_handler=fix_date).classes('w-1/3')
 
-        # КНОПКИ ДІЇ
-        with ui.row().classes('w-full justify-end mt-4 gap-2'):
-            ui.button('Скасувати', on_click=dialog.close).props('outline')
+                        # Права колонка (ЄРДР Секція)
+                        with ui.card().classes('col-span-12 md:col-span-5 p-6 shadow-sm border border-gray-200 gap-0'):
+                            with ui.row().classes('items-center gap-2 mb-4 w-full border-b pb-2'):
+                                ui.icon('policy', size='sm', color='blue-600')
+                                ui.label('Дані ЄРДР').classes('text-xl font-bold text-gray-800')
+
+                            date_input(COLUMN_ERDR_DATE, person, 'erdr_date', blur_handler=fix_date).classes('w-full mb-4').props('filled')
+                            ui.textarea(COLUMN_ERDR_NOTATION).bind_value(person, 'erdr_notation').classes('w-full').props('filled autogrow')
+
+        # ФУТЕР З КНОПКАМИ ДІЇ (Фіксований внизу екрану)
+        with ui.row().classes('w-full justify-end items-center p-4 bg-white border-t border-gray-300 shrink-0 gap-4 shadow-inner z-10'):
+            ui.button('Скасувати', icon='close', on_click=dialog.close).props('outline color="gray"').classes('px-6 h-12')
             if person_ctrl.auth_manager.has_access('person', 'write'):
-                ui.button('💾 ЗБЕРЕГТИ',
-                          on_click=lambda: handle_save(person, person_ctrl, ctx, dialog, on_close=on_close, paint_color=None)) \
-                    .classes('bg-green-600 text-white')
+                ui.button('ЗБЕРЕГТИ ДАНІ', icon='save',
+                          on_click=lambda: handle_save(person, person_ctrl, ctx, dialog, on_close=on_close,paint_color=None)) \
+                    .classes('bg-green-600 text-white px-8 h-12 text-lg font-bold shadow-md hover:bg-green-700 transition-colors')
 
     dialog.open()
 
@@ -174,7 +179,6 @@ def edit_erdr(person: Person, person_ctrl, ctx: RequestContext, on_close=None):
             bio_tab = ui.tab('📝 БІО')
 
         with ui.tab_panels(tabs, value=main_tab).classes('w-full'):
-            # ВАЖЛИВО: Встановлюємо дефолтний статус ЛИШЕ якщо поле порожнє
             if not person.review_status:
                 person.review_status = REVIEW_STATUS_WAITING
 
@@ -190,7 +194,7 @@ def edit_erdr(person: Person, person_ctrl, ctx: RequestContext, on_close=None):
 
                 with ui.row().classes('w-full gap-4 mt-2'):
                     ui.input(COLUMN_ORDER_ASSIGNMENT_NUMBER).bind_value(person, 'o_ass_num').classes('w-40')
-                    date_input(COLUMN_ORDER_ASSIGNMENT_DATE, person, 'o_ass_date').classes('w-1/3')
+                    date_input(COLUMN_ORDER_ASSIGNMENT_DATE, person, 'o_ass_date', blur_handler=fix_date).classes('w-1/3')
 
                 with ui.row().classes('w-full gap-4 mt-2'):
                     ui.input(COLUMN_ORDER_RESULT_NUMBER).bind_value(person, 'o_res_num').classes('w-40')
@@ -202,7 +206,6 @@ def edit_erdr(person: Person, person_ctrl, ctx: RequestContext, on_close=None):
 
                 with ui.row().classes('w-full gap-4 mt-2'):
                     ui.input(COLUMN_DBR_NUMBER).bind_value(person, 'dbr_num').classes('w-40')
-                    # Передаємо blur_handler для фіксу дати
                     date_input(COLUMN_DBR_DATE, person, 'dbr_date', blur_handler=fix_date).classes('w-1/3')
 
             with ui.tab_panel(bio_tab):
@@ -212,9 +215,8 @@ def edit_erdr(person: Person, person_ctrl, ctx: RequestContext, on_close=None):
         with ui.row().classes('w-full justify-end mt-4 gap-2'):
             ui.button('Скасувати', on_click=dialog.close).props('outline')
             if person_ctrl.auth_manager.has_access('person', 'write'):
-                ui.button('💾 ЗБЕРЕГТИ', on_click=lambda: handle_save(person, person_ctrl, ctx, dialog, on_close=on_close,
-                                                                     paint_color=EXCEL_BLUE_COLOR)) \
-                .classes('bg-green-600 text-white')
+                ui.button('💾 ЗБЕРЕГТИ', on_click=lambda: handle_save(person, person_ctrl, ctx, dialog, on_close=on_close, paint_color=EXCEL_BLUE_COLOR)) \
+                    .classes('bg-green-600 text-white')
 
     dialog.open()
 

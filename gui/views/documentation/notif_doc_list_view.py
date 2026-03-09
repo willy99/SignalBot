@@ -20,6 +20,7 @@ def render_notif_drafts_list_page(notif_ctrl, ctx: RequestContext):
 
         rows.append({
             'id': d.get('id'),
+            'region': d.get('region'),
             'out_number': d.get('out_number') or '—',
             'out_date': d.get('out_date') or '—',
             'people_count': len(payload),
@@ -30,6 +31,7 @@ def render_notif_drafts_list_page(notif_ctrl, ctx: RequestContext):
     # 2. Визначаємо колонки
     columns = [
         {'name': 'id', 'label': 'ID', 'field': 'id', 'align': 'center', 'sortable': True},
+        {'name': 'region', 'label': 'Звідки СЗЧ', 'field': 'region', 'left': 'center', 'sortable': True},
         {'name': 'out_number', 'label': 'Вихідний номер', 'field': 'out_number', 'align': 'left', 'sortable': True},
         {'name': 'out_date', 'label': 'Дата відправки', 'field': 'out_date', 'align': 'left', 'sortable': True},
         {'name': 'people_count', 'label': 'Осіб у пакеті', 'field': 'people_count', 'align': 'center',

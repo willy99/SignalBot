@@ -2,18 +2,19 @@ import os
 from datetime import datetime, timedelta
 
 import config
+from service.storage.LoggerManager import LoggerManager
 from service.storage.StorageFactory import StorageFactory
 from service.processing.processors.ExcelProcessor import ExcelProcessor
 from service.processing.processors.DocProcessor import DocProcessor
 import traceback
 
 class BatchProcessor:
-    def __init__(self, workflow, excel_file_path):
-        self.workflow = workflow
+    def __init__(self, log_manager: LoggerManager, excel_file_path):
         # Вмикаємо режим батчу
-        self.excelProcessor = ExcelProcessor(excel_file_path, log_manager=workflow.log_manager, batch_processing=True)
-        self.fileProxy = StorageFactory.create_client(excel_file_path, self.workflow.log_manager)
-        self.logger = self.workflow.log_manager.get_logger()
+        self.excelProcessor = ExcelProcessor(excel_file_path, log_manager=log_manager, batch_processing=True)
+        self.fileProxy = StorageFactory.create_client(excel_file_path, log_manager)
+        self.log_manager = log_manager
+        self.logger = self.log_manager.get_logger()
 
     def start_processing(self, days_back=1):
         self.logger.debug("🚀 >>> BATCH STARTED")
@@ -50,7 +51,7 @@ class BatchProcessor:
                                 f.write(file_data.getbuffer())
 
                         doc_processor = DocProcessor(
-                            self.workflow,
+                            self.log_manager,
                             local_path,
                             file_name,
                             insertion_date=current_folder_date

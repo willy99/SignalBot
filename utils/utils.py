@@ -4,9 +4,8 @@ from datetime import datetime, date
 import config
 import os
 from typing import Any, Tuple, Dict
-from dics.deserter_xls_dic import NA, PATTERN_DOC_NUM
+from dics.deserter_xls_dic import NA
 from domain.person_key import PersonKey
-import re
 
 def clean_text(text):
     if text is None: return None
@@ -300,21 +299,3 @@ def get_year_safe(date_val) -> str:
             return date_str[:4]
 
     return None
-
-def is_number(s):
-    try:
-        float(s) # Try converting to a float
-        return True
-    except ValueError:
-        return False
-
-
-def is_valid_doc_number(number_str: str) -> bool:
-    """
-    Перевіряє, чи відповідає номер супроводу формату 642/XXXX,
-    де X - від 1 до 4 цифр.
-    """
-    if not number_str:
-        return False
-
-    return bool(re.match(PATTERN_DOC_NUM, str(number_str).strip()))

@@ -6,7 +6,7 @@ from dics.deserter_xls_dic import *
 from collections import defaultdict
 from service.storage.LoggerManager import LoggerManager
 from config import DESERTER_TAB_NAME, EXCEL_DATE_FORMAT
-from utils.utils import get_strint_fromfloat, get_year_safe, is_number
+from utils.utils import get_strint_fromfloat, get_year_safe
 from domain.person_filter import PersonSearchFilter
 import re
 import os

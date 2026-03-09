@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS notif_docs (
     created_by INTEGER NOT NULL,
     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status TEXT DEFAULT 'DRAFT',        -- 'DRAFT' або 'COMPLETED'
+    region TEXT,                        -- регіон сзч
     out_number TEXT,                    -- Вихідний номер
     out_date TEXT,                      -- Дата відправки
     payload TEXT,                       -- JSON масив з обраними особами

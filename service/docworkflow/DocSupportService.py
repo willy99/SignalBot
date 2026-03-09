@@ -33,7 +33,7 @@ class DocSupportService:
 
     def get_all_support_docs(self, created_by: Optional[int] = None) -> List[Dict[str, Any]]:
         query = """
-            SELECT id, created_by, created_date, status, city, support_number, support_date, payload 
+            SELECT id, created_by, created_date, region, status, city, support_number, support_date, payload 
             FROM """ + DB_TABLE_SUPPORT_DOC
         params = ()
 
@@ -51,11 +51,12 @@ class DocSupportService:
                 'id': r[0],
                 'created_by': r[1],
                 'created_date': r[2],  # Дата у форматі 'YYYY-MM-DD HH:MM:SS'
-                'status': r[3],
-                'city': r[4],
-                'support_number': r[5],
-                'support_date': r[6],
-                'payload': json.loads(r[7]) if r[7] else []
+                'region': r[3],
+                'status': r[4],
+                'city': r[5],
+                'support_number': r[6],
+                'support_date': r[7],
+                'payload': json.loads(r[8]) if r[8] else []
             })
 
         return drafts

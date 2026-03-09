@@ -117,13 +117,19 @@ class SMBFileClient(FileStorageClient):
     '''
 
     def copy_file(self, source_path: str, dest_path: str):
-        """Копіює (завантажує) файл з локального диска на SMB-сервер."""
+        """Універсальне копіювання файлів (SMB<->SMB, Local->SMB, SMB->Local, Local->Local)."""
         with self._smb_lock:
             try:
-                if source_path.startswith("\\\\"):
+                is_source_smb = source_path.startswith("\\\\")
+                is_dest_smb = dest_path.startswith("\\\\")
+
+                if is_source_smb and is_dest_smb:
+                    # 1. Мережа -> Мережа (працює швидко на боці сервера)
                     smbclient.copyfile(source_path, dest_path)
-                    self.logger.debug(f"📁 Файл успішно скопійовано на сервері в: {dest_path}")
-                else:
+                    self.logger.debug(f"📁 Файл скопійовано (SMB -> SMB): {dest_path}")
+
+                elif not is_source_smb and is_dest_smb:
+                    # 2. Локальний комп'ютер -> Мережа
                     with open(source_path, 'rb') as local_f:
                         with smbclient.open_file(dest_path, mode='wb') as smb_f:
                             while True:
@@ -131,7 +137,25 @@ class SMBFileClient(FileStorageClient):
                                 if not chunk:
                                     break
                                 smb_f.write(chunk)
-                    self.logger.debug(f"📡 Вкладення успішно скопійовано на сервер: {dest_path}")
+                    self.logger.debug(f"📡 Файл завантажено (Local -> SMB): {dest_path}")
+
+                elif is_source_smb and not is_dest_smb:
+                    # 3. Мережа -> Локальний комп'ютер (ОСЬ ЦЕ ВИРІШУЄ ВАШУ ПРОБЛЕМУ!)
+                    with smbclient.open_file(source_path, mode='rb') as smb_f:
+                        with open(dest_path, 'wb') as local_f:
+                            while True:
+                                chunk = smb_f.read(64 * 1024)
+                                if not chunk:
+                                    break
+                                local_f.write(chunk)
+                    self.logger.debug(f"⬇️ Файл завантажено (SMB -> Local): {dest_path}")
+
+                else:
+                    # 4. Локальний -> Локальний (про всяк випадок, щоб не впало)
+                    import shutil
+                    shutil.copyfile(source_path, dest_path)
+                    self.logger.debug(f"📂 Файл скопійовано (Local -> Local): {dest_path}")
+
             except Exception as e:
                 self.logger.error(f"❌ Помилка копіювання файлу на сервер ({source_path} -> {dest_path}): {e}")
                 raise

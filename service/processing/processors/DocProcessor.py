@@ -1,6 +1,7 @@
 from pathlib import Path
 from service.processing.parsers.ParserFactory import ParserFactory
 import config
+from service.storage.LoggerManager import LoggerManager
 from utils.utils import format_to_excel_date, get_file_name, clean_text, check_birthday_id_number
 import dics.deserter_xls_dic as col
 from dics.deserter_xls_dic import *
@@ -17,19 +18,19 @@ class DocProcessor:
     __PIECE_3 : Final  = 'piece 3'
     __PIECE_4 : Final  = 'piece 4'
 
-    def __init__(self, workflow, file_path, original_filename, insertion_date=datetime.now(), use_ml=True):
+    def __init__(self, log_manager: LoggerManager, file_path, original_filename, insertion_date=datetime.now(), use_ml=True):
         self.file_path = file_path
         self.original_filename = original_filename
-        self.workflow = workflow
         self.insertion_date = insertion_date
-        self.logger = workflow.log_manager.get_logger()
+        self.logger = log_manager.get_logger()
+        self.log_manager = log_manager
         self.response = {
             'insertionDate' :None,
         }
         if file_path:
             self.extension = Path(self.file_path).suffix
-            self.engine = ParserFactory.get_parser(file_path, workflow.log_manager)
-        self.ml_parser = MLParser(model_path=config.ML_MODEL_PATH, log_manager=self.workflow.log_manager, use_ml=use_ml)
+            self.engine = ParserFactory.get_parser(file_path, self.log_manager)
+        self.ml_parser = MLParser(model_path=config.ML_MODEL_PATH, log_manager=self.log_manager, use_ml=use_ml)
 
     def process(self):
         self.logger.debug(f"--- Обробка тексту... {self.extension}")
@@ -63,9 +64,6 @@ class DocProcessor:
                 all_final_records.extend(processed_data)
             else:
                 all_final_records.append(processed_data)
-
-        self.workflow.stats.attachmentWordProcessed += 1
-        self.workflow.stats.doc_names.append(self.original_filename)
 
         self.logger.debug(f"--- ✔️ Обробка закінчено. Знайдено осіб: {len(all_final_records)}")
         return all_final_records
@@ -509,7 +507,6 @@ class DocProcessor:
                 if value == NA:
                     error = 'КОЛОНКА ' + col_name + ' ПОРОЖНЯ!'
                     self.logger.warning('------ ⚠️ ' + error)
-                    self.workflow.stats.add_error(self.original_filename, error)
                     result = False
         return result
 

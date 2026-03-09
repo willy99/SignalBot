@@ -2,7 +2,6 @@ from service.connection.SignalClient import SignalClient
 from service.processing.processors.ExcelProcessor import ExcelProcessor
 from service.processing.AttachmentHandler import AttachmentHandler
 from service.connection.MyDataBase import MyDataBase
-from service.processing.Stat import Stat
 from service.processing.processors.BatchProcessor import BatchProcessor
 import traceback
 from service.storage.LoggerManager import LoggerManager
@@ -31,9 +30,7 @@ class MyWorkFlow:
         self.attachmentHandler = None
         self.client = SignalClient()
         self.db = MyDataBase()
-        self.stats = Stat()  # Створюємо об'єкт статистики
         self.excelFilePath = None
-
 
         self.backuper = BackupData(self.log_manager)
 
@@ -51,8 +48,6 @@ class MyWorkFlow:
             # self.logger.debug(str(data))
             # 1. Обробка вхідного повідомлення від когось іншого
             if "dataMessage" in envelope:
-                self.stats.messagesProcessed += 1
-
                 msg = envelope["dataMessage"]
                 source = envelope.get("source") or envelope.get("sourceNumber") or "Невідомий"
                 source_uuid = envelope.get("sourceUuid")  # Важливо для реакцій!
@@ -136,11 +131,6 @@ class MyWorkFlow:
             if text == "1":
                 user_service.set_user_state(user_id, "PROCESS")
                 return process_menu
-            elif text == "2":
-                user_service.set_user_state(user_id, "STAT")
-                result = self.stats.get_report()
-                result += stat_menu
-                return result
             elif text == "4" or text == "вихід":
                 user_service.set_user_state(user_id, "START")
                 return menu_prompt
@@ -152,11 +142,11 @@ class MyWorkFlow:
                 user_service.set_user_state(user_id, "MAIN_MENU")
                 return main_menu
             if text == "1" or text == 'batch':
-                batch_processor = BatchProcessor(self, self.excelFilePath)
+                batch_processor = BatchProcessor(self.log_manager, self.excelFilePath)
                 batch_processor.start_processing(0)
                 return "OK"
             if text == "2" or text == 'convert':
-                column_converter = ColumnConverter(self.excelFilePath, self)
+                column_converter = ColumnConverter(self.excelFilePath, self.log_manager)
                 column_converter.convert()
                 return "OK"
         elif current_state == "STAT":

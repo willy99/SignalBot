@@ -78,8 +78,10 @@ class InboxService:
     def delete_file(self, user_login: str, filename: str):
         """Видаляє файл з персональної папки користувача на SMB сервері."""
         client = StorageFactory.create_client(config.INBOX_DIR_PATH, self.log_manager)
-        target_path = f"{config.INBOX_DIR_PATH}{client.get_separator()}{user_login}{client.get_separator()}{filename}"
-
+        if user_login:
+            target_path = f"{config.INBOX_DIR_PATH}{client.get_separator()}{user_login}{client.get_separator()}{filename}"
+        else:
+            target_path = f"{config.INBOX_DIR_PATH}{client.get_separator()}{filename}"
         with client:
             try:
                 # Метод remove_file вже був у вашому SMBFileClient

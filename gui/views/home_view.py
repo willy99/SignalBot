@@ -44,14 +44,26 @@ def render_home_page(auth_manager):
         if can_doc_support or can_doc_notif:
             ui.label('Документообіг').classes('text-xl font-bold w-full max-w-5xl mt-8 text-gray-600 border-b pb-2')
             with ui.grid().classes('w-full max-w-5xl gap-6 mt-4 grid-cols-1 md:grid-cols-3'):
+                if can_doc_notif:
+                    create_nav_card('Повідомлення', 'Формування повідомлень та витягів', 'description',
+                                    '/doc_notif', 'green')
+
                 if can_doc_support:
                     create_nav_card('Супровідні листи', 'Масова генерація пакетів супровідних документів',
                                     'mark_email_unread', '/doc_support', 'green')
-                if can_doc_notif:
-                    create_nav_card('Довідки', 'Формування повідомлень та витягів (В розробці)', 'description',
-                                    '/doc_notif', 'green')
                 if can_doc_dbr:
                     create_nav_card('На ДБР', 'Відправка справ на ДБР і очікування  ЄРДР', 'gavel', '/doc_dbr', 'orange')
+
+        # --- Секція: CMS ---
+        can_task = auth_manager.has_access('task', 'read')
+
+        if can_task:
+            ui.label('Задачі та процесінг').classes('text-xl font-bold w-full max-w-5xl mt-8 text-gray-600 border-b pb-2')
+            with ui.grid().classes('w-full max-w-5xl gap-6 mt-4 grid-cols-1 md:grid-cols-3'):
+                create_nav_card('Задачі', 'Щоденні, щомісячні та беклог',
+                                'checklist_rtl', '/tasks', 'yellow')
+                create_nav_card('Inbox', 'Керування файлами в inbox', 'forward_to_inbox',
+                                '/inbox', 'yellow')
 
         # --- Секція: АНАЛІТИКА ---
         can_report_units = auth_manager.has_access('report_units', 'read')

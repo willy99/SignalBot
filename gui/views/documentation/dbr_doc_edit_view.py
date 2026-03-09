@@ -2,16 +2,18 @@ from nicegui import ui, run
 
 from dics.deserter_xls_dic import COLUMN_ORDER_ASSIGNMENT_NUMBER, COLUMN_ORDER_ASSIGNMENT_DATE, \
     COLUMN_ORDER_RESULT_NUMBER, COLUMN_ORDER_RESULT_DATE, COLUMN_KPP_NUMBER, COLUMN_KPP_DATE, COLUMN_DBR_NUMBER, \
-    COLUMN_DBR_DATE, PATTERN_DOC_NUM
+    COLUMN_DBR_DATE, VALID_PATTERN_DOC_NUM
 from gui.controllers.dbr_controller import DbrController
 from gui.controllers.person_controller import PersonController
 from service.storage.FileCacher import FileCacheManager
 from gui.services.request_context import RequestContext
 from domain.person_filter import PersonSearchFilter
 from config import UI_DATE_FORMAT
-from datetime import datetime, date
+from gui.tools.validation import fix_date
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
-from utils.utils import is_number, format_to_excel_date, is_valid_doc_number
+from gui.tools.validation import is_number, is_valid_doc_number
+from utils.utils import format_to_excel_date
+
 import re
 
 def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file_cache_manager: FileCacheManager,
@@ -54,7 +56,7 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                     status_badge = ui.badge(status_text, color=badge_color).classes('text-sm px-2 py-1')
 
                 out_number_input = ui.input('Загальний вих. номер (СЕДО)', placeholder='Наприклад: 642/123', validation={
-                   'Формат має бути 642/ХХХХ (до 4 цифр)': lambda v: bool(re.match(PATTERN_DOC_NUM, v.strip())) if v else True
+                   'Формат має бути 642/ХХХХ (до 4 цифр)': lambda v: bool(re.match(VALID_PATTERN_DOC_NUM, v.strip())) if v else True
                     }) \
                     .bind_value(state, 'out_number') \
                     .on_value_change(lambda e: state['current_person'].update({'dbr_num': e.value + '/'})) \
@@ -499,10 +501,3 @@ def date_input(label: str, state, field: str, blur_handler=None, change_handler=
         with ui.menu():
             ui.date().bind_value(state, field).props(f'mask="{UI_DATE_FORMAT}"')
     return inp
-
-def fix_date(e):
-    val = e.sender.value
-    if not val: return
-    parts = val.split('.')
-    if len(parts) == 2:
-        e.sender.value = f"{val}.{datetime.now().year}"

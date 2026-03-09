@@ -6,6 +6,7 @@ from service.storage.LoggerManager import LoggerManager
 import tempfile
 import os
 
+'''
 class MockWorkflow:
     """Заглушка для workflow, щоб збирати статистику без бота"""
 
@@ -16,7 +17,7 @@ class MockWorkflow:
             'attachmentPDFProcessed': 0,
             'doc_names': []
         })
-
+'''
 
 class FileCacheManager:
     def __init__(self, cache_filepath: str, log_manager):
@@ -34,7 +35,7 @@ class FileCacheManager:
         new_cache = []
 
         # Створюємо мок-воркфлоу один раз для всіх файлів, щоб не перевантажувати пам'ять
-        workflow = MockWorkflow()
+        # workflow = MockWorkflow()
         normalized_root = root_folder.rstrip('\\/')
 
         with self.client:
@@ -76,7 +77,7 @@ class FileCacheManager:
                                 temp_local_path = temp_file.name  # Отримуємо локальний шлях
 
                             # 3. Годуємо парсеру ЛОКАЛЬНИЙ файл
-                            processor = DocProcessor(workflow, temp_local_path, filename, use_ml=False)
+                            processor = DocProcessor(LoggerManager(), temp_local_path, filename, use_ml=False)
 
                             # Витягуємо блок тексту з переліком осіб
                             raw_piece_3 = processor.engine.extract_text_between(

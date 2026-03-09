@@ -108,9 +108,10 @@ class DocTemplator:
 
     def generate_notif_batch(self, region: str, notif_number: str, notif_date: str, raw_documents: list) -> tuple[bytes, str]:
         if region not in self.region_templates:
+            print('>>> шаблон не знайдено ' + str(region))
             raise FileNotFoundError(f"Шаблон для регіону {region} не знайдено.")
 
-        template_path = self.templates[region]
+        template_path = self.region_templates[region]
         doc = DocxTemplate(str(template_path))
 
         formatted_docs = []
@@ -120,7 +121,7 @@ class DocTemplator:
                 'NOTIF_NUMBER': notif_number,
                 'NOTIF_DATE': notif_date,
                 'INCREMENTAL': raw.get('seq_num', 0),
-                'NOTIF_CONDITIONS': raw.get('conditions', ''),
+                'NOTIF_CONDITIONS': raw.get('desertion_conditions', ''),
             }
             formatted_docs.append(formatted_doc)
 
