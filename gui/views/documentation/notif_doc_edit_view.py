@@ -7,7 +7,7 @@ from domain.person_filter import PersonSearchFilter, YES
 from config import UI_DATE_FORMAT, EXCEL_DATE_FORMAT
 from datetime import datetime, timedelta
 from dics.deserter_xls_dic import COLUMN_TITLE_2, VALID_PATTERN_DOC_NUM, COLUMN_INSERT_DATE, REVIEW_STATUS_MAP, \
-    REVIEW_STATUS_NON_ERDR, COLUMN_REVIEW_STATUS, COLUMN_DESERTION_DATE, COLUMN_NAME, COLUMN_DESERTION_REGION
+    REPORT_REVIEW_STATUS_NON_ERDR, COLUMN_REVIEW_STATUS, COLUMN_DESERTION_DATE, COLUMN_NAME, COLUMN_DESERTION_REGION
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
 from utils.utils import format_to_excel_date
 from gui.tools.validation import is_valid_doc_number
@@ -136,7 +136,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                         des_date_from=state['filter_date_from'],
                         des_date_to=state['filter_date_to'] if state['filter_date_to'] else minus_4_days,
                         title2=state['filter_title'],
-                        review_statuses=REVIEW_STATUS_MAP[REVIEW_STATUS_NON_ERDR],
+                        review_statuses=REVIEW_STATUS_MAP[REPORT_REVIEW_STATUS_NON_ERDR],
                         empty_kpp=YES,  # Шукаємо тільки тих, у кого немає повідомлення на КПП
                         desertion_region=des_region_val
                     )

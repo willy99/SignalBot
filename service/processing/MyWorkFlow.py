@@ -61,7 +61,6 @@ class MyWorkFlow:
                 attachments = msg.get("attachments", [])
 
                 # process attachments
-                file_saved = False
                 if len(attachments) > 0:
                     self.logger.debug('--------------------------🔓 BEGIN ------------------------------------------ ')
                     for att in attachments:
@@ -70,11 +69,11 @@ class MyWorkFlow:
 
                         self.logger.debug(f"📎 Отримано файл: {filename} (ID: {att_id})")
                         self.attachmentHandler = AttachmentHandler(self)
-                        file_saved = self.attachmentHandler.handle_attachment(att_id, filename)
+                        file_process_messages = self.attachmentHandler.handle_attachment(att_id, filename)
                         self.client.send_reaction(
                             group_id,
                             recipient,
-                            "➕" if file_saved else "⚠️",
+                            "➕" if len(file_process_messages) == 0 else "⚠️",
                             source_uuid,
                             timestamp
                         )

@@ -50,12 +50,11 @@ def render_inbox_page(inbox_ctrl, task_ctrl, auth_manager, ctx: RequestContext):
                 try:
                     if atype == 'excel':
                         ui.notify(f'⏳ Ексель: обробка {fname}...', type='info')
-                        success = await run.io_bound(inbox_ctrl.process_file_to_excel, ctx, fname)
-                        if success:
+                        process_messages = await run.io_bound(inbox_ctrl.process_file_to_excel, ctx, fname)
+                        if len(process_messages) > 0:
+                            ui.notify(f'⚠️ ' + str(process_messages), type='warning')
                             ui.notify(f'✅ {fname} занесено в Ексель!', type='positive')
-                            await run.io_bound(inbox_ctrl.delete_file, ctx, None, folder, fname)
-                        else:
-                            ui.notify(f'❌ Помилка розпізнавання {fname}', type='negative')
+                        await run.io_bound(inbox_ctrl.delete_file, ctx, None, folder, fname)
 
                     elif atype == 'archive':
                         ui.notify(f'⏳ Архів: збереження {fname}...', type='info')

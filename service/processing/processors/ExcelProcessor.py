@@ -83,7 +83,7 @@ class ExcelProcessor:
                     if idx:
                         # Кортеж тут!
                         current_cell = self.sheet.range((existing_row, idx))
-                        if (not current_cell.value or current_cell.value == NA) and value:
+                        if (not current_cell.value or current_cell.value == NA or col_name in OVERRIDE_COLUMNS) and value:
                             current_cell.value = get_typed_value(value)
                             self.logger.debug(f'--- [Рядок {existing_row}] оновлюємо {col_name}: {value}')
             else:

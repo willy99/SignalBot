@@ -9,7 +9,7 @@ class AttachmentHandler:
         self.workflow = workflow
         self.logger = self.workflow.log_manager.get_logger()
 
-    def handle_attachment(self, attachment_id, original_filename):
+    def handle_attachment(self, attachment_id, original_filename) -> list[str]:
         # 1. Знаходимо локальний файл, який завантажив Signal
         source_file = os.path.join(config.SIGNAL_ATTACHMENTS_DIR, attachment_id)
         if not os.path.exists(source_file):

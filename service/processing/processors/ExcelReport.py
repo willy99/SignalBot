@@ -50,9 +50,9 @@ class ExcelReporter:
                     REVIEW_STATUS_NOT_ASSIGNED: 0,
                     REVIEW_STATUS_EXECUTING: 0,
                     REVIEW_STATUS_CLOSED: 0,
-                    REVIEW_STATUS_NON_ERDR: 0,
-                    REVIEW_STATUS_ERDR: 0,
-                    REVIEW_STATUS_NON_EVIL: 0,
+                    REPORT_REVIEW_STATUS_NON_ERDR: 0,
+                    REPORT_REVIEW_STATUS_ERDR: 0,
+                    REPORT_REVIEW_STATUS_NON_EVIL: 0,
                     'dupl': 0,
                     'un_des': 0, 'un_ret': 0,
                     'st_term': 0, 'st_call': 0, 'st_contr': 0,
@@ -263,11 +263,11 @@ class ExcelReporter:
                         if is_officer:
                             stats[unit][sub_unit]['офіцер']['rev_dbr_mater'] += 1
 
-                    if review_status in REVIEW_STATUS_MAP[REVIEW_STATUS_NON_ERDR]:
+                    if review_status in REVIEW_STATUS_MAP[REPORT_REVIEW_STATUS_NON_ERDR]:
                         stats[unit][sub_unit]['all']['rev_dbr_nonerdr'] += 1
                         if is_officer:
                             stats[unit][sub_unit]['офіцер']['rev_dbr_nonerdr'] += 1
-                    if review_status in REVIEW_STATUS_MAP[REVIEW_STATUS_ERDR]:
+                    if review_status in REVIEW_STATUS_MAP[REPORT_REVIEW_STATUS_ERDR]:
                         stats[unit][sub_unit]['all']['rev_dbr_erdr'] += 1
                         if is_officer:
                             stats[unit][sub_unit]['офіцер']['rev_dbr_erdr'] += 1
@@ -283,7 +283,7 @@ class ExcelReporter:
                     stats[unit][sub_unit]['all']['rev_punish'] = 0 # const
                     stats[unit][sub_unit]['офіцер']['rev_punish'] = 0 # const
 
-                    if review_status in REVIEW_STATUS_MAP[REVIEW_STATUS_NON_EVIL]:
+                    if review_status in REVIEW_STATUS_MAP[REPORT_REVIEW_STATUS_NON_EVIL]:
                         stats[unit][sub_unit]['all']['rev_nonevil'] += 1
                         if is_officer:
                             stats[unit][sub_unit]['офіцер']['rev_nonevil'] += 1
@@ -369,7 +369,7 @@ class ExcelReporter:
                 return {
                     'under_3': 0, 'over_3': 0, 'ret_mu': 0, 'ret_res': 0,
                     REVIEW_STATUS_NOT_ASSIGNED: 0, REVIEW_STATUS_EXECUTING: 0, REVIEW_STATUS_CLOSED: 0,
-                    REVIEW_STATUS_NON_ERDR: 0, REVIEW_STATUS_ERDR: 0, REVIEW_STATUS_NON_EVIL: 0,
+                    REPORT_REVIEW_STATUS_NON_ERDR: 0, REPORT_REVIEW_STATUS_ERDR: 0, REPORT_REVIEW_STATUS_NON_EVIL: 0,
                     'dupl': 0, 'un_des': 0, 'un_ret': 0,
                     'st_term': 0, 'st_call': 0, 'st_contr': 0,
                     'pl_ppd': 0, 'pl_rvbz': 0, 'pl_other': 0,
@@ -507,10 +507,10 @@ class ExcelReporter:
                     stats[des_date_year]['all']['rev_dbr_mater'] += 1
                     if is_officer: stats[des_date_year]['офіцер']['rev_dbr_mater'] += 1
 
-                if review_status in REVIEW_STATUS_MAP[REVIEW_STATUS_NON_ERDR]:
+                if review_status in REVIEW_STATUS_MAP[REPORT_REVIEW_STATUS_NON_ERDR]:
                     stats[des_date_year]['all']['rev_dbr_nonerdr'] += 1
                     if is_officer: stats[des_date_year]['офіцер']['rev_dbr_nonerdr'] += 1
-                if review_status in REVIEW_STATUS_MAP[REVIEW_STATUS_ERDR]:
+                if review_status in REVIEW_STATUS_MAP[REPORT_REVIEW_STATUS_ERDR]:
                     stats[des_date_year]['all']['rev_dbr_erdr'] += 1
                     if is_officer: stats[des_date_year]['офіцер']['rev_dbr_erdr'] += 1
 
@@ -518,7 +518,7 @@ class ExcelReporter:
                     stats[des_date_year]['all']['rev_suspend'] += 1
                     if is_officer: stats[des_date_year]['офіцер']['rev_suspend'] += 1
 
-                if review_status in REVIEW_STATUS_MAP[REVIEW_STATUS_NON_EVIL]:
+                if review_status in REVIEW_STATUS_MAP[REPORT_REVIEW_STATUS_NON_EVIL]:
                     stats[des_date_year]['all']['rev_nonevil'] += 1
                     if is_officer: stats[des_date_year]['офіцер']['rev_nonevil'] += 1
 
@@ -611,6 +611,7 @@ class ExcelReporter:
         subunit_idx = self.excelProcessor.header.get(COLUMN_SUBUNIT, 1) - 1
         call_idx = self.excelProcessor.header.get(COLUMN_ENLISTMENT_DATE, 1) - 1
         days_idx = self.excelProcessor.header.get(COLUMN_SERVICE_DAYS, 1) - 1
+        des_place_idx = self.excelProcessor.header.get(COLUMN_DESERTION_PLACE, 1) - 1
 
         results = []
         target_sheets = ['А0224', 'А7018']  # Назви ваших аркушів в Excel
@@ -657,7 +658,8 @@ class ExcelReporter:
                         'title': row[title_idx] if len(row) > title_idx else 'Не вказано',
                         'subunit': row[subunit_idx] if len(row) > subunit_idx else 'Не вказано',
                         'call_date': call_date,
-                        'term_days': get_strint_fromfloat(term_days)
+                        'term_days': get_strint_fromfloat(term_days),
+                        'desertion_place': row[des_place_idx]
                     })
 
         return results

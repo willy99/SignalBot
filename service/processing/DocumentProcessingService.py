@@ -49,7 +49,7 @@ class DocumentProcessingService:
             self.logger.debug(traceback.format_exc())
             return None
 
-    def process_to_excel(self, source_file_path: str, original_filename: str) -> bool:
+    def process_to_excel(self, source_file_path: str, original_filename: str) -> list[str]:
         """3. Розпізнавання документа та запис результатів у Excel/БД."""
         if not os.path.exists(
                 source_file_path):  # Якщо це мережевий шлях, os.path.exists може брехати, але залишимо для сумісності
@@ -69,13 +69,13 @@ class DocumentProcessingService:
             # 3. Передаємо ЛОКАЛЬНИЙ файл у ваш парсер!
             doc_processor = DocProcessor(self.log_manager, local_temp_path, original_filename)
             data_for_excel = doc_processor.process()
-            file_parsed = doc_processor.check_for_errors(data_for_excel)
+            file_parse_messages = doc_processor.check_for_errors(data_for_excel)
 
             if config.PROCESS_XLS and data_for_excel is not None and self.excel_processor:
                 self.excel_processor.upsert_record(data_for_excel)
                 self.logger.debug(f"📊 Дані з {original_filename} записано в таблицю.")
 
-            return file_parsed
+            return file_parse_messages
 
         except Exception as e:
             self.logger.error(f"❌ Помилка під час обробки та запису в Excel: {e}")
@@ -89,7 +89,7 @@ class DocumentProcessingService:
                 except Exception as cleanup_err:
                     self.logger.warning(f"🧹 Не вдалося видалити тимчасовий файл {local_temp_path}: {cleanup_err}")
 
-    def process_full_workflow(self, source_file_path: str, original_filename: str) -> bool:
+    def process_full_workflow(self, source_file_path: str, original_filename: str) -> list[str]:
         """
         Метод-фасад для повного циклу: Бекап -> Архів -> Ексель.
         (Ідеально підходить для використання у Signal AttachmentHandler).

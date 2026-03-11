@@ -18,6 +18,7 @@ def results_ui(data, person_ctrl, ctx: RequestContext, refresh_callback):
         {'name': 'unit', 'label': COLUMN_SUBUNIT, 'field': 'unit', 'sortable': True},
         {'name': 'desertion_date', 'label': COLUMN_DESERTION_DATE, 'field': 'desertion_date', 'sortable': True},
         {'name': 'return_date', 'label': COLUMN_RETURN_DATE, 'field': 'return_date', 'sortable': True},
+        {'name': 'return_reserve_date', 'label': COLUMN_RETURN_TO_RESERVE_DATE, 'field': 'return_reserve_date', 'sortable': True},
         {'name': 'erdr_date', 'label': COLUMN_ERDR_DATE, 'field': 'erdr_date', 'sortable': True},
         {'name': 'erdr_notation', 'label': COLUMN_ERDR_NOTATION, 'field': 'erdr_notation', 'sortable': True},
         {'name': 'action', 'label': 'Дія', 'field': 'action', 'align': 'center'},
@@ -32,6 +33,7 @@ def results_ui(data, person_ctrl, ctx: RequestContext, refresh_callback):
             'unit': person.subunit,
             'desertion_date': person.desertion_date,
             'return_date': person.return_date,
+            'return_reserve_date': person.return_reserve_date,
             'erdr_date': person.erdr_date,
             'erdr_notation': person.erdr_notation,
             'raw_model': person.model_dump()

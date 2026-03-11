@@ -53,6 +53,9 @@ COLUMN_ERDR_DATE: Final[str] = "Дата внесення в ЄРДР"
 COLUMN_ERDR_NOTATION: Final[str] = "примітки/ ЄРДР"
 COLUMN_NOTATION: Final[str] = "Примітка"
 
+OVERRIDE_COLUMNS: Final[List[str]] = [COLUMN_DESERTION_TYPE, COLUMN_REVIEW_STATUS]
+
+
 PATTERN_TITLE_MAPPING: Final[Dict[str, str]] = {
     # Складні звання (спочатку перевіряємо їх, щоб не "з'їсти" частину)
     r'(?i)молодш[а-я]{1,3}\s+лейтенант[а-я]{0,3}\b': 'молодший лейтенант',
@@ -170,6 +173,10 @@ PATTERN_DESERTION_TYPE_MAPPING : Final[Dict[str, str]] = {
 
 PATTERN_RETURN_SIGN: Final[List[str]] = [
     r'(?i)(?<!не\s)(?<!не)(?:доповідь\s+про|факт)?\s*(поверн(?:увся|ення)|присутн(?:ості|ість))\s+'
+]
+
+PATTERN_ERROR_SIGN: Final[List[str]] = [
+    r'(?i)(?:доповідь\s+про|факт)?\s*(помилк[ового|и]+|відміни)\s+(?:повідомлення|поданих даних)?'
 ]
 
 # Мапінг типів служби: Регулярний вираз -> Результат
@@ -364,21 +371,27 @@ PATTERN_PIECE_4_END : Final[str] = r'5[\.\s\)]+Військове звання'
 
 
 REVIEW_STATUS_NOT_ASSIGNED: Final[str] = 'не призначено'
+REVIEW_STATUS_NOT_DIRECTED: Final[str] = 'не направляємо'
+REVIEW_STATUS_ASSIGNED: Final[str] = 'призначено'
 REVIEW_STATUS_EXECUTING: Final[str] = 'проводяться'
 REVIEW_STATUS_CLOSED: Final[str] = 'завершено'
 REVIEW_STATUS_WAITING: Final[str] = 'чекаємо ЄРДР'
-REVIEW_STATUS_NON_ERDR: Final[str] = 'не отримано витяг з ЄРДР'
-REVIEW_STATUS_ERDR: Final[str] = 'отримано витяг з ЄРДР'
-REVIEW_STATUS_NON_EVIL: Final[str] = "не є суб'єктом злочину"
+REVIEW_STATUS_ERROR: Final[str] = 'помилково'
+REVIEW_STATUS_ERDR: Final[str] = 'ЄРДР'
+
+REPORT_REVIEW_STATUS_NON_ERDR: Final[str] = 'не отримано витяг з ЄРДР'
+REPORT_REVIEW_STATUS_ERDR: Final[str] = 'не отримано витяг з ЄРДР'
+REPORT_REVIEW_STATUS_NON_EVIL: Final[str] = "не є суб'єктом злочину"
+
 
 REVIEW_STATUS_MAP: Final[Dict[str, List[str]]] = {
-    REVIEW_STATUS_NOT_ASSIGNED: ['не призначено', 'не направляємо', 'помилково'],
-    REVIEW_STATUS_EXECUTING: ['призначено'],
-    REVIEW_STATUS_CLOSED: ['закрито', 'чекаємо ЄРДР'],
+    REVIEW_STATUS_NOT_ASSIGNED: [REVIEW_STATUS_NOT_ASSIGNED, REVIEW_STATUS_NOT_DIRECTED, REVIEW_STATUS_ERROR],
+    REVIEW_STATUS_EXECUTING: [REVIEW_STATUS_ASSIGNED],
+    REVIEW_STATUS_CLOSED: [REVIEW_STATUS_CLOSED, REVIEW_STATUS_WAITING],
 
-    REVIEW_STATUS_NON_ERDR: ['призначено', 'не призначено', 'закрито', 'чекаємо ЄРДР'],
-    REVIEW_STATUS_ERDR: ['ЄРДР'],
-    REVIEW_STATUS_NON_EVIL: ['помилково', 'не направляємо']
+    REPORT_REVIEW_STATUS_NON_ERDR: [REVIEW_STATUS_ASSIGNED, REVIEW_STATUS_NOT_ASSIGNED, REVIEW_STATUS_CLOSED, REVIEW_STATUS_WAITING],
+    REPORT_REVIEW_STATUS_ERDR: [REVIEW_STATUS_ERDR],
+    REPORT_REVIEW_STATUS_NON_EVIL: [REVIEW_STATUS_ERROR, REVIEW_STATUS_NOT_DIRECTED]
 }
 
 REPORT_SUBUNIT_EXCLUDE_ARTICLES = ['402']

@@ -145,44 +145,45 @@ def render_daily_report_page(report_ctrl, task_ctrl: TaskController, ctx: Reques
         try:
             target_date_str = date_input.value
 
-            details = f"📊 **Щоденне: {target_date_str}**\n\n"
+            # Починаємо формувати HTML
+            details = f"<h3>📊 Щоденне: {target_date_str}</h3>"
 
             # ==========================================
             # 1. ДОДАНІ СЗЧ (Ті що пішли)
             # ==========================================
             added_data = state.get('data', [])
             if added_data:
-                details += "⬅️ **ПІШЛИ В СЗЧ:**\n"
+                details += "<p><b>⬅️ ПІШЛИ В СЗЧ:</b></p>"
                 data_A0224 = [r for r in added_data if r.get('sheet_name') == 'А0224']
                 data_A7018 = [r for r in added_data if r.get('sheet_name') == 'А7018']
 
                 if data_A0224:
-                    details += f"👉 **ВЧ А0224 (Додано: {len(data_A0224)})**\n"
-                    for i, r in enumerate(data_A0224, 1):
-                        details += f"{i}. {r['name']} ({r.get('title', 'Не вказано')}, {r.get('subunit', 'Не вказано')}) — СЗЧ з {r.get('des_date', '')} ({r.get('term_days', 0)} дн.)\n"
-                    details += "\n"
+                    details += f"<p>👉 <b>ВЧ А0224 (Додано: {len(data_A0224)})</b></p><ul>"
+                    for r in data_A0224:
+                        details += f"<li><b>{r['name']}</b> ({r.get('title', 'Не вказано')}, {r.get('subunit', 'Не вказано')}) — СЗЧ з {r.get('desertion_place', 'Не вказано')} ({r.get('term_days', 0)} дн.)</li>"
+                    details += "</ul>"
 
                 if data_A7018:
-                    details += f"👉 **ВЧ А7018 (Додано: {len(data_A7018)})**\n"
-                    for i, r in enumerate(data_A7018, 1):
-                        details += f"{i}. {r['name']} ({r.get('title', 'Не вказано')}, {r.get('subunit', 'Не вказано')}) — СЗЧ з {r.get('des_date', '')} ({r.get('term_days', 0)} дн.)\n"
-                    details += "\n"
+                    details += f"<p>👉 <b>ВЧ А7018 (Додано: {len(data_A7018)})</b></p><ul>"
+                    for r in data_A7018:
+                        details += f"<li><b>{r['name']}</b> ({r.get('title', 'Не вказано')}, {r.get('subunit', 'Не вказано')}) — СЗЧ з {r.get('desertion_place', 'Не вказано')} ({r.get('term_days', 0)} дн.)</li>"
+                    details += "</ul>"
 
             # ==========================================
             # 2. ПОВЕРНУЛИСЯ З СЗЧ
             # ==========================================
             return_data = state.get('returns', [])
             if return_data:
-                details += f"↪️ **ПОВЕРНУЛИСЯ ({len(return_data)}):**\n"
-                for i, r in enumerate(return_data, 1):
+                details += f"<p><b>↪️ ПОВЕРНУЛИСЯ ({len(return_data)}):</b></p><ul>"
+                for r in return_data:
                     name = r.get('name', 'Невідомо')
                     title = r.get('title', 'Не вказано')
                     subunit = r.get('subunit', 'Не вказано')
                     des_date = r.get('des_date', 'Невідомо')
                     ret_date = r.get('ret_date', 'Не вказано')
 
-                    details += f"{i}. {name} ({title}, {subunit}) — Був у СЗЧ з {des_date}, повернувся {ret_date}\n"
-                details += "\n"
+                    details += f"<li><b>{name}</b> ({title}, {subunit}) — Був у СЗЧ з {des_date}, повернувся {ret_date}</li>"
+                details += "</ul>"
 
             now = datetime.now()
             deadline = now.replace(hour=23, minute=59, second=59)

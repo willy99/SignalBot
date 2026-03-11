@@ -16,25 +16,7 @@ import config
 from config import DESERTER_TAB_NAME
 from service.processing.MyWorkFlow import MyWorkFlow
 import threading
-from pynput import keyboard
-import webbrowser
 from gui.navigation import init_nicegui
-
-def open_browser():
-    """Просто відкриває вже запущений сервер у браузері"""
-    print("🚀 Відкриваю браузер...")
-    webbrowser.open("http://127.0.0.1:" + config.UI_PORT)
-
-def listen_hotkeys():
-    """Фонове прослуховування клавіш для відкриття браузера"""
-    hotkeys = {
-        '<cmd>+<shift>+9': open_browser,
-        '<ctrl>+<shift>+9': open_browser
-    }
-    print("⌨️  Слухаю комбінацію Cmd+Shift+9...")
-    with keyboard.GlobalHotKeys(hotkeys) as h:
-        h.join()
-
 
 def bot_worker(workflow):
     """Окрема функція для роботи бота в потоці"""

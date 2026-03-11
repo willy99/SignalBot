@@ -1,5 +1,3 @@
-from spacy.pipeline.tagger import tagger_score
-
 from domain.task import *
 from gui.services.request_context import RequestContext
 from service.connection.MyDataBase import MyDataBase
@@ -12,7 +10,6 @@ class TaskService:
         self.ctx = ctx
 
     def save_task(self, task: Task) -> int:
-        # 1. Формуємо словник для головної задачі
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         task_data = {
@@ -25,7 +22,6 @@ class TaskService:
             'updated_date': current_time
         }
 
-        # 2. Зберігаємо головну задачу
         if task.id is None:
             task_data['created_by'] = self.ctx.user_id
             task_data['created_date'] = current_time
@@ -35,10 +31,8 @@ class TaskService:
             task_id = task.id
             self.db.update_record(DB_TABLE_TASK, task_id, task_data)
 
-            # Очищуємо старі підзадачі перед записом нових
             self.db.delete_children(DB_TABLE_SUBTASK, 'task_id', task_id)
 
-        # 3. Зберігаємо нові підзадачі (якщо вони є)
         if task.subtasks:
             subtasks_data = [
                 {
@@ -64,7 +58,6 @@ class TaskService:
         """
         params = []
 
-        # 1. Фільтр по виконавцю (assignee)
         assignee_id = search_filter.get('assignee_id', 'all')
         if assignee_id == 'unassigned':
             query += " AND assignee IS NULL"
@@ -77,16 +70,13 @@ class TaskService:
         #    query += " AND created_by = ?"
         #    params.append(created_by)
 
-        # 3. Фільтр по типу задачі
         task_type = search_filter.get('task_type_filter', 'all')
         if task_type != 'all' and task_type is not None:
             query += " AND task_type = ?"
             params.append(task_type)
 
-        # 4. Фільтр по даті створення (Рік, З, До)
         created_year = search_filter.get('created_year')
         if created_year:
-            # У SQLite дати зберігаються як рядки 'YYYY-MM-DD ...'
             query += " AND created_date LIKE ?"
             params.append(f"{created_year}-%")
 
@@ -100,13 +90,11 @@ class TaskService:
             query += " AND created_date <= ?"
             params.append(f"{created_to} 23:59:59")  # Кінець доби
 
-        # 5. Тематичний період (дедлайни)
         period = search_filter.get('period_filter', 'all')
         if period != 'all':
             now = datetime.now()
             now_str = now.strftime('%Y-%m-%d %H:%M:%S')
 
-            # Початок і кінець поточного дня
             today_morning_str = now.strftime('%Y-%m-%d 00:00:00')
             today_evening_str = now.strftime('%Y-%m-%d 23:59:59')
 
@@ -135,16 +123,12 @@ class TaskService:
                 query += f" AND (task_status != '{TASK_STATUS_COMPLETED}' AND (task_deadline IS NULL OR task_deadline >= ?))"
                 params.append(now_str)
 
-        # Сортуємо: найсвіжіші зміни — зверху
         query += " ORDER BY updated_date DESC"
 
-        # Виконуємо запит
-        # print('query: ' + str(query))
         rows = self.db.__execute_fetchall__(query, tuple(params))
         return [self._map_row_to_task(r) for r in rows]
 
     def get_task_by_id(self, task_id: int) -> Task:
-        # 1. Завантажуємо головну задачу
         query = "SELECT * FROM task WHERE id = ?"
         task_row = self.db.__execute_fetch__(query, (task_id,))
 
@@ -153,7 +137,6 @@ class TaskService:
 
         task = self._map_row_to_task(task_row)
 
-        # 2. Завантажуємо підзадачі
         sub_query = "SELECT id, task_id, title, is_done FROM subtask WHERE task_id = ?"
         sub_rows = self.db.__execute_fetchall__(sub_query, (task_id,))
 
@@ -209,7 +192,6 @@ class TaskService:
     def _map_row_to_task(self, task_row: tuple) -> Task:
         """Допоміжний метод для перетворення сирого рядка з БД у Pydantic модель."""
 
-        # Функція для безпечного парсингу дат з рядка
         def parse_date(date_str):
             if not date_str: return None
             try:

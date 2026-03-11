@@ -126,6 +126,11 @@ class DocProcessor:
 
         fields[col.COLUMN_SERVICE_DAYS] = self._calculate_service_days(fields[col.COLUMN_ENLISTMENT_DATE], fields[col.COLUMN_DESERTION_DATE])
 
+        if self._check_error_sign(text_pieces[self.__PIECE_HEADER]):
+            fields[col.COLUMN_DESERTION_TYPE] = REVIEW_STATUS_ERROR
+            fields[col.COLUMN_REVIEW_STATUS] = REVIEW_STATUS_ERROR
+            fields[col.COLUMN_RETURN_DATE] = format_to_excel_date(self.insertion_date),
+
         text = text_pieces[self.__PIECE_4]
         fields[col.COLUMN_EXECUTOR] = self._extract_name(text)
 
@@ -497,23 +502,30 @@ class DocProcessor:
         return "407"
 
 
-    def check_for_errors(self, data_for_excel):
-        result = True
+    def check_for_errors(self, data_for_excel) -> list[str]:
+        result = []
         if not data_for_excel:
-            return False
+            return result
 
         for data_dict in data_for_excel:
             for col_name, value in data_dict.items():
                 if value == NA:
                     error = 'КОЛОНКА ' + col_name + ' ПОРОЖНЯ!'
+                    result.append(error)
                     self.logger.warning('------ ⚠️ ' + error)
-                    result = False
         return result
 
     def _check_return_sign(self, text):
         for pattern in PATTERN_RETURN_SIGN:
             if re.search(pattern, text, re.IGNORECASE):
                 self.logger.debug('--- ✌️ ВИЯВЛЕНО ПОВЕРНЕННЯ! УРА')
+                return True
+        return False
+
+    def _check_error_sign(self, text):
+        for pattern in PATTERN_ERROR_SIGN:
+            if re.search(pattern, text, re.IGNORECASE):
+                self.logger.debug('--- ☝️ ВИЯВЛЕНО ПОМИЛКОВЕ ПОВІДОМЛЕННЯ')
                 return True
         return False
 
