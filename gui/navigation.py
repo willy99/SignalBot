@@ -19,7 +19,7 @@ from gui.views.report import dups_report_view
 from gui.views.report import waiting_for_erdr_report_view
 from gui.views.report.logs_view import render_logs_page
 from gui.views.report import daily_report_view
-from gui.views.inbox import inbox_view
+from gui.views.inbox import inbox_triage_view
 from gui.views.task import task_list_view, task_edit_view
 from gui.views.calendar import calendar_view
 from gui.views.admin.admin_permissions_view import render_permissions_page
@@ -197,8 +197,8 @@ def init_nicegui(workflow_obj):
     @require_access(auth_manager, 'task', 'read')  # Або будь-яке інше право, яке ви використовуєте для доступу
     def inbox_page():
         ctx = auth_manager.get_current_context()
-        app_menu.render(ctx)  # Наше красиве єдине меню
-        inbox_view.render_inbox_page(inbox_ctrl, task_ctrl, auth_manager, ctx)
+        app_menu.render(ctx)
+        inbox_triage_view.render_inbox_page(inbox_ctrl, task_ctrl, auth_manager, ctx)
 
     @ui.page('/calendar')
     @require_access(auth_manager, 'search', 'read')

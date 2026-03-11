@@ -51,7 +51,7 @@ COLUMN_DBR_NUMBER: Final[str] = "№ вих на ДБР"
 COLUMN_DBR_DATE: Final[str] = "Дата відправки справи на ДБР"
 COLUMN_ERDR_DATE: Final[str] = "Дата внесення в ЄРДР"
 COLUMN_ERDR_NOTATION: Final[str] = "примітки/ ЄРДР"
-
+COLUMN_NOTATION: Final[str] = "Примітка"
 
 PATTERN_TITLE_MAPPING: Final[Dict[str, str]] = {
     # Складні звання (спочатку перевіряємо їх, щоб не "з'їсти" частину)
@@ -169,7 +169,7 @@ PATTERN_DESERTION_TYPE_MAPPING : Final[Dict[str, str]] = {
 }
 
 PATTERN_RETURN_SIGN: Final[List[str]] = [
-    r'(?i)(?<!не\s)(?<!не)(?:доповідь\s+про|факт)?\s*поверн(?:увся|ення)\s+'
+    r'(?i)(?<!не\s)(?<!не)(?:доповідь\s+про|факт)?\s*(поверн(?:увся|ення)|присутн(?:ості|ість))\s+'
 ]
 
 # Мапінг типів служби: Регулярний вираз -> Результат

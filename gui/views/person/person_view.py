@@ -154,6 +154,8 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, on_close=None)
                             date_input(COLUMN_ERDR_DATE, person, 'erdr_date', blur_handler=fix_date).classes('w-full mb-4').props('filled')
                             ui.textarea(COLUMN_ERDR_NOTATION).bind_value(person, 'erdr_notation').classes('w-full').props('filled autogrow')
 
+                            ui.textarea(COLUMN_NOTATION).bind_value(person, 'notation').classes('w-full min-h-[300px]')
+
         # ФУТЕР З КНОПКАМИ ДІЇ (Фіксований внизу екрану)
         with ui.row().classes('w-full justify-end items-center p-4 bg-white border-t border-gray-300 shrink-0 gap-4 shadow-inner z-10'):
             ui.button('Скасувати', icon='close', on_click=dialog.close).props('outline color="gray"').classes('px-6 h-12')

@@ -369,8 +369,10 @@ class ExcelProcessor:
 
         q_text = (filter_obj.query or "").lower().strip()
         q_des_year = filter_obj.des_year
-        q_des_date_from = datetime.strptime(filter_obj.des_date_from,EXCEL_DATE_FORMAT).date() if filter_obj.des_date_from else None
-        q_des_date_to = datetime.strptime(filter_obj.des_date_to, EXCEL_DATE_FORMAT).date() if filter_obj.des_date_to else None
+
+        q_des_date_from = date.fromisoformat(filter_obj.des_date_from) if filter_obj.des_date_from else None
+        q_des_date_to = date.fromisoformat(filter_obj.des_date_to) if filter_obj.des_date_to else None
+
 
         q_order = filter_obj.o_ass_num
         q_title2 = filter_obj.title2

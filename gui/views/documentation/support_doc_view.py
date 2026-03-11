@@ -477,17 +477,13 @@ def render_document_page(controller: SupportController, person_controller: Perso
                 finally:
                     save_draft_btn.enable()
 
-            save_draft_btn = ui.button('ЗБЕРЕГТИ', on_click=on_save_draft_click,
-                                       icon='save_as').classes('w-full mt-2 h-10').props('outline color="primary"')
+            save_draft_btn = ui.button('ЗБЕРЕГТИ', on_click=on_save_draft_click,icon='save_as').classes('w-full mt-2 h-10').props('outline color="primary"')
 
-            generate_docs_btn = ui.button('ЗГЕНЕРУВАТИ WORD', on_click=on_generate_docs_click,
-                                          icon='print').classes('w-full mt-4 h-12').props('color="green"')
+            generate_docs_btn = ui.button('ЗГЕНЕРУВАТИ WORD', on_click=on_generate_docs_click,icon='print').classes('w-full mt-4 h-12').props('color="green"')
 
-            complete_btn = ui.button('ВІДПРАВКА НА ДБР', on_click=on_send_dbr_click,
-                                     icon='exit_to_app').classes('w-full mt-2 h-10').props('color="primary"')
+            complete_btn = ui.button('ВІДПРАВКА НА ДБР', on_click=on_send_dbr_click,icon='exit_to_app').classes('w-full mt-2 h-10').props('color="primary"')
 
-            generate_logs_btn = ui.button('ЗГЕНЕРУВАТИ INFO ДЛЯ СEДО', on_click=on_generate_logs_click,
-                                          icon='description').classes('w-full mt-4 h-12').props('color="primary"')
+            generate_logs_btn = ui.button('ЗГЕНЕРУВАТИ INFO ДЛЯ СEДО', on_click=on_generate_logs_click,icon='description').classes('w-full mt-4 h-12').props('color="primary"')
 
             def refresh_status_ui():
                 current_status = state.get('status', DOC_STATUS_DRAFT)

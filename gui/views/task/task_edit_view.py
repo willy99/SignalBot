@@ -74,8 +74,9 @@ def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_
             'w-full mb-4 text-lg font-medium').props('autofocus outlined')
 
         # 3. Детальний опис
-        ui.textarea('Детальний опис задачі').bind_value(state, 'task_details').classes('w-full mb-4').props(
-            'outlined rows=6')
+        ui.editor(placeholder='Опишіть задачу, додайте деталі...').bind_value(state, 'task_details').classes(
+            'w-full mb-6 border border-gray-300 rounded'
+        )
 
         # 4. Дедлайн (Використовуємо поле з іконкою календаря/годинника)
         with ui.input('Дедлайн (ДД.ММ.РРРР ГГ:ХХ)').bind_value(state, 'task_deadline').classes('w-1/3 mb-6').props(

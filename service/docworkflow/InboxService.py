@@ -17,10 +17,11 @@ class InboxService:
         client = StorageFactory.create_client(config.INBOX_DIR_PATH, self.log_manager)
         result = {
             'root_files': [],
-            'personal_files': []
+            'personal_files': [],
+            'outbox_files': []
         }
         try:
-            with client:
+            with (client):
                 try:
                     root_items = client.list_files(config.INBOX_DIR_PATH, silent=True, exclude_dirs=True)
                     result['root_files'] = [f for f in root_items if not f.startswith('.')]
@@ -29,10 +30,16 @@ class InboxService:
 
                 if self.ctx.user_login:
                     user_path = f"{config.INBOX_DIR_PATH}{client.get_separator()}{self.ctx.user_login}"
+                    outbox_path = f"{config.OUTBOX_DIR_PATH}{client.get_separator()}{self.ctx.user_login}"
+
                     try:
                         u_items = client.list_files(user_path, silent=True, exclude_dirs=False)
                         if u_items:
                             result['personal_files'] = [f for f in u_items if not f.startswith('.')]
+                        u_items = client.list_files(outbox_path, silent=True, exclude_dirs=False)
+                        if u_items:
+                            result['outbox_files'] = [f for f in u_items if not f.startswith('.')]
+
                     except Exception:
                         pass
 
@@ -75,13 +82,13 @@ class InboxService:
                 self.logger.error(f"Помилка призначення файлу {filename} для {target_user}: {e}")
                 raise
 
-    def delete_file(self, user_login: str, filename: str):
+    def delete_file(self, user_login: str, folder:str, filename: str):
         """Видаляє файл з персональної папки користувача на SMB сервері."""
         client = StorageFactory.create_client(config.INBOX_DIR_PATH, self.log_manager)
         if user_login:
-            target_path = f"{config.INBOX_DIR_PATH}{client.get_separator()}{user_login}{client.get_separator()}{filename}"
+            target_path = f"{folder}{client.get_separator()}{user_login}{client.get_separator()}{filename}"
         else:
-            target_path = f"{config.INBOX_DIR_PATH}{client.get_separator()}{filename}"
+            target_path = f"{folder}{client.get_separator()}{filename}"
         with client:
             try:
                 # Метод remove_file вже був у вашому SMBFileClient

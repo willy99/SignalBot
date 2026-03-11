@@ -3,10 +3,8 @@ from abc import ABC, abstractmethod
 import datetime
 import config
 import os
-import threading
 
 class FileStorageClient(ABC):
-    _smb_lock = threading.Lock()
 
     @abstractmethod
     def get_separator(self):

@@ -31,10 +31,10 @@ class InboxController:
         source_user = ctx.user_login if is_personal else None
         service.assign_file(source_user, filename, target_username)
 
-    def delete_file(self, ctx:RequestContext, user_login:str, filename: str):
+    def delete_file(self, ctx:RequestContext, user_login:str, folder:str, filename: str):
         """Обробник для видалення файлу користувачем."""
         service = InboxService(self.log_manager, ctx)
-        service.delete_file(user_login, filename)
+        service.delete_file(user_login, folder, filename)
 
     def upload_root_file(self, ctx: RequestContext, filename: str, file_data: bytes):
         """Обробник для завантаження нового файлу через UI."""

@@ -1,18 +1,19 @@
 import io
 import os
 import smbclient
-# from smbclient import register_session, delete_session, open_file, makedirs
 from config import NET_SERVER_IP, NET_USERNAME, NET_PASSWORD
 from service.storage.FileStorageClient import FileStorageClient
 from service.storage.LoggerManager import LoggerManager
 import json
-import time
+import threading
 
 class SMBFileClient(FileStorageClient):
     """
     Клас для управління підключенням до мережевого диска через протокол SMB.
     Забезпечує роботу з файлами та папками за допомогою UNC шляхів.
     """
+
+    _shared_smb_semaphore = threading.BoundedSemaphore(5)
 
     def __init__(self, path, log_manager: LoggerManager):
         self.server_ip = NET_SERVER_IP
@@ -21,6 +22,7 @@ class SMBFileClient(FileStorageClient):
         self.is_connected = False
         self.logger = log_manager.get_logger()
         self.separator = "\\" if path.startswith("\\\\") else os.sep
+        self._smb_lock = SMBFileClient._shared_smb_semaphore
 
     def get_separator(self):
         return self.separator
@@ -35,27 +37,30 @@ class SMBFileClient(FileStorageClient):
         self.disconnect()
 
     def connect(self):
-        """Встановлює SMB-сесію з сервером."""
-        try:
-            smbclient.register_session(self.server_ip, username=self.username, password=self.password)
-            self.is_connected = True
-            # self.logger.debug(f"✅ Сесію з {self.server_ip} встановлено.")
-        except Exception as e:
-            self.logger.error(f"❌ Помилка підключення до SMB {self.server_ip}: {e}")
-            raise
+        """Встановлює SMB-сесію з сервером. Теж захищено семафором!"""
+        with self._smb_lock:
+            try:
+                smbclient.register_session(self.server_ip, username=self.username, password=self.password)
+                self.is_connected = True
+            except Exception as e:
+                error_msg = str(e).lower()
+                # 💡 Захист від мертвих сесій та залишку кредитів
+                if "credits" in error_msg or "connection" in error_msg:
+                    self.logger.warning(f"🔄 Вичерпано кредити або зависла сесія. Робимо жорстке скидання SMB кешу...")
+                    try:
+                        smbclient.reset_connection_cache()
+                        smbclient.register_session(self.server_ip, username=self.username, password=self.password)
+                        self.is_connected = True
+                        self.logger.info(f"✅ Сесію успішно відновлено після скидання.")
+                        return
+                    except Exception as retry_err:
+                        self.logger.error(f"❌ Помилка ПОВТОРНОГО підключення до SMB: {retry_err}")
+
+                self.logger.error(f"❌ Помилка підключення до SMB {self.server_ip}: {e}")
+                raise
 
     def disconnect(self):
-        """Закриває активну сесію."""
         self.is_connected = False
-        '''
-        if self.is_connected:
-            try:
-                smbclient.delete_session(self.server_ip)
-                self.is_connected = False
-                # self.logger.debug(f"🔌 Сесію з {self.server_ip} закрито.")
-            except Exception as e:
-                self.logger.error(f"⚠️ Помилка при закритті сесії: {e}")
-        '''
 
     def make_dirs(self, path: str):
         with self._smb_lock:
@@ -86,35 +91,25 @@ class SMBFileClient(FileStorageClient):
 
     def save_json(self, path: str, data: list):
         """Зберігає об'єкт Python у JSON файл на мережевому диску."""
-        try:
-            # open_file беремо з smbclient
-            with smbclient.open_file(path, mode='w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False)
-            self.logger.debug(f"💾 JSON успішно збережено: {path}")
-        except Exception as e:
-            self.logger.error(f"❌ Помилка збереження JSON у {path}: {e}")
-            raise
+        with self._smb_lock:
+            try:
+                # open_file беремо з smbclient
+                with smbclient.open_file(path, mode='w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False)
+                self.logger.debug(f"💾 JSON успішно збережено: {path}")
+            except Exception as e:
+                self.logger.error(f"❌ Помилка збереження JSON у {path}: {e}")
+                raise
 
     def load_json(self, path: str) -> list:
         """Читає JSON файл з мережевого диска."""
-        try:
-            with smbclient.open_file(path, mode='r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            self.logger.error(f"❌ Помилка читання JSON з {path}: {e}")
-            raise
-
-    '''
-    def copy_file(self, source_path: str, dest_path: str):
-        """Копіює файл з однієї SMB-папки в іншу SMB-папку."""
         with self._smb_lock:
             try:
-                smbclient.copyfile(source_path, dest_path)
-                self.logger.debug(f"📁 Файл успішно скопійовано на сервері в Outbox: {dest_path}")
+                with smbclient.open_file(path, mode='r', encoding='utf-8') as f:
+                    return json.load(f)
             except Exception as e:
-                self.logger.error(f"❌ Помилка копіювання на сервері ({source_path} -> {dest_path}): {e}")
+                self.logger.error(f"❌ Помилка читання JSON з {path}: {e}")
                 raise
-    '''
 
     def copy_file(self, source_path: str, dest_path: str):
         """Універсальне копіювання файлів (SMB<->SMB, Local->SMB, SMB->Local, Local->Local)."""
@@ -164,7 +159,6 @@ class SMBFileClient(FileStorageClient):
         """Переміщує (або перейменовує) файл на SMB-сервері."""
         with self._smb_lock:
             try:
-                # smbclient.rename працює миттєво для переміщення файлів на одному мережевому диску
                 smbclient.rename(source_path, dest_path)
                 self.logger.debug(f"📁 Файл переміщено: {source_path} -> {dest_path}")
             except Exception as e:
@@ -172,11 +166,9 @@ class SMBFileClient(FileStorageClient):
                 raise
 
     def list_files(self, path: str, silent: bool = False, exclude_dirs: bool = False) -> list:
-        # 1. Світлофор залишається (він має метод __enter__, з ним все ок)
         with self._smb_lock:
             try:
                 files = []
-                # 2. Просто перебираємо результати в циклі, без `with`
                 for entry in smbclient.scandir(path):
                     if entry.is_dir() and not exclude_dirs:
                         files.append(entry.name)

@@ -23,8 +23,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
 
         # Група кнопок праворуч
         with ui.row().classes('items-center gap-4'):
-            save_draft_btn = ui.button('ЗБЕРЕГТИ ЧЕРНЕТКУ', icon='save').props('outline color="primary"').classes(
-                'h-10')
+            save_draft_btn = ui.button('ЗБЕРЕГТИ ЧЕРНЕТКУ', icon='save').props('outline color="primary"').classes('h-10')
             generate_docs_btn = ui.button('СФОРМУВАТИ (WORD)', icon='description').props('color="blue"').classes('h-10')
             complete_btn = ui.button('ВІДПРАВКА НА КПП', icon='send').props('color="green"').classes('h-10')
 
@@ -211,10 +210,8 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                                         ui.label(str(p.rnokpp)).classes('text-xs text-gray-500 truncate w-full')
 
                                     ui.label(getattr(p, 'title', '')).classes('w-32 shrink-0 text-sm truncate')
-                                    ui.label(format_to_excel_date(p.desertion_date)).classes(
-                                        'w-24 shrink-0 text-sm text-red-600 text-center')
-                                    ui.label(getattr(p, 'review_status', '')).classes(
-                                        'w-24 shrink-0 text-sm text-center truncate')
+                                    ui.label(format_to_excel_date(p.desertion_date)).classes('w-24 shrink-0 text-sm text-red-600 text-center')
+                                    ui.label(getattr(p, 'review_status', '')).classes('w-24 shrink-0 text-sm text-center truncate')
 
                     ui.notify(f'Знайдено {len(results)} кандидатів', type='info')
 
@@ -326,9 +323,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                                     ui.label(info_str).classes('text-xs text-gray-500')
 
                                 with ui.row().classes('gap-1'):
-                                    delete_button = ui.button(icon='close', color='red',
-                                                              on_click=lambda idx=i: on_remove_click(idx)).props(
-                                        'flat dense size=sm')
+                                    delete_button = ui.button(icon='close', color='red', on_click=lambda idx=i: on_remove_click(idx)).props('flat dense size=sm')
 
                                     if state['status'] == DOC_STATUS_COMPLETED:
                                         delete_button.disable()
@@ -394,6 +389,8 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                     return
                 await on_save_draft_click()
 
+                ui.notify('❌ Ой, ще не реалізовано!', type='warning')
+                return
                 complete_btn.disable()
                 complete_btn.props('loading')
                 ui.notify('⏳ Оновлюємо дані в Excel, зачекайте...', type='info')
@@ -412,7 +409,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                     if success:
                         state['status'] = DOC_STATUS_COMPLETED
                         refresh_status_ui()
-                        ui.notify(f'✅ Справи успішно відправлені на КПП!', type='positive')
+                        ui.notify(f'✅ Справи успішно помічені, як відправлені!', type='positive')
                     else:
                         ui.notify(f'⚠️ Виникла помилка під час відправки', type='negative')
                 except Exception as e:
