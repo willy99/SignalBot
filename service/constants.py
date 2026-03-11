@@ -4,6 +4,7 @@ DB_TABLE_SUPPORT_DOC: Final[str] = 'support_docs'
 DB_TABLE_DBR_DOC: Final[str] = 'dbr_docs'
 DB_TABLE_NOTIF_DOC: Final[str] = 'notif_docs'
 DB_TABLE_TASK: Final[str] = 'task'
+DB_TABLE_SUBTASK: Final[str] = 'subtask'
 
 DOC_STATUS_DRAFT: Final[str] = 'Draft'
 DOC_STATUS_COMPLETED: Final[str] = 'Completed'

@@ -1,5 +1,6 @@
 import os
 import multiprocessing
+import argparse
 
 os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
@@ -22,7 +23,7 @@ from gui.navigation import init_nicegui
 def open_browser():
     """Просто відкриває вже запущений сервер у браузері"""
     print("🚀 Відкриваю браузер...")
-    webbrowser.open("http://127.0.0.1:8080")
+    webbrowser.open("http://127.0.0.1:" + config.UI_PORT)
 
 def listen_hotkeys():
     """Фонове прослуховування клавіш для відкриття браузера"""
@@ -51,8 +52,19 @@ def bot_worker(workflow):
     except Exception as e:
         print(f"❌ Помилка бота: {e}")
 
+def parse_parameters():
+    parser = argparse.ArgumentParser(description="Система A0224 Втікачі")
+    parser.add_argument('--dev', action='store_true', help='Запуск у режимі розробки (порт 8081, автоперезавантаження)')
+    parser.add_argument('--prod', action='store_true', help='Запуск у бойовому режимі (порт 8080)')
+    args = parser.parse_args()
+    config.IS_DEV = args.dev
+
+    if config.IS_DEV:
+        print ('>>> 🖥🖥🖥🖥🖥🖥🖥🖥🖥🖥🖥🖥🖥    RUNNING IN DEV MODE:    🖥🖥🖥🖥🖥🖥🖥🖥🖥🖥🖥🖥🖥')
 
 def main():
+    parse_parameters()
+
     workflow = MyWorkFlow()
     try:
         # Ініціалізація Excel

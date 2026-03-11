@@ -251,5 +251,5 @@ def init_nicegui(workflow_obj):
 
     # native=False дозволяє працювати як веб-сервер
     # reload=False обов'язково, бо ми в потоці
-    ui.run(port=8080, title='A0224 Втікачі', reload=False, show=False, storage_secret=config.UI_SECRET_KEY)
+    ui.run(port=config.UI_PORT, title='A0224 Втікачі', reload=config.UI_RELOAD, show=False, storage_secret=config.UI_SECRET_KEY)
 

@@ -208,7 +208,7 @@ class ExcelReporter:
                 name_key = f"{id_number}_{name}"
 
                 # 1. Отримуємо список дублікатів (якщо немає - створюємо порожній)
-                review_status = str(row[exp_review_idx]).strip().lower()
+                review_status = str(row[exp_review_idx]).strip()
 
                 rank_separated_key = 'офіцер' if is_officer else 'сержант' if is_sergeant else 'рядовий'  # для класифіц. звіту
                 if des_year_less_equal:
@@ -437,7 +437,7 @@ class ExcelReporter:
                 is_sergeant = 'сержант' in rank
                 rank_key = 'офіцер' if is_officer else 'рядовий_сержант'
                 suspended = str(row[suspended_idx]).strip()
-                review_status = str(row[exp_review_idx]).strip().lower()
+                review_status = str(row[exp_review_idx]).strip()
 
                 name_key = f"{id_number}_{name}"
                 rank_separated_key = 'офіцер' if is_officer else 'сержант' if is_sergeant else 'рядовий'
@@ -475,7 +475,7 @@ class ExcelReporter:
                 if ret_res_str and ret_res_str != 'None' and ret_res_date_year == des_date_year:
                     stats[des_date_year][rank_key]['ret_res'] += 1
 
-                # 3. ІНШІ СТАТУСИ
+                # 3. ІНШІ СТАТУСИ. Відмови ми не рахуємо, памʼятай! 402 статя - лісом!
                 for review_key, value in REVIEW_STATUS_MAP.items():
                     if review_status in value:
                         stats[des_date_year]['all'][review_key] += 1

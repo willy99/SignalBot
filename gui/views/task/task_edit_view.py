@@ -1,16 +1,15 @@
 from nicegui import ui
 from datetime import datetime
 from gui.services.request_context import RequestContext
-from domain.task import Task
+from domain.task import Task, Subtask
 from gui.controllers.task_controller import TaskController
 from service.constants import TASK_STATUS_NEW, TASK_STATUS_COMPLETED
 from dics.deserter_xls_dic import TASK_TYPES
 
+
 def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_id: int = None):
     is_new = task_id is None
     page_title = 'Створення нової задачі' if is_new else f'Редагування задачі №{task_id}'
-
-    ui.label(page_title).classes('w-full text-center text-3xl font-bold mb-6')
 
     # Стейт форми
     state = {
@@ -20,7 +19,8 @@ def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_
         'task_type': 'Документація',
         'assignee': ctx.user_id,
         'task_deadline': '',
-        'task_status': TASK_STATUS_NEW  # За замовчуванням
+        'task_status': TASK_STATUS_NEW,  # За замовчуванням
+        'subtasks': []
     }
 
     users_list = controller.get_available_users()
@@ -45,6 +45,9 @@ def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_
             state['task_type'] = existing_task.task_type or 'Інше'
             state['assignee'] = existing_task.assignee
             state['task_status'] = existing_task.task_status
+            if existing_task.subtasks:
+                state['subtasks'] = [{'title': st.title, 'is_done': st.is_done} for st in existing_task.subtasks]
+
             if existing_task.task_deadline:
                 # Конвертуємо datetime в рядок для UI
                 state['task_deadline'] = existing_task.task_deadline.strftime('%d.%m.%Y %H:%M')
@@ -53,80 +56,123 @@ def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_
             ui.navigate.to('/tasks')
             return
 
-    # --- МАЛЮЄМО ФОРМУ ---
-    with ui.card().classes('w-full max-w-4xl mx-auto p-6 shadow-md'):
+    # --- ОБРОБНИК ЗБЕРЕЖЕННЯ (Перенесено наверх) ---
+    def on_save():
+        if not state['task_subject'].strip():
+            ui.notify('Введіть тему задачі!', type='warning')
+            return
 
-        # 1. Рядок: Статус, Виконавець, Тип
-        with ui.row().classes('w-full items-center gap-4 mb-4'):
-
-            # Статус (просто кольоровий бейдж, змінюється на дошці)
-            badge_color = 'green' if state['task_status'] == TASK_STATUS_COMPLETED else 'blue'
-            with ui.row().classes('items-center gap-2'):
-                ui.label('Статус:').classes('text-gray-500 font-medium')
-                ui.badge(state['task_status'], color=badge_color).classes('text-sm px-2 py-1')
-
-            # Випадаючі списки
-            ui.select(users_options, label='Виконавець (Кому)').bind_value(state, 'assignee').classes('flex-1')
-            ui.select(type_options, label='Тип задачі').bind_value(state, 'task_type').classes('w-1/4')
-
-        # 2. Тема задачі
-        ui.input('Короткий заголовок (Тема)').bind_value(state, 'task_subject').classes(
-            'w-full mb-4 text-lg font-medium').props('autofocus outlined')
-
-        # 3. Детальний опис
-        ui.editor(placeholder='Опишіть задачу, додайте деталі...').bind_value(state, 'task_details').classes(
-            'w-full mb-6 border border-gray-300 rounded'
-        )
-
-        # 4. Дедлайн (Використовуємо поле з іконкою календаря/годинника)
-        with ui.input('Дедлайн (ДД.ММ.РРРР ГГ:ХХ)').bind_value(state, 'task_deadline').classes('w-1/3 mb-6').props(
-                'outlined clearable') as deadline_input:
-            with deadline_input.add_slot('append'):
-                ui.icon('event').classes('cursor-pointer')
-                with ui.menu().classes('p-2'):
-                    ui.date().bind_value(state, 'task_deadline').props('mask="DD.MM.YYYY HH:mm"')
-                    ui.time().bind_value(state, 'task_deadline').props('mask="DD.MM.YYYY HH:mm" format24h')
-
-        ui.separator().classes('mb-4')
-
-        # --- ОБРОБНИК ЗБЕРЕЖЕННЯ ---
-        def on_save():
-            if not state['task_subject'].strip():
-                ui.notify('Введіть тему задачі!', type='warning')
+        # Парсимо дедлайн назад у datetime, якщо він є
+        parsed_deadline = None
+        if state['task_deadline']:
+            try:
+                parsed_deadline = datetime.strptime(state['task_deadline'], '%d.%m.%Y %H:%M')
+            except ValueError:
+                ui.notify('Невірний формат дати. Використовуйте ДД.ММ.РРРР ГГ:ХХ', type='negative')
                 return
 
-            # Парсимо дедлайн назад у datetime, якщо він є
-            parsed_deadline = None
-            if state['task_deadline']:
-                try:
-                    parsed_deadline = datetime.strptime(state['task_deadline'], '%d.%m.%Y %H:%M')
-                except ValueError:
-                    ui.notify('Невірний формат дати. Використовуйте ДД.ММ.РРРР ГГ:ХХ', type='negative')
-                    return
+        parsed_subtasks = [Subtask(title=st['title'], is_done=st['is_done']) for st in state.get('subtasks', [])]
 
-            # Створюємо об'єкт Pydantic
-            # Примітка: Task імпортуємо з вашого сервісу
-            task_model = Task(
-                id=state['id'],
-                created_by=ctx.user_id,  # Якщо це редагування, сервіс проігнорує це поле і залишить старого автора
-                assignee=state['assignee'],
-                task_status=state['task_status'],
-                task_type=state['task_type'],
-                task_subject=state['task_subject'].strip(),
-                task_details=state['task_details'].strip(),
-                task_deadline=parsed_deadline
-            )
+        task_model = Task(
+            id=state['id'],
+            created_by=ctx.user_id,
+            assignee=state['assignee'],
+            task_status=state['task_status'],
+            task_type=state['task_type'],
+            task_subject=state['task_subject'].strip(),
+            task_details=state['task_details'].strip(),
+            task_deadline=parsed_deadline,
+            subtasks=parsed_subtasks
+        )
 
-            try:
-                # Зберігаємо через контролер
-                saved_id = controller.save_task(ctx, task_model)
-                ui.notify(f'Задачу №{saved_id} успішно збережено!', type='positive')
-                ui.navigate.to('/tasks')  # Повертаємось на дошку
-            except Exception as e:
-                ui.notify(f'Помилка збереження: {e}', type='negative')
+        try:
+            saved_id = controller.save_task(ctx, task_model)
+            ui.notify(f'Задачу №{saved_id} успішно збережено!', type='positive')
+            ui.navigate.to('/tasks')
+        except Exception as e:
+            ui.notify(f'Помилка збереження: {e}', type='negative')
 
-        # 5. Кнопки управління
-        with ui.row().classes('w-full justify-between items-center'):
-            ui.button('Скасувати', icon='close', on_click=lambda: ui.navigate.to('/tasks')).props('flat color="gray"')
-            ui.button('Зберегти задачу', icon='save', on_click=on_save).props('color="primary" size="lg"').classes(
-                'px-8')
+    # ==========================================
+    # ШАПКА ФОРМИ (Заголовок + Кнопки)
+    # ==========================================
+    with ui.row().classes('w-full max-w-6xl mx-auto items-center justify-between mb-6'):
+        ui.label(page_title).classes('text-3xl font-bold')
+
+        with ui.row().classes('items-center gap-4'):
+            ui.button('СКАСУВАТИ', icon='close', on_click=lambda: ui.navigate.to('/tasks')).props('flat color="gray"').classes('h-10')
+            ui.button('ЗБЕРЕГТИ', icon='save', on_click=on_save).props('color="primary"').classes('h-10 px-8')
+
+    # ==========================================
+    # ТІЛО ФОРМИ (Дві колонки)
+    # ==========================================
+    with ui.grid(columns=12).classes('w-full max-w-6xl mx-auto gap-6 items-start'):
+
+        # --- ЛІВА ПАНЕЛЬ: Тема, Опис, Чек-ліст ---
+        with ui.column().classes('col-span-12 md:col-span-8 w-full gap-4'):
+            with ui.card().classes('w-full p-6 shadow-md'):
+
+                ui.input('Короткий заголовок (Тема)').bind_value(state, 'task_subject').classes(
+                    'w-full mb-4 text-lg font-bold').props('autofocus outlined')
+
+                ui.label('Детальний опис задачі').classes('text-sm text-gray-500 font-medium mb-1')
+                ui.editor(placeholder='Опишіть задачу, додайте деталі...').bind_value(state, 'task_details').classes(
+                    'w-full mb-6 border border-gray-300 rounded'
+                )
+
+                ui.label('Чек-ліст (Підзадачі)').classes('text-sm text-gray-500 font-medium mb-1')
+
+                @ui.refreshable
+                def render_subtasks():
+                    subtasks = state.get('subtasks', [])
+                    if subtasks:
+                        completed = sum(1 for st in subtasks if st.get('is_done'))
+                        total = len(subtasks)
+                        progress = completed / total if total > 0 else 0
+                        ui.linear_progress(progress, show_value=False).props('color="green"').classes('mb-2')
+                        ui.label(f'Виконано: {completed} з {total}').classes('text-xs text-gray-500 mb-2')
+
+                    with ui.column().classes('w-full gap-1'):
+                        for idx, st in enumerate(subtasks):
+                            with ui.row().classes('w-full items-center justify-between group hover:bg-gray-50 p-1 rounded transition-colors flex-nowrap'):
+                                with ui.row().classes('items-center gap-2 flex-grow overflow-hidden'):
+                                    ui.checkbox().bind_value(st, 'is_done').on('change', render_subtasks.refresh)
+                                    text_classes = 'text-gray-400 text-sm truncate line-through' if st.get('is_done') else 'text-gray-800 text-sm truncate'
+                                    ui.label(st['title']).classes(text_classes)
+                                ui.button(icon='close', on_click=lambda i=idx: remove_subtask(i)).props('flat dense size="sm" color="red"').classes('opacity-50 hover:opacity-100')
+
+                def add_subtask(e=None):
+                    val = new_subtask_input.value
+                    if val and val.strip():
+                        state['subtasks'].append({'title': val.strip(), 'is_done': False})
+                        new_subtask_input.value = ''
+                        render_subtasks.refresh()
+
+                def remove_subtask(index):
+                    state['subtasks'].pop(index)
+                    render_subtasks.refresh()
+
+                with ui.card().classes('w-full p-4 mb-2 shadow-none border border-gray-200 bg-gray-50/50'):
+                    render_subtasks()
+                    with ui.row().classes('w-full items-center gap-2 mt-2 flex-nowrap'):
+                        ui.icon('add_task', color='gray-400')
+                        new_subtask_input = ui.input(placeholder='Додати нову підзадачу...').classes('flex-grow').props('dense borderless')
+                        new_subtask_input.on('keydown.enter', add_subtask)
+                        ui.button('Додати', on_click=add_subtask).props('flat color="primary" size="sm"')
+
+        # --- ПРАВА ПАНЕЛЬ: Параметри ---
+        with ui.column().classes('col-span-12 md:col-span-4 w-full gap-4'):
+            with ui.card().classes('w-full p-6 shadow-md gap-4'):
+                badge_color = 'green' if state['task_status'] == TASK_STATUS_COMPLETED else 'blue'
+                with ui.row().classes('items-center justify-between w-full border-b border-gray-100 pb-3 mb-2'):
+                    ui.label('Статус:').classes('text-gray-600 font-bold')
+                    ui.badge(state['task_status'], color=badge_color).classes('text-sm px-2 py-1')
+
+                ui.select(users_options, label='Виконавець (Кому)').bind_value(state, 'assignee').classes('w-full')
+                ui.select(type_options, label='Тип задачі').bind_value(state, 'task_type').classes('w-full')
+
+                with ui.input('Дедлайн').bind_value(state, 'task_deadline').classes('w-full').props('outlined clearable') as deadline_input:
+                    with deadline_input.add_slot('append'):
+                        ui.icon('event').classes('cursor-pointer')
+                        with ui.menu().classes('p-2'):
+                            ui.date().bind_value(state, 'task_deadline').props('mask="DD.MM.YYYY HH:mm"')
+                            ui.time().bind_value(state, 'task_deadline').props('mask="DD.MM.YYYY HH:mm" format24h')

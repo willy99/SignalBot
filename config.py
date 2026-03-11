@@ -1,13 +1,25 @@
 import os
 from typing import Final
 from dotenv import load_dotenv
+import sys
 
 load_dotenv()
+IS_DEV = '--dev' in sys.argv
 
 NET_SERVER_IP = os.getenv("NET_SERVER_IP", "127.0.0.1")
 NET_USERNAME = os.getenv("NET_USERNAME")
 NET_PASSWORD = os.getenv("NET_PASSWORD")
 UI_SECRET_KEY = os.getenv("UI_SECRET_KEY")
+
+
+if IS_DEV:
+    UI_PORT=8081
+    UI_RELOAD=False
+    DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_copy_pasha.xlsx"
+else:
+    UI_PORT=8080
+    UI_RELOAD=False
+    DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_1.xlsx"
 
 # Основна функціональність
 PROCESS_DOC : Final = True   # copy doc file from signal to date-folder
@@ -21,10 +33,6 @@ SAVE_EXCEL_AT_CLOSE = False # по закриттю зберігати всі з
 EXCEL_DIR: Final[str] = 'exchange\\projekt407'
 DOC_DIR : Final[str] = "exchange\\ДД"
 BACKUP_DIR: Final[str] = 'exchange\\projekt407\\backups'
-
-#DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_copy_pasha.xlsx"
-DESERTER_XLSX: Final = "А0224 СЗЧ 2022-2025_1.xlsx"
-# DESERTER_XLSX: Final = "Тестовий Майданчик - не чипати.xlsx"
 
 DESERTER_TAB_NAME : Final = "А0224"
 DESERTER_RESERVE_TAB_NAME : Final = "А7018"

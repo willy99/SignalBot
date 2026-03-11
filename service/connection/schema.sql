@@ -58,6 +58,17 @@ CREATE TABLE IF NOT EXISTS task (
 );
 
 
+CREATE TABLE IF NOT EXISTS subtask (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    is_done INTEGER DEFAULT 0,  -- SQLite не має типу BOOLEAN, використовуємо 0 або 1
+    FOREIGN KEY (task_id) REFERENCES task (id) ON DELETE CASCADE
+);
+
+
+
+
 CREATE TABLE IF NOT EXISTS dbr_docs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created_by INTEGER NOT NULL,

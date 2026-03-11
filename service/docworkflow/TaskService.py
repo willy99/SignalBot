@@ -1,11 +1,9 @@
-from typing import List
-
-from engineio.async_client import task_reference_holder
+from spacy.pipeline.tagger import tagger_score
 
 from domain.task import *
 from gui.services.request_context import RequestContext
 from service.connection.MyDataBase import MyDataBase
-from service.constants import DB_TABLE_TASK, TASK_STATUS_IN_PROGRESS, TASK_STATUS_NEW, TASK_STATUS_COMPLETED
+from service.constants import DB_TABLE_TASK, TASK_STATUS_IN_PROGRESS, TASK_STATUS_NEW, TASK_STATUS_COMPLETED, DB_TABLE_SUBTASK
 from datetime import datetime, timedelta
 
 class TaskService:
@@ -14,31 +12,45 @@ class TaskService:
         self.ctx = ctx
 
     def save_task(self, task: Task) -> int:
-        """Зберігає нову або оновлює існуючу задачу."""
-
-        # Перетворюємо Pydantic модель у словник, виключаючи системні поля, які ми контролюємо самі
-        data_to_save = task.model_dump(exclude={'id', 'created_date', 'updated_date'}, exclude_none=True)
-        if task.task_deadline:
-            data_to_save['task_deadline'] = task.task_deadline.strftime('%Y-%m-%d %H:%M:%S')
-        else:
-            data_to_save['task_deadline'] = None
-
+        # 1. Формуємо словник для головної задачі
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        if task.id:
-            # ОНОВЛЕННЯ ІСНУЮЧОЇ ЗАДАЧІ
-            data_to_save['updated_date'] = current_time
-            self.db.update_record(DB_TABLE_TASK, task.id, data_to_save)
-            return task.id
-        else:
-            # СТВОРЕННЯ НОВОЇ ЗАДАЧІ
-            data_to_save['created_by'] = self.ctx.user_id  # Примусово ставимо автора з контексту
-            data_to_save['task_status'] = TASK_STATUS_NEW if not task.task_status else task.task_status
-            data_to_save['created_date'] = current_time
-            data_to_save['updated_date'] = current_time
+        task_data = {
+            'task_subject': task.task_subject,
+            'task_details': task.task_details,
+            'task_type': task.task_type,
+            'assignee': task.assignee,
+            'task_status': task.task_status,
+            'task_deadline': task.task_deadline,
+            'updated_date': current_time
+        }
 
-            print(str(data_to_save))
-            return self.db.insert_record(DB_TABLE_TASK, data_to_save)
+        # 2. Зберігаємо головну задачу
+        if task.id is None:
+            task_data['created_by'] = self.ctx.user_id
+            task_data['created_date'] = current_time
+            task_id = self.db.insert_record(DB_TABLE_TASK, task_data)
+
+        else:
+            task_id = task.id
+            self.db.update_record(DB_TABLE_TASK, task_id, task_data)
+
+            # Очищуємо старі підзадачі перед записом нових
+            self.db.delete_children(DB_TABLE_SUBTASK, 'task_id', task_id)
+
+        # 3. Зберігаємо нові підзадачі (якщо вони є)
+        if task.subtasks:
+            subtasks_data = [
+                {
+                    'task_id': task_id,
+                    'title': st.title,
+                    'is_done': 1 if st.is_done else 0
+                }
+                for st in task.subtasks
+            ]
+            self.db.insert_records_batch(DB_TABLE_SUBTASK, subtasks_data)
+
+        return task_id
 
     def get_all_tasks(self, search_filter: dict) -> List[Task]:
         """
@@ -131,14 +143,30 @@ class TaskService:
         rows = self.db.__execute_fetchall__(query, tuple(params))
         return [self._map_row_to_task(r) for r in rows]
 
-    def get_task_by_id(self, task_id: int) -> Optional[Task]:
-        """Отримує конкретну задачу за ID."""
-        query = f"SELECT id, created_by, assignee, task_status, task_type, task_subject, task_details, task_deadline, created_date, updated_date FROM {DB_TABLE_TASK} WHERE id = ?"
-        row = self.db.__execute_fetch__(query, (task_id,))
+    def get_task_by_id(self, task_id: int) -> Task:
+        # 1. Завантажуємо головну задачу
+        query = "SELECT * FROM task WHERE id = ?"
+        task_row = self.db.__execute_fetch__(query, (task_id,))
 
-        if row:
-            return self._map_row_to_task(row)
-        return None
+        if not task_row:
+            return None
+
+        task = self._map_row_to_task(task_row)
+
+        # 2. Завантажуємо підзадачі
+        sub_query = "SELECT id, task_id, title, is_done FROM subtask WHERE task_id = ?"
+        sub_rows = self.db.__execute_fetchall__(sub_query, (task_id,))
+
+        task.subtasks = [
+            Subtask(
+                id=row['id'],
+                task_id=row['task_id'],
+                title=row['title'],
+                is_done=bool(row['is_done'])
+            ) for row in sub_rows
+        ]
+
+        return task
 
     def get_task_counts_for_user(self, user_id) -> tuple[int, int]:
         try:
@@ -178,7 +206,7 @@ class TaskService:
         self.db.update_record(DB_TABLE_TASK, task_id, data)
         return True
 
-    def _map_row_to_task(self, r: tuple) -> Task:
+    def _map_row_to_task(self, task_row: tuple) -> Task:
         """Допоміжний метод для перетворення сирого рядка з БД у Pydantic модель."""
 
         # Функція для безпечного парсингу дат з рядка
@@ -189,18 +217,21 @@ class TaskService:
             except ValueError:
                 return None
 
-        return Task(
-            id=r[0],
-            created_by=r[1],
-            assignee=r[2],
-            task_status=r[3],
-            task_type=r[4],
-            task_subject=r[5],
-            task_details=r[6],
-            task_deadline=parse_date(r[7]),
-            created_date=parse_date(r[8]),
-            updated_date=parse_date(r[9])
+        task = Task(
+            id=task_row['id'],
+            task_subject=task_row['task_subject'],
+            task_details=task_row['task_details'],
+            task_type=task_row['task_type'],
+            assignee=task_row['assignee'],
+            task_status=task_row['task_status'],
+            task_deadline=parse_date(task_row['task_deadline']),
+            created_by = task_row['created_by'],
+            created_date=parse_date(task_row['created_date']),
+            updated_date=parse_date(task_row['updated_date']),
+            subtasks=[]
         )
+
+        return task
 
     def get_triggered_alarms(self, user_id: int) -> list:
         """Повертає ID та Теми задач, дедлайн яких ЩОЙНО настав або вже минув"""

@@ -39,6 +39,7 @@ class MyDataBase:
         if self.connection is None:
             # timeout=10 змушує SQLite почекати 10 секунд, якщо база зайнята, замість помилки
             self.connection = sqlite3.connect(self.db_name, check_same_thread=False, timeout=10)
+            self.connection.row_factory = sqlite3.Row
 
             # Вмикаємо режим WAL (дозволяє паралельне читання та запис)
             self.connection.execute('PRAGMA journal_mode=WAL;')
@@ -90,6 +91,28 @@ class MyDataBase:
         # __execute_insert__ повертає lastrowid, що нам і треба
         return self.__execute_insert__(query, tuple(data.values()))
 
+    def insert_records_batch(self, table: str, data_list: list) -> bool:
+        """Масовий запис списку словників (для оптимізації)."""
+        if not data_list:
+            return True
+
+        columns = ', '.join(data_list[0].keys())
+        placeholders = ', '.join(['?'] * len(data_list[0]))
+        query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
+
+        conn = self.connect()
+        try:
+            with closing(conn.cursor()) as cursor:
+                # Перетворюємо список словників у список кортежів значень
+                values = [tuple(data.values()) for data in data_list]
+                cursor.executemany(query, values)
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            print(f"❌ Помилка масового запису в БД: {e}")
+            conn.rollback()
+            return False
+
     def update_record(self, table: str, record_id: int, data: dict):
         set_clause = ', '.join([f"{k} = ?" for k in data.keys()])
         query = f"UPDATE {table} SET {set_clause} WHERE id = ?"
@@ -102,3 +125,10 @@ class MyDataBase:
         query = f"DELETE FROM {table} WHERE id = ?"
         self.__execute_insert__(query, (record_id,))
         return True
+
+    def delete_children(self, table: str, field: str, value):
+        """Універсальне видалення записів за вказаним полем (наприклад, task_id)."""
+        query = f"DELETE FROM {table} WHERE {field} = ?"
+        self.__execute_insert__(query, (value,))
+        return True
+

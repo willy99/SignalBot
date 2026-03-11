@@ -33,8 +33,14 @@ class AppMenu:
 
         with ui.header().classes('bg-slate-800 items-center justify-between'):
             with ui.row().classes('items-center gap-2'):
-                ui.button('А0224, 🏃‍♂️ВТІКАЧІ 👨‍🚀', on_click=lambda: ui.navigate.to('/')) \
-                    .props('flat').classes('font-bold text-xl text-white normal-case')
+                if config.IS_DEV:
+                    title = 'DEVMODE!!!'
+                    props = 'color="red" stack'
+                else:
+                    title = 'А0224, 🏃‍♂️ВТІКАЧІ 👨‍🚀'
+                    props = 'flat'
+                ui.button(title, on_click=lambda: ui.navigate.to('/')) \
+                    .props(props).classes('font-bold text-xl text-white normal-case')
 
                 # ==========================================
                 # 🌟 1. ІКОНКА INBOX (Нова логіка)
