@@ -358,7 +358,7 @@ class ExcelProcessor:
         return self.column_values
 
     def search_people(self, filter_obj: PersonSearchFilter) -> list:
-        self.switch_to_sheet(DESERTER_TAB_NAME, silent=True)
+        self.switch_to_sheet(filter_obj.mil_unit if filter_obj.mil_unit else DESERTER_TAB_NAME , silent=True)
 
         results = []
         last_row = self.get_last_row()
@@ -372,7 +372,6 @@ class ExcelProcessor:
 
         q_des_date_from = date.fromisoformat(filter_obj.des_date_from) if filter_obj.des_date_from else None
         q_des_date_to = date.fromisoformat(filter_obj.des_date_to) if filter_obj.des_date_to else None
-
 
         q_order = filter_obj.o_ass_num
         q_title2 = filter_obj.title2

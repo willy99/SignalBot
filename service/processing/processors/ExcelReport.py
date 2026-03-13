@@ -4,6 +4,8 @@ import traceback
 import config
 from dics.deserter_xls_dic import *
 from collections import defaultdict
+
+from service.constants import DB_DATE_FORMAT
 from service.storage.LoggerManager import LoggerManager
 from config import DESERTER_TAB_NAME, EXCEL_DATE_FORMAT
 from utils.utils import get_strint_fromfloat, get_year_safe
@@ -669,7 +671,7 @@ class ExcelReporter:
             exclude_names = []
 
         # Форматуємо дату так, як вона записана в логах на початку рядка (напр. "2026-03-04")
-        log_date_prefix = target_date.strftime('%Y-%m-%d')
+        log_date_prefix = target_date.strftime(DB_DATE_FORMAT)
 
         log_path = self.log_manager.get_log_path()
         unique_returns = {}

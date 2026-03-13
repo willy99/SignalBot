@@ -3,7 +3,7 @@ from gui.services.request_context import RequestContext
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
 
 def render_notif_drafts_list_page(notif_ctrl, ctx: RequestContext):
-    ui.label('Список пакетів для відправки на ДБР').classes('w-full text-center text-3xl font-bold mb-8')
+    ui.label('Список пакетів для відправки повідомлень').classes('w-full text-center text-3xl font-bold mb-8')
 
     try:
         drafts = notif_ctrl.get_all_drafts(ctx)

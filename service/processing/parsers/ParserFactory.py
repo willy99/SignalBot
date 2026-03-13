@@ -4,6 +4,8 @@ from service.storage.LoggerManager import LoggerManager
 from .DocxParser import DocxParser
 from .DocOldParser import DocOldParser
 from .PdfParser import PdfParser
+from .TxtParser import TxtParser
+
 
 class ParserFactory:
     @staticmethod
@@ -13,7 +15,8 @@ class ParserFactory:
         parsers = {
             '.docx': DocxParser,
             '.doc': DocOldParser,
-            '.pdf': PdfParser
+            '.pdf': PdfParser,
+            '.txt': TxtParser
         }
 
         parser_class = parsers.get(extension)

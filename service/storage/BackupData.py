@@ -1,6 +1,7 @@
 import os
 import io
 import config
+from service.constants import DB_DATE_FORMAT
 from service.storage.StorageFactory import StorageFactory
 from datetime import datetime, timedelta
 import zipfile
@@ -22,10 +23,10 @@ class BackupData:
             target_path = client.get_target_folder_path(effective_date, self.base_backup_path)
 
             source_file_name = os.path.basename(self.source_file)
-            backup_file_name = f"{effective_date.strftime('%Y-%m-%d')}_{source_file_name}"
+            backup_file_name = f"{effective_date.strftime(DB_DATE_FORMAT)}_{source_file_name}"
 
             # Назва архіву тепер .zip
-            backup_zip_name = f"{effective_date.strftime('%Y-%m-%d')}_{source_file_name}.zip"
+            backup_zip_name = f"{effective_date.strftime(DB_DATE_FORMAT)}_{source_file_name}.zip"
 
             separator = client.separator
             destination_zip_path = f"{target_path.rstrip(separator)}{separator}{backup_zip_name}"

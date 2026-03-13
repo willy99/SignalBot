@@ -2,7 +2,9 @@ from nicegui import ui, run
 import calendar
 from datetime import datetime, date, timedelta
 from collections import defaultdict
-from service.constants import TASK_STATUS_COMPLETED, TASK_STATUS_IN_PROGRESS, TASK_STATUS_NEW, MONTHS
+
+from dics.deserter_xls_dic import TASK_TYPES
+from service.constants import TASK_STATUS_COMPLETED, TASK_STATUS_IN_PROGRESS, TASK_STATUS_NEW, MONTHS, DB_DATETIME_FORMAT, DB_DATE_FORMAT
 
 
 def render_calendar_page(task_ctrl, ctx):
@@ -23,12 +25,10 @@ def render_calendar_page(task_ctrl, ctx):
         'all': 'Всі співробітники',
         ctx.user_id: 'Тільки мої задачі'
     }
-    task_type_options = {
-        'all': 'Всі типи',
-        'СЗЧ': 'СЗЧ',
-        'Службове розслідування': 'Службове розслідування',
-        'Інше': 'Інше'
-    }
+
+    task_type_options = {'all': 'Всі типи'}
+    for t in TASK_TYPES.keys():
+        task_type_options[t] = t
 
     # Контейнер для самого календаря, який ми будемо перемальовувати
     calendar_container = ui.column().classes('w-full max-w-7xl mx-auto shadow-md rounded-lg overflow-hidden border')
@@ -77,8 +77,8 @@ def render_calendar_page(task_ctrl, ctx):
                 'assignee_id': state['assignee_id'] if state['assignee_id'] != 'all' else None,
                 'task_type_filter': state['task_type_filter'],
                 'period_filter': 'all',  # Ми беремо 'all', бо відсічемо по датах нижче
-                'created_from': start_date.strftime('%Y-%m-%d'),
-                'created_to': end_date.strftime('%Y-%m-%d'),
+                'created_from': start_date.strftime(DB_DATE_FORMAT),
+                'created_to': end_date.strftime(DB_DATE_FORMAT),
             }
 
             # Забираємо задачі через ваш контролер
@@ -121,11 +121,11 @@ def render_calendar_page(task_ctrl, ctx):
                 cal = calendar.Calendar(firstweekday=0)  # Тиждень починається з понеділка
                 month_days = cal.monthdatescalendar(state['year'], state['month'])
 
-                today_str = datetime.now().strftime('%Y-%m-%d')
+                today_str = datetime.now().strftime(DB_DATE_FORMAT)
 
                 for week in month_days:
                     for d in week:
-                        date_str = d.strftime('%Y-%m-%d')
+                        date_str = d.strftime(DB_DATE_FORMAT)
                         is_current_month = (d.month == state['month'])
                         is_today = (date_str == today_str)
 

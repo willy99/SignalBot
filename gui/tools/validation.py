@@ -2,18 +2,6 @@ from datetime import datetime
 import re
 from dics.deserter_xls_dic import VALID_PATTERN_DOC_NUM
 
-def fix_date(e):
-    val = e.sender.value
-    if not val:
-        return
-    parts = val.split('.')
-    # Якщо введено "ДД.ММ" (наприклад, 12.06)
-    if len(parts) == 2:
-        current_year = datetime.now().year
-        # Оновлюємо значення в полі
-        e.sender.value = f"{val}.{current_year}"
-
-
 def is_number(s):
     try:
         float(s) # Try converting to a float

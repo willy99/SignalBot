@@ -8,12 +8,10 @@ from gui.controllers.person_controller import PersonController
 from service.storage.FileCacher import FileCacheManager
 from gui.services.request_context import RequestContext
 from domain.person_filter import PersonSearchFilter
-from config import UI_DATE_FORMAT
-from gui.tools.validation import fix_date
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
 from gui.tools.validation import is_number, is_valid_doc_number
 from utils.utils import format_to_excel_date
-
+from gui.tools.ui_components import date_input, fix_date
 import re
 
 def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file_cache_manager: FileCacheManager,
@@ -486,18 +484,3 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                 load_draft(dbr_doc_id)
 
             refresh_buffer_ui()
-
-
-def date_input(label: str, state, field: str, blur_handler=None, change_handler=None):
-    """Створює поле для вводу дати зі спливаючим календарем (іконкою)"""
-    inp = ui.input(label=label).bind_value(state, field)
-    if blur_handler:
-        inp.on('blur', blur_handler)
-    if change_handler:
-        inp.on_value_change(change_handler)  # ДОДАНО: обробник зміни значення
-
-    with inp.add_slot('append'):
-        ui.icon('edit_calendar').classes('cursor-pointer')
-        with ui.menu():
-            ui.date().bind_value(state, field).props(f'mask="{UI_DATE_FORMAT}"')
-    return inp

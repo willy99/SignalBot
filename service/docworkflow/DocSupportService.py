@@ -1,89 +1,66 @@
 import json
-from typing import List, Dict, Any, Optional
-from service.constants import DB_TABLE_SUPPORT_DOC
+from datetime import datetime
+from typing import List, Optional
+from service.constants import DB_TABLE_SUPPORT_DOC, DOC_STATUS_COMPLETED, DB_DATETIME_FORMAT
 from service.connection.MyDataBase import MyDataBase
 from gui.services.request_context import RequestContext
-from service.constants import DOC_STATUS_COMPLETED, DOC_STATUS_DRAFT
+from domain.support_doc import SupportDoc
 
 class DocSupportService:
-    def __init__(self, db:MyDataBase, ctx: RequestContext):
+    def __init__(self, db: MyDataBase, ctx: RequestContext):
         self.db = db
         self.ctx = ctx
+        self.table_name = DB_TABLE_SUPPORT_DOC
 
-    def save_support_doc(self, city: str, support_number: str, support_date, buffer_data: list,
-                   support_doc_id: Optional[int] = None) -> int:
-        payload_json = json.dumps(buffer_data, ensure_ascii=False)
+    def save_support_doc(self, doc: SupportDoc) -> int:
+        doc_data = doc.model_dump(exclude={'id'})
+        doc_data['payload'] = json.dumps(doc_data['payload'], ensure_ascii=False)
 
-        data_to_save = {
-            'city': city,
-            'support_number': support_number,
-            'support_date': support_date,
-            'payload': payload_json
-        }
+        if doc_data.get('created_date') and isinstance(doc_data['created_date'], datetime):
+            doc_data['created_date'] = doc_data['created_date'].strftime(DB_DATETIME_FORMAT)
 
-        if support_doc_id:
-            # ОНОВЛЕННЯ ІСНУЮЧОЇ ЧЕРНЕТКИ
-            self.db.update_record(DB_TABLE_SUPPORT_DOC, support_doc_id, data_to_save)
-            return support_doc_id
+        if doc.id is None:
+            doc_data['created_by'] = self.ctx.user_id
+            doc_data['created_date'] = datetime.now().strftime(DB_DATETIME_FORMAT)
+            return self.db.insert_record(self.table_name, doc_data)
         else:
-            # СТВОРЕННЯ НОВОЇ ЧЕРНЕТКИ
-            data_to_save['created_by'] = self.ctx.user_id
-            data_to_save['status'] = DOC_STATUS_DRAFT  # Початковий статус
-            return self.db.insert_record(DB_TABLE_SUPPORT_DOC, data_to_save)
+            self.db.update_record(self.table_name, doc.id, doc_data)
+            return doc.id
 
-    def get_all_support_docs(self, created_by: Optional[int] = None) -> List[Dict[str, Any]]:
-        query = """
-            SELECT id, created_by, created_date, region, status, city, support_number, support_date, payload 
-            FROM """ + DB_TABLE_SUPPORT_DOC
-        params = ()
+    def get_all_support_docs(self, created_by: Optional[int] = None) -> List[SupportDoc]:
+        query = f"SELECT * FROM {self.table_name}"
+        params = []
 
         if created_by:
             query += " WHERE created_by = ?"
-            params = (created_by,)
+            params.append(created_by)
 
         query += " ORDER BY created_date DESC"
 
-        rows = self.db.__execute_fetchall__(query, params)
-        drafts = []
+        rows = self.db.__execute_fetchall__(query, tuple(params))
+        result = []
 
         for r in rows:
-            drafts.append({
-                'id': r[0],
-                'created_by': r[1],
-                'created_date': r[2],  # Дата у форматі 'YYYY-MM-DD HH:MM:SS'
-                'region': r[3],
-                'status': r[4],
-                'city': r[5],
-                'support_number': r[6],
-                'support_date': r[7],
-                'payload': json.loads(r[8]) if r[8] else []
-            })
+            r_dict = dict(r)
+            r_dict['payload'] = json.loads(r_dict['payload']) if r_dict.get('payload') else []
+            result.append(SupportDoc(**r_dict))
 
-        return drafts
+        return result
 
-    def get_support_doc_by_id(self, support_doc_id: int) -> Optional[Dict[str, Any]]:
-        query = """
-            SELECT id, created_by, created_date, status, city, support_number, support_date, payload 
-            FROM """ + DB_TABLE_SUPPORT_DOC + """ WHERE id = ?
-        """
-        r = self.db.__execute_fetch__(query, (support_doc_id,))
+    def get_support_doc_by_id(self, support_doc_id: int) -> Optional[SupportDoc]:
+        query = f"SELECT * FROM {self.table_name} WHERE id = ?"
+        row = self.db.__execute_fetch__(query, (support_doc_id,))
 
-        if r:
-            return {
-                'id': r[0],
-                'created_by': r[1],
-                'created_date': r[2],
-                'status': r[3],
-                'city': r[4],
-                'support_number': r[5],
-                'support_date': r[6],
-                'payload': json.loads(r[7]) if r[7] else []
-            }
-        return None
+        if not row:
+            return None
+
+        r_dict = dict(row)
+        r_dict['payload'] = json.loads(r_dict['payload']) if r_dict.get('payload') else []
+        return SupportDoc(**r_dict)
 
     def delete_support_doc(self, support_doc_id: int):
-        self.db.delete_record(DB_TABLE_SUPPORT_DOC, support_doc_id)
+        self.db.delete_record(self.table_name, support_doc_id)
 
     def mark_as_completed(self, support_doc_id: int) -> bool:
-        self.db.update_record(DB_TABLE_SUPPORT_DOC, support_doc_id, {'status': DOC_STATUS_COMPLETED})
+        self.db.update_record(self.table_name, support_doc_id, {'status': DOC_STATUS_COMPLETED})
         return True

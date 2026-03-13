@@ -7,20 +7,32 @@ from domain.person_filter import PersonSearchFilter
 from gui.services.request_context import RequestContext
 from config import MAX_QUERY_RESULTS
 
+ui.add_css('''
+    .my-sticky-header-table thead tr th {
+        position: sticky;
+        z-index: 1;
+        background-color: #f3f4f6; /* Це колір bg-gray-100 Tailwind */
+        font-weight: bold;
+    }
+    .my-sticky-header-table thead tr:first-child th {
+        top: 0;
+    }
+''', shared=True)
+
 def results_ui(data, person_ctrl, ctx: RequestContext, refresh_callback):
     if not data:
         return
 
     columns = [
-        {'name': 'pib', 'label': COLUMN_NAME, 'field': 'pib', 'align': 'left', 'sortable': True},
+        {'name': 'pib', 'label': COLUMN_NAME, 'field': 'pib', 'align': 'left', 'sortable': True, 'classes': 'whitespace-normal min-w-[150px]'},
         {'name': 'title2', 'label': COLUMN_TITLE_2, 'field': 'title2', 'sortable': True},
         {'name': 'rnokpp', 'label': COLUMN_ID_NUMBER, 'field': 'rnokpp', 'sortable': True},
-        {'name': 'unit', 'label': COLUMN_SUBUNIT, 'field': 'unit', 'sortable': True},
+        {'name': 'unit', 'label': COLUMN_SUBUNIT, 'field': 'unit', 'sortable': True, 'classes': 'whitespace-normal min-w-[120px]'},
         {'name': 'desertion_date', 'label': COLUMN_DESERTION_DATE, 'field': 'desertion_date', 'sortable': True},
         {'name': 'return_date', 'label': COLUMN_RETURN_DATE, 'field': 'return_date', 'sortable': True},
         {'name': 'return_reserve_date', 'label': COLUMN_RETURN_TO_RESERVE_DATE, 'field': 'return_reserve_date', 'sortable': True},
         {'name': 'erdr_date', 'label': COLUMN_ERDR_DATE, 'field': 'erdr_date', 'sortable': True},
-        {'name': 'erdr_notation', 'label': COLUMN_ERDR_NOTATION, 'field': 'erdr_notation', 'sortable': True},
+        {'name': 'erdr_notation', 'label': COLUMN_ERDR_NOTATION, 'field': 'erdr_notation', 'sortable': True, 'classes': 'whitespace-normal min-w-[150px]'},
         {'name': 'action', 'label': 'Дія', 'field': 'action', 'align': 'center'},
     ]
 
@@ -39,15 +51,18 @@ def results_ui(data, person_ctrl, ctx: RequestContext, refresh_callback):
             'raw_model': person.model_dump()
         })
 
-    table = ui.table(columns=columns, rows=rows, row_key='rnokpp').classes('w-full max-w-8xl general-table')
+    # 💡 Головна зміна: додаємо .props('wrap-cells') і використовуємо w-full
+    table = ui.table(columns=columns, rows=rows, row_key='rnokpp').classes(
+        'w-full general-table my-sticky-header-table max-h-[70vh]'
+    ).props('wrap-cells flat bordered')
 
     table.add_slot('body-cell-action', '''
-            <q-td :props="props">
-                <q-btn size="sm" color="primary" icon="edit" @click="$parent.$emit('editAction', props.row.raw_model)">
-                    Редагувати
-                </q-btn>
-            </q-td>
-        ''')
+                <q-td :props="props">
+                    <q-btn size="sm" color="primary" icon="edit" @click="$parent.$emit('editAction', props.row.raw_model)">
+                        Редагувати
+                    </q-btn>
+                </q-td>
+            ''')
 
     table.on('editAction', lambda e: edit_person(
         Person(**e.args),
@@ -56,7 +71,7 @@ def results_ui(data, person_ctrl, ctx: RequestContext, refresh_callback):
         on_close=refresh_callback
     ))
 
-    with ui.row().classes('w-full max-w-8xl justify-end mt-2 px-2'):
+    with ui.row().classes('w-full justify-end mt-2 px-2'):
         ui.label(f'Всього знайдено записів: {len(data)}').classes('text-gray-600 font-bold')
 
 def search_page(person_ctrl, ctx: RequestContext):
@@ -107,6 +122,7 @@ def search_page(person_ctrl, ctx: RequestContext):
         date_to_val = des_date_to.value if des_date_to.value else None
         title2_val = None if title2_filter.value == 'Всі' else title2_filter.value
         service_val = None if service_filter.value == 'Всі' else service_filter.value
+        mil_unit = sheet_select.value
 
         if not any([query, des_year_val, ins_year_val, date_from_val, date_to_val, title2_val, service_val]):
             ui.notify('Введіть запит або оберіть фільтр для пошуку', type='warning')
@@ -122,7 +138,8 @@ def search_page(person_ctrl, ctx: RequestContext):
         state.update({
             'last_query': query, 'last_des_year': des_year_val, 'last_ins_year': ins_year_val,
             'last_des_from': date_from_val, 'last_des_to': date_to_val, 'last_title2': title2_val,
-            'last_service': service_val
+            'last_service': service_val,
+            'mil_unit': mil_unit
         })
 
         results_container.clear()
@@ -132,7 +149,7 @@ def search_page(person_ctrl, ctx: RequestContext):
         try:
             search_filter = PersonSearchFilter(
                 query=query if query else None, des_year=des_year_val, ins_year=ins_year_val,
-                des_date_from=date_from_val, des_date_to=date_to_val, title2=title2_val, service_type=service_val
+                des_date_from=date_from_val, des_date_to=date_to_val, title2=title2_val, service_type=service_val, mil_unit=mil_unit
             )
             data = await run.io_bound(person_ctrl.search, ctx, search_filter)
             results_container.clear()
@@ -166,7 +183,15 @@ def search_page(person_ctrl, ctx: RequestContext):
         ui.label('Пошук і редагування військовослужбовців').classes('text-h4 mb-4')
 
         with ui.row().classes('w-full max-w-4xl items-center gap-4'):
+            # Головний рядок пошуку
             with ui.row().classes('w-full max-w-7xl items-center gap-4'):
+                # НОВИЙ ЕЛЕМЕНТ: Вибір ВЧ (листа Excel)
+                sheet_select = ui.select(
+                    options=MIL_UNITS,
+                    value=MIL_UNITS[0],
+                    label='ВЧ',
+                ).classes('w-32')
+
                 search_field = ui.input(label='Введіть дані (ПІБ або РНОКПП)').classes('flex-grow').props(
                     'autofocus clearable')
 
@@ -175,6 +200,7 @@ def search_page(person_ctrl, ctx: RequestContext):
                 ui.button('Знайти', icon='search', on_click=handle_search).props('elevated').classes(
                     'h-14 bg-blue-600 text-white')
 
+            # Рядок фільтрів 1
             with ui.row().classes('w-full max-w-7xl items-center gap-4 mt-2'):
                 des_year_filter = ui.select(options=des_year_options, multiple=True, label='Рік СЗЧ',
                                             on_change=on_year_change).classes('w-48').props(
@@ -189,9 +215,10 @@ def search_page(person_ctrl, ctx: RequestContext):
                                             on_change=handle_filter_change).classes('w-48').props(
                     'use-chips stack-label clearable')
 
+            # Рядок фільтрів 2
             with ui.row().classes('w-full max-w-7xl items-center gap-4 mt-2'):
                 title2_filter = ui.select(options=title2_options, label=COLUMN_TITLE_2, value='Всі',
-                                         on_change=handle_filter_change).classes('flex-grow')
+                                          on_change=handle_filter_change).classes('flex-grow')
                 service_filter = ui.select(options=service_options, label=COLUMN_SERVICE_TYPE, value='Всі',
                                            on_change=handle_filter_change).classes('flex-grow')
 

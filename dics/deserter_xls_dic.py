@@ -380,7 +380,7 @@ REVIEW_STATUS_ERROR: Final[str] = 'помилково'
 REVIEW_STATUS_ERDR: Final[str] = 'ЄРДР'
 
 REPORT_REVIEW_STATUS_NON_ERDR: Final[str] = 'не отримано витяг з ЄРДР'
-REPORT_REVIEW_STATUS_ERDR: Final[str] = 'не отримано витяг з ЄРДР'
+REPORT_REVIEW_STATUS_ERDR: Final[str] = 'отримано витяг з ЄРДР'
 REPORT_REVIEW_STATUS_NON_EVIL: Final[str] = "не є суб'єктом злочину"
 
 
@@ -398,6 +398,8 @@ REPORT_SUBUNIT_EXCLUDE_ARTICLES = ['402']
 
 SUSPENDED_KEYWORD:Final[str] = 'призупинено В/С'
 DESERTION_TYPE_WEAPON_KEYWORD: Final[str] = 'СЗЧ зброя'
+
+MIL_UNITS: Final[List[str]] = ['А0224', 'А7018']
 
 TASK_TYPES: Final[Dict[str, str]] = {
     'Документація': 'description',

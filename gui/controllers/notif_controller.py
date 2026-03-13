@@ -1,5 +1,4 @@
-from domain.person_filter import PersonSearchFilter
-from service.docworkflow.NotifService import NotifService
+from service.docworkflow.NotifService import NotifService, NotifDoc
 from gui.services.auth_manager import AuthManager
 from gui.services.request_context import RequestContext
 from service.processing.MyWorkFlow import MyWorkFlow
@@ -11,22 +10,31 @@ from config import EXCEL_LIGHT_GRAY_COLOR
 
 
 class NotifController:
-    def __init__(self, doc_templator: DocTemplator, workflow:MyWorkFlow, auth_manager: AuthManager):
+    def __init__(self, doc_templator: DocTemplator, workflow: MyWorkFlow, auth_manager: AuthManager):
         self.db = workflow.db
         self.excel_processor = workflow.excelProcessor
         self.log_manager = workflow.log_manager
         self.logger = self.log_manager.get_logger()
         self.doc_templator = doc_templator
 
-
     def get_all_drafts(self, ctx: RequestContext):
         dservice = NotifService(self.db, ctx)
-        return dservice.get_all_docs()
+        docs = dservice.get_all_docs()
+        return [doc.model_dump() for doc in docs]
 
-    def save_doc(self, ctx: RequestContext, region, out_number: str, out_date: str, payload: list,
-                   doc_id: int = None) -> int:
+    def save_doc(self, ctx: RequestContext, region: str, out_number: str, out_date: str, payload: list,
+                 doc_id: int = None) -> int:
         service = NotifService(self.db, ctx)
-        return service.save_doc(region, out_number, out_date, payload, doc_id)
+
+        doc_model = NotifDoc(
+            id=doc_id,
+            region=region,
+            out_number=out_number,
+            out_date=out_date,
+            payload=payload
+        )
+
+        return service.save_doc(doc_model)
 
     def delete_doc(self, ctx: RequestContext, doc_id: int):
         self.logger.debug('UI:' + ctx.user_name + ': Видаляємо пакет супроводів: ' + str(doc_id))
@@ -35,7 +43,10 @@ class NotifController:
 
     def get_doc_by_id(self, ctx: RequestContext, doc_id: int) -> dict:
         service = NotifService(self.db, ctx)
-        return service.get_doc_by_id(doc_id)
+        doc_model = service.get_doc_by_id(doc_id)
+        if doc_model:
+            return doc_model.model_dump()
+        return None
 
     def generate_document(self, ctx: RequestContext, region: str, out_number: str, out_date: str, buffer_data: list) -> tuple[bytes, str]:
         self.logger.debug('UI:' + ctx.user_name + ': Генеруємо доповідь: ' + str(region) + ', number:' + out_number + ':' + str(buffer_data))
@@ -45,30 +56,27 @@ class NotifController:
         if not out_number:
             raise ValueError("Будь ласка, введіть загальний вихідний номер.")
 
-        # Викликаємо процесор для генерації
         return self.doc_templator.generate_notif_batch(region, out_number, out_date, buffer_data)
 
-    def mark_as_completed(self, ctx: RequestContext, doc_id: int, payload: list, out_number: str, out_date: str,
-                          person_controller=None) -> bool:
-
+    def mark_as_completed(self, ctx: RequestContext, doc_id: int, payload: list, out_number: str, out_date: str, person_controller=None) -> bool:
         self.logger.debug(f'UI:{ctx.user_name}: Помічаємо комплект документів як COMPLETED: {doc_id}')
 
         draft = self.get_doc_by_id(ctx, doc_id)
         if not draft:
             raise ValueError(f"Чернетку №{doc_id} не знайдено!")
 
-        payload = draft.get('payload', [])
+        payload_data = draft.get('payload', [])
         persons_to_update = []
-        for doc in payload:
 
+        for doc in payload_data:
             row_key = get_person_key_from_str(doc.get('id_number'))
             found_person_data = person_controller.find_person(ctx, row_key)
             kpp_number = doc.get('kpp_num')
             kpp_date = doc.get('kpp_date')
+            row_seq_num = doc.get('seq_num')
 
             if not found_person_data:
-                self.logger.warning(
-                    f"Пропущено: не знайдено людину за ключем {row_key}")
+                self.logger.warning(f"Пропущено: не знайдено людину за ключем {row_key}")
                 continue
 
             person_dict = found_person_data.get('data', {})
@@ -79,9 +87,8 @@ class NotifController:
             if logical_id is not None:
                 p = Person(
                     id=logical_id,
-                    kpp_num=kpp_number,
+                    kpp_num=kpp_number + '/' + str(row_seq_num),
                     kpp_date=kpp_date,
-                    # review_status=REVIEW_STATUS_WAITING
                 )
                 persons_to_update.append(p)
 

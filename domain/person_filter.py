@@ -1,12 +1,15 @@
 from dataclasses import dataclass
 from typing import Optional, Union, Final
 
+from dics.deserter_xls_dic import MIL_UNITS
+
 # options for topic search
 YES: Final[str] = 'Yes'
 NO: Final[str] = 'No'
 
 @dataclass
 class PersonSearchFilter:
+    mil_unit: Optional[str] = MIL_UNITS[0]
     query: Optional[str] = None
     o_ass_num: Optional[str] = None
     title: Optional[str] = None

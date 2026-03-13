@@ -2,27 +2,10 @@ from nicegui import ui, run
 from dics.deserter_xls_dic import *
 from domain.person import Person
 import asyncio
-from config import UI_DATE_FORMAT, EXCEL_BLUE_COLOR
+from config import EXCEL_BLUE_COLOR
 from gui.services.request_context import RequestContext
-from gui.tools.validation import fix_date
 import re
-
-def date_input(label: str, person: Person, field: str, blur_handler=None):
-    """Створює поле для вводу дати зі спливаючим календарем (іконкою)"""
-    inp = ui.input(label=label, placeholder='dd.mm.YYYY', validation={
-                                'Формат має бути dd.mm.YYYY': lambda v: bool(re.match(VALID_PATTERN_DATE, str(v))) if v else True
-                            })
-    inp.bind_value(person, field)
-
-    if blur_handler:
-        inp.on('blur', blur_handler)
-
-    with inp.add_slot('append'):
-        ui.icon('edit_calendar').classes('cursor-pointer')
-        with ui.menu():
-            ui.date().bind_value(person, field).props(f'mask="{UI_DATE_FORMAT}"')
-
-    return inp
+from gui.tools.ui_components import date_input, fix_date
 
 def search_select(options: list, label: str, person: Person, field: str):
     """Створює випадаючий список із можливістю пошуку"""

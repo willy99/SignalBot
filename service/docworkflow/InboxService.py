@@ -1,4 +1,3 @@
-from service.storage.FileStorageClient import FileStorageClient
 from service.storage.LoggerManager import LoggerManager
 from service.storage.StorageFactory import StorageFactory
 import config

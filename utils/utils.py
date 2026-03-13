@@ -6,6 +6,8 @@ import os
 from typing import Any, Tuple, Dict
 from dics.deserter_xls_dic import NA
 from domain.person_key import PersonKey
+from service.constants import DB_DATE_FORMAT
+
 
 def clean_text(text):
     if text is None: return None
@@ -32,16 +34,16 @@ def to_html_date(val):
 
     # 1. Якщо прийшов об'єкт datetime від xlwings
     if isinstance(val, (datetime, date)):
-        return val.strftime('%Y-%m-%d')
+        return val.strftime(DB_DATE_FORMAT)
 
     # 2. Якщо прийшов рядок (наприклад, з вашого config.EXCEL_DATE_FORMAT)
     try:
         dt = datetime.strptime(str(val).strip(), config.EXCEL_DATE_FORMAT)
-        return dt.strftime('%Y-%m-%d')
+        return dt.strftime(DB_DATE_FORMAT)
     except (ValueError, TypeError):
         # 3. Якщо формат невідомий, пробуємо стандартний ISO
         try:
-            return datetime.fromisoformat(str(val)).strftime('%Y-%m-%d')
+            return datetime.fromisoformat(str(val)).strftime(DB_DATE_FORMAT)
         except:
             return ""
 

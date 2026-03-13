@@ -184,7 +184,7 @@ def render_inbox_page(inbox_ctrl, task_ctrl, auth_manager, ctx: RequestContext):
                 ui.label('Завантажити у спільну папку').classes('font-bold text-blue-800 text-sm mb-1')
                 ui.upload(multiple=True, auto_upload=True, on_upload=handle_upload).classes('w-full').props('color="blue" accept="*" flat')
 
-            with ui.expansion(f'🔴 Вхідні ({len(state["personal_files"])})', value=True) \
+            with ui.expansion(f'🔴 Вхідні (Inbox) ({len(state["personal_files"])})', value=True) \
                     .props('header-class="font-bold text-red-800 bg-red-50 rounded" dense').classes('w-full'):
                 with ui.column().classes('w-full gap-2 mt-2'):
                     if not state['personal_files']:
@@ -200,25 +200,6 @@ def render_inbox_page(inbox_ctrl, task_ctrl, auth_manager, ctx: RequestContext):
 
                             with ui.row().classes(f'w-full p-2 border rounded cursor-pointer items-center gap-2 flex-nowrap transition-colors {bg_color}') \
                                     .on('click', lambda fname=f: select_file(fname, 'inbox_personal')):
-                                ui.icon(icon_name, color=icon_color)
-                                ui.label(f).classes('text-sm truncate flex-grow font-medium' if is_sel or in_queue else 'text-sm truncate flex-grow text-gray-700')
-
-            with ui.expansion(f'⚪ Спільні файли ({len(state["root_files"])})', value=True) \
-                    .props('header-class="font-bold text-gray-700 bg-gray-100 rounded" dense').classes('w-full'):
-                with ui.column().classes('w-full gap-2 mt-2'):
-                    if not state['root_files']:
-                        ui.label('Немає файлів').classes('text-xs text-gray-400 italic pl-1')
-                    else:
-                        for f in state['root_files']:
-                            is_sel = (state['selected_file'] == f and state['selected_type'] == 'inbox_shared')
-                            in_queue = is_queued(f)
-
-                            bg_color = 'bg-amber-50 border-amber-300' if in_queue else ('bg-blue-100 border-blue-300' if is_sel else 'bg-white hover:bg-gray-100 border-gray-200')
-                            icon_name = 'hourglass_empty' if in_queue else 'description'
-                            icon_color = 'amber-500' if in_queue else ('blue-600' if is_sel else 'gray-400')
-
-                            with ui.row().classes(f'w-full p-2 border rounded cursor-pointer items-center gap-2 flex-nowrap transition-colors {bg_color}') \
-                                    .on('click', lambda fname=f: select_file(fname, 'inbox_shared')):
                                 ui.icon(icon_name, color=icon_color)
                                 ui.label(f).classes('text-sm truncate flex-grow font-medium' if is_sel or in_queue else 'text-sm truncate flex-grow text-gray-700')
 
@@ -238,6 +219,27 @@ def render_inbox_page(inbox_ctrl, task_ctrl, auth_manager, ctx: RequestContext):
 
                             with ui.row().classes(f'w-full p-2 border rounded cursor-pointer items-center gap-2 flex-nowrap transition-colors {bg_color}') \
                                     .on('click', lambda fname=f: select_file(fname, 'outbox_personal')):
+                                ui.icon(icon_name, color=icon_color)
+                                ui.label(f).classes('text-sm truncate flex-grow font-medium' if is_sel or in_queue else 'text-sm truncate flex-grow text-gray-700')
+
+
+
+            with ui.expansion(f'⚪ Спільні файли ({len(state["root_files"])})', value=True) \
+                    .props('header-class="font-bold text-gray-700 bg-gray-100 rounded" dense').classes('w-full'):
+                with ui.column().classes('w-full gap-2 mt-2'):
+                    if not state['root_files']:
+                        ui.label('Немає файлів').classes('text-xs text-gray-400 italic pl-1')
+                    else:
+                        for f in state['root_files']:
+                            is_sel = (state['selected_file'] == f and state['selected_type'] == 'inbox_shared')
+                            in_queue = is_queued(f)
+
+                            bg_color = 'bg-amber-50 border-amber-300' if in_queue else ('bg-blue-100 border-blue-300' if is_sel else 'bg-white hover:bg-gray-100 border-gray-200')
+                            icon_name = 'hourglass_empty' if in_queue else 'description'
+                            icon_color = 'amber-500' if in_queue else ('blue-600' if is_sel else 'gray-400')
+
+                            with ui.row().classes(f'w-full p-2 border rounded cursor-pointer items-center gap-2 flex-nowrap transition-colors {bg_color}') \
+                                    .on('click', lambda fname=f: select_file(fname, 'inbox_shared')):
                                 ui.icon(icon_name, color=icon_color)
                                 ui.label(f).classes('text-sm truncate flex-grow font-medium' if is_sel or in_queue else 'text-sm truncate flex-grow text-gray-700')
 

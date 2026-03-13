@@ -1,5 +1,4 @@
 import sqlite3
-from typing import Final
 from contextlib import closing
 import config
 import os
