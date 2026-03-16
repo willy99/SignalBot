@@ -5,6 +5,7 @@ from gui.controllers.inbox_controller import InboxController
 from gui.controllers.task_controller import TaskController
 from config import CHECK_INBOX_EVERY_SEC
 from gui.services.auth_manager import AuthManager
+from security_config import MODULE_DOC_SUPPORT, MODULE_DOC_DBR, MODULE_DOC_NOTIF, MODULE_PERSON, MODULE_REPORT_UNITS, MODULE_REPORT_GENERAL, MODULE_ADMIN
 
 if not hasattr(app, 'alarmed_tasks'):
     app.alarmed_tasks = set()
@@ -177,10 +178,10 @@ class AppMenu:
                 user_role = user_info.get('role', '')
                 # Якщо є ПІБ - показуємо його, інакше показуємо логін, інакше "Гість"
                 user_name = user_info.get('full_name') or user_info.get('username') or 'Гість'
-                can_doc_support = self.auth_manager.has_access('doc_support', 'read')
-                can_doc_dbr = self.auth_manager.has_access('doc_dbr', 'read')
-                can_doc_notif = self.auth_manager.has_access('doc_notif', 'read')
-                can_search_person = self.auth_manager.has_access('person', 'read')
+                can_doc_support = self.auth_manager.has_access(MODULE_DOC_SUPPORT, 'read')
+                can_doc_dbr = self.auth_manager.has_access(MODULE_DOC_DBR, 'read')
+                can_doc_notif = self.auth_manager.has_access(MODULE_DOC_NOTIF, 'read')
+                can_search_person = self.auth_manager.has_access(MODULE_PERSON, 'read')
 
                 # 1. Пошук
                 if can_search_person:
@@ -212,8 +213,8 @@ class AppMenu:
 
 
                 # 4. Звіти
-                can_report_units = self.auth_manager.has_access('report_units', 'read')
-                can_report_general = self.auth_manager.has_access('report_general', 'read')
+                can_report_units = self.auth_manager.has_access(MODULE_REPORT_UNITS, 'read')
+                can_report_general = self.auth_manager.has_access(MODULE_REPORT_GENERAL, 'read')
                 if can_report_units or can_report_general:
                     with ui.button('Звіти', icon='analytics').props('flat text-white icon-right="expand_more"'):
                         with ui.menu():
@@ -229,7 +230,7 @@ class AppMenu:
                                 make_menu_item('Щоденний звіт', 'event_available', '/report_daily')
 
                 # 5. Адмінка
-                if self.auth_manager.has_access('admin_panel', 'read'):
+                if self.auth_manager.has_access(MODULE_ADMIN, 'read'):
                     # Іконка щита переїхала наліво, а стрілочка вниз тепер справа
                     with ui.button('Адмінка', icon='admin_panel_settings').props(
                             'flat text-yellow-400 font-bold icon-right="expand_more"'):

@@ -3,9 +3,13 @@ from dics.deserter_xls_dic import *
 from domain.person import Person
 import asyncio
 from config import EXCEL_BLUE_COLOR
+from gui.controllers.person_controller import PersonController
+from gui.services.auth_manager import AuthManager
 from gui.services.request_context import RequestContext
 import re
 from gui.tools.ui_components import date_input, fix_date
+from security_config import MODULE_PERSON, PERM_READ, PERM_DELETE, PERM_EDIT
+from datetime import datetime, timedelta
 
 def search_select(options: list, label: str, person: Person, field: str):
     """Створює випадаючий список із можливістю пошуку"""
@@ -14,12 +18,38 @@ def search_select(options: list, label: str, person: Person, field: str):
     return sel
 
 
+def is_delete_allowed(person: Person) -> bool:
+    """Перевіряє, чи запис було додано сьогодні або вчора."""
+    # Припускаємо, що поле називається insert_date або ins_date.
+    # Змініть 'insert_date' на вашу реальну назву поля у моделі Person, якщо вона інша.
+    ins_date_val = getattr(person, 'insert_date', getattr(person, 'ins_date', None))
+
+    if not ins_date_val:
+        return False
+
+    try:
+        if isinstance(ins_date_val, str):
+            parsed_date = datetime.strptime(ins_date_val, '%d.%m.%Y').date()
+        elif isinstance(ins_date_val, datetime):
+            parsed_date = ins_date_val.date()
+        else:
+            parsed_date = ins_date_val  # Якщо це вже об'єкт datetime.date
+
+        today = datetime.now().date()
+        yesterday = today - timedelta(days=1)
+
+        return parsed_date in (today, yesterday)
+    except Exception:
+        return False
+
 # ==========================================
 # 🪟 ВІКНА ДІАЛОГІВ
 # ==========================================
 
-def edit_person(person: Person, person_ctrl, ctx: RequestContext, on_close=None):
+def edit_person(person: Person, person_ctrl, ctx: RequestContext, auth_manager: AuthManager, on_close=None):
     ui_options = person_ctrl.get_column_options()
+    can_edit = auth_manager.has_access(MODULE_PERSON, PERM_EDIT)
+    can_delete = auth_manager.has_access(MODULE_PERSON, PERM_DELETE)
 
     with ui.dialog().props('maximized') as dialog, ui.card().classes(
             'w-full h-full max-w-none p-0 gap-0 flex flex-col bg-gray-50'):
@@ -143,9 +173,19 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, on_close=None)
         with ui.row().classes('w-full justify-end items-center p-4 bg-white border-t border-gray-300 shrink-0 gap-4 shadow-inner z-10'):
             ui.button('Скасувати', icon='close', on_click=dialog.close).props('outline color="gray"').classes('px-6 h-12')
             if person_ctrl.auth_manager.has_access('person', 'write'):
-                ui.button('ЗБЕРЕГТИ ДАНІ', icon='save',
-                          on_click=lambda: handle_save(person, person_ctrl, ctx, dialog, on_close=on_close,paint_color=None)) \
-                    .classes('bg-green-600 text-white px-8 h-12 text-lg font-bold shadow-md hover:bg-green-700 transition-colors')
+                if can_edit:
+                    ui.button('ЗБЕРЕГТИ ДАНІ', icon='save',
+                              on_click=lambda: handle_save(person, person_ctrl, ctx, dialog, on_close=on_close,paint_color=None)) \
+                        .classes('bg-green-600 text-white px-8 h-12 text-lg font-bold shadow-md hover:bg-green-700 transition-colors')
+
+                if can_delete:
+                    del_btn = ui.button('ВИДАЛИТИ', icon='delete',
+                                        on_click=lambda: handle_delete(person, person_ctrl, ctx, dialog, on_close=on_close)) \
+                        .classes('bg-red-600 text-white px-8 h-12 text-lg font-bold shadow-md hover:bg-red-700 transition-colors').props('color="red"')
+
+                    if not is_delete_allowed(person):
+                        del_btn.disable()
+                        del_btn.tooltip('Видалення можливе лише для записів, які були додані сьогодні або вчора.')
 
     dialog.open()
 
@@ -206,7 +246,32 @@ def edit_erdr(person: Person, person_ctrl, ctx: RequestContext, on_close=None):
     dialog.open()
 
 
-async def handle_save(person, person_ctrl, ctx, dialog, on_close=None, paint_color=None):
+async def handle_delete(person, person_ctrl:PersonController, ctx:RequestContext, dialog, on_close=None):
+    with ui.notification(message='Зберігаю дані...', spinner=True, timeout=0) as n:
+        await asyncio.sleep(0.1)  # Даємо UI відмалювати спінер
+
+        success = await run.io_bound(person_ctrl.delete_record, ctx, person)
+
+        if success:
+            n.message = 'Успішно видалено!'
+            n.type = 'positive'
+            n.spinner = False
+            n.timeout = 2
+
+            dialog.close()
+
+            if on_close:
+                if asyncio.iscoroutinefunction(on_close):
+                    await on_close()
+                else:
+                    on_close()
+
+        else:
+            n.message = 'Помилка видалення!'
+            n.type = 'negative'
+            n.spinner = False
+
+async def handle_save(person, person_ctrl:PersonController, ctx:RequestContext, dialog, on_close=None, paint_color=None):
     with ui.notification(message='Зберігаю дані...', spinner=True, timeout=0) as n:
         await asyncio.sleep(0.1)  # Даємо UI відмалювати спінер
 

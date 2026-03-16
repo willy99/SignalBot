@@ -62,8 +62,8 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                 out_date_input = date_input(
                     'Дата відправки', state, 'out_date',
                     blur_handler=fix_date,
-                    change_handler=lambda e: state['current_person'].update({'dbr_date': e.value})
-                ).classes('flex-1')
+                ).classes('flex-1').on_value_change(lambda e: state['current_person'].update({'dbr_date': e.value})) \
+                 .classes('flex-1')
 
             # --- 2. Блок пошуку ---
             ui.label('Додавання військовослужбовців').classes('text-lg font-bold text-gray-700 mb-2')
@@ -471,16 +471,25 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                 try:
                     draft = dbr_ctrl.get_dbr_doc_by_id(ctx, d_id)
                     if draft:
-                        state['out_number'] = draft.get('out_number', '')
-                        state['out_date'] = draft.get('out_date', '')
+                        out_num = draft.get('out_number', '')
+                        out_date = draft.get('out_date', '')
+
+                        state['out_number'] = out_num
+                        out_number_input.set_value(out_num)
+
+                        state['out_date'] = out_date
+                        out_date_input.set_value(out_date)
+
                         state['buffer'] = draft.get('payload', [])
                         state['status'] = draft.get('status', DOC_STATUS_DRAFT)
+
                         refresh_status_ui()
+                        refresh_buffer_ui()
                         ui.notify(f'Чернетку завантажено', type='positive')
                 except Exception as e:
                     ui.notify(f'Помилка завантаження: {e}', type='negative')
 
             if dbr_doc_id is not None:
                 load_draft(dbr_doc_id)
-
-            refresh_buffer_ui()
+            else:
+                refresh_buffer_ui()

@@ -111,6 +111,15 @@ class SMBFileClient(FileStorageClient):
                 self.logger.error(f"❌ Помилка читання JSON з {path}: {e}")
                 raise
 
+    def exists(self, path: str) -> bool:
+        """Перевіряє, чи існує файл або папка на SMB-сервері."""
+        with self._smb_lock:
+            try:
+                return smbclient.path.exists(path)
+            except Exception as e:
+                self.logger.error(f"❌ Помилка перевірки шляху SMB {path}: {e}")
+                return False
+
     def copy_file(self, source_path: str, dest_path: str):
         """Універсальне копіювання файлів (SMB<->SMB, Local->SMB, SMB->Local, Local->Local)."""
         with self._smb_lock:

@@ -46,8 +46,8 @@ class InboxController:
         client = StorageFactory.create_client(config.INBOX_DIR_PATH, self.log_manager)
         source_file = f"{config.INBOX_DIR_PATH}{client.get_separator()}{filename}"  # Або шлях до персональної папки
 
-        processor = DocumentProcessingService(self.log_manager)
-        return processor.archive_document(source_file, filename) is not None
+        dservice = DocumentProcessingService(self.log_manager)
+        return dservice.archive_document(source_file, filename) is not None
 
 
     def process_file_to_excel(self, ctx, filename: str) -> list[str]:

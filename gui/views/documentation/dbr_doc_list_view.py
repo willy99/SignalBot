@@ -1,6 +1,7 @@
 from nicegui import ui
 from gui.services.request_context import RequestContext
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
+from datetime import datetime
 
 def render_dbr_drafts_list_page(dbr_ctrl, ctx: RequestContext):
     ui.label('Список пакетів для відправки на ДБР').classes('w-full text-center text-3xl font-bold mb-8')
@@ -17,14 +18,22 @@ def render_dbr_drafts_list_page(dbr_ctrl, ctx: RequestContext):
     for d in drafts:
         # Безпечно отримуємо список людей (може бути порожнім, якщо JSON не розпарсився)
         payload = d.get('payload') or []
-
+        c_date = d.get('created_date')
+        if isinstance(c_date, datetime):
+            # Якщо це об'єкт datetime (завдяки Pydantic)
+            created_str = c_date.strftime('%Y-%m-%d %H:%M')
+        elif isinstance(c_date, str):
+            # Якщо це звичайний рядок
+            created_str = c_date[:16]
+        else:
+            created_str = '—'
 
         rows.append({
             'id': d.get('id'),
             'out_number': d.get('out_number') or '—',
             'out_date': d.get('out_date') or '—',
             'people_count': len(payload),
-            'created_date': d.get('created_date', '—')[:16],  # Відрізаємо секунди для краси
+            'created_date': created_str,
             'status': d.get('status', DOC_STATUS_DRAFT),
         })
 
@@ -33,8 +42,7 @@ def render_dbr_drafts_list_page(dbr_ctrl, ctx: RequestContext):
         {'name': 'id', 'label': 'ID', 'field': 'id', 'align': 'center', 'sortable': True},
         {'name': 'out_number', 'label': 'Вихідний номер', 'field': 'out_number', 'align': 'left', 'sortable': True},
         {'name': 'out_date', 'label': 'Дата відправки', 'field': 'out_date', 'align': 'left', 'sortable': True},
-        {'name': 'people_count', 'label': 'Осіб у пакеті', 'field': 'people_count', 'align': 'center',
-         'sortable': True},
+        {'name': 'people_count', 'label': 'Осіб у пакеті', 'field': 'people_count', 'align': 'center', 'sortable': True},
         {'name': 'created_date', 'label': 'Створено', 'field': 'created_date', 'align': 'left', 'sortable': True},
         {'name': 'status', 'label': 'Статус', 'field': 'status', 'align': 'center', 'sortable': True},
         {'name': 'actions', 'label': 'Дії', 'field': 'actions', 'align': 'center'},

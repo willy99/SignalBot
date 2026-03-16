@@ -1,11 +1,13 @@
 from nicegui import ui
 from dics.deserter_xls_dic import *
 from domain.person import Person
+from gui.services.auth_manager import AuthManager
 from gui.views.person.person_view import edit_person
 from nicegui import run
 from domain.person_filter import PersonSearchFilter
 from gui.services.request_context import RequestContext
 from config import MAX_QUERY_RESULTS
+from security_config import MODULE_PERSON, PERM_EDIT
 
 ui.add_css('''
     .my-sticky-header-table thead tr th {
@@ -19,10 +21,10 @@ ui.add_css('''
     }
 ''', shared=True)
 
-def results_ui(data, person_ctrl, ctx: RequestContext, refresh_callback):
+def results_ui(data, person_ctrl, ctx: RequestContext, auth_manager: AuthManager, refresh_callback):
     if not data:
         return
-
+    can_edit = auth_manager.has_access(MODULE_PERSON, PERM_EDIT)
     columns = [
         {'name': 'pib', 'label': COLUMN_NAME, 'field': 'pib', 'align': 'left', 'sortable': True, 'classes': 'whitespace-normal min-w-[150px]'},
         {'name': 'title2', 'label': COLUMN_TITLE_2, 'field': 'title2', 'sortable': True},
@@ -56,25 +58,27 @@ def results_ui(data, person_ctrl, ctx: RequestContext, refresh_callback):
         'w-full general-table my-sticky-header-table max-h-[70vh]'
     ).props('wrap-cells flat bordered')
 
-    table.add_slot('body-cell-action', '''
-                <q-td :props="props">
-                    <q-btn size="sm" color="primary" icon="edit" @click="$parent.$emit('editAction', props.row.raw_model)">
-                        Редагувати
-                    </q-btn>
-                </q-td>
-            ''')
+    if can_edit:
+        table.add_slot('body-cell-action', '''
+                    <q-td :props="props">
+                        <q-btn size="sm" color="primary" icon="edit" @click="$parent.$emit('editAction', props.row.raw_model)">
+                            Редагувати
+                        </q-btn>
+                    </q-td>
+                ''')
 
     table.on('editAction', lambda e: edit_person(
         Person(**e.args),
         person_ctrl,
         ctx=ctx,
+        auth_manager=auth_manager,
         on_close=refresh_callback
     ))
 
     with ui.row().classes('w-full justify-end mt-2 px-2'):
         ui.label(f'Всього знайдено записів: {len(data)}').classes('text-gray-600 font-bold')
 
-def search_page(person_ctrl, ctx: RequestContext):
+def search_page(person_ctrl, ctx: RequestContext, auth_manager: AuthManager):
     state = {
         'last_query': None, 'last_title2': None, 'last_service': None,
         'last_des_year': None, 'last_des_from': None, 'last_des_to': None, 'last_ins_year': None
@@ -162,7 +166,7 @@ def search_page(person_ctrl, ctx: RequestContext):
             # ТУТ lambda працює нормально, бо ui.timer очікує звичайну функцію (не async)
             refresh_cb = lambda: ui.timer(0, lambda: do_search(auto_open=False, force_refresh=True), once=True)
             if len(data) == 1 and auto_open:
-                edit_person(data[0], person_ctrl, ctx=ctx, on_close=refresh_cb)
+                edit_person(data[0], person_ctrl, ctx=ctx, auth_manager=auth_manager, on_close=refresh_cb)
             if len(data) > MAX_QUERY_RESULTS:
                 ui.notify(
                     f'⚠️ Знайдено занадто багато результатів ({len(data)}). Показано перші {MAX_QUERY_RESULTS}. Будь ласка, уточніть параметри пошуку',
@@ -171,7 +175,7 @@ def search_page(person_ctrl, ctx: RequestContext):
                 )
                 data = data[:MAX_QUERY_RESULTS]  # Відсікаємо все зайве
             with results_container:
-                results_ui(data, person_ctrl, ctx, refresh_callback=refresh_cb)
+                results_ui(data, person_ctrl, ctx, auth_manager=auth_manager, refresh_callback=refresh_cb)
 
         except Exception as e:
             results_container.clear()

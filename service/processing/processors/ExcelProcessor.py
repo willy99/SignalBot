@@ -4,7 +4,7 @@ import sys
 
 import warnings
 from domain.person_filter import YES
-from config import DESERTER_TAB_NAME, EXCEL_CHUNK_SIZE, EXCEL_DATE_FORMAT
+from config import DESERTER_TAB_NAME, EXCEL_CHUNK_SIZE, EXCEL_DATE_FORMAT, DESERTER_RESERVE_TAB_NAME
 from dics.deserter_xls_dic import *
 from dics.deserter_xls_dic import NA
 from typing import List, Dict, Any
@@ -34,11 +34,21 @@ class ExcelProcessor:
 
         self.column_values: Dict[str, List[str]] = {} # для комбіков
 
+    def get_correct_sheet_name(self, mil_unit):
+        sheet_name = DESERTER_TAB_NAME
+        if mil_unit is None:
+            return sheet_name
+        if mil_unit.find("701") > -1:
+            return DESERTER_RESERVE_TAB_NAME
+        return sheet_name
+
     def upsert_record(self, records_list: List[Dict[str, Any]]) -> None:
         if not records_list:
             return
-        sheet_name = records_list[0].get(COLUMN_MIL_UNIT, None)
+        sheet_name = self.get_correct_sheet_name(records_list[0].get(COLUMN_MIL_UNIT, None))
+        print('>>>> sheet name: ' + sheet_name + ' and mil unit ' + str(records_list[0].get(COLUMN_MIL_UNIT, None)))
         self._load_workbook(sheet_name)
+        self.switch_to_sheet(sheet_name)
         try:
             self._processRow(records_list)
             if not self.batch_processing:
@@ -298,7 +308,6 @@ class ExcelProcessor:
     def _load_workbook(self, sheet_name) -> None:
         try:
             try:
-                # Проста перевірка на "вошивість" зв'язку з Excel
                 _ = self.app.api
             except:
                 self.logger.debug(">> Excel process was dead, restarting...")
@@ -542,6 +551,29 @@ class ExcelProcessor:
             if cell is not None:
                 cell = str(cell).strip()
             serialized_row.append(cell)
+
+    def delete_record(self, row_id: int) -> bool:
+        try:
+            with self.lock:
+                ids = self.sheet.range('A2').expand('down').value
+
+                if not isinstance(ids, list):
+                    ids = [ids]
+
+                try:
+                    target_row_idx = ids.index(row_id) + 2
+                except ValueError:
+                    self.logger.debug(f"❌ EXCEL, delete_record, ID {row_id} не знайдено в колонці А")
+                    return False
+
+                self.sheet.range(f"{target_row_idx}:{target_row_idx}").delete()
+
+                self.logger.debug(f"✅ EXCEL: Рядок з ID {row_id} (рядок {target_row_idx}) успішно видалено.")
+                return True
+
+        except Exception as e:
+            self.logger.debug(f"❌ EXCEL, Помилка видалення xlwings: {e}")
+            return False
 
     def update_row_by_id(self, row_id: int, updated_data: dict, paint_with_color=None):
         try:

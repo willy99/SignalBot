@@ -71,7 +71,7 @@ def init_nicegui(workflow_obj):
     def search():
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
-        search_view.search_page(person_ctrl, ctx)
+        search_view.search_page(person_ctrl, ctx, auth_manager)
 
     @ui.page('/batch_search')
     @require_access(auth_manager, 'search', 'read')  # Наприклад, головна - це пошук

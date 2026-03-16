@@ -54,6 +54,10 @@ class FileStorageClient(ABC):
     def walk(self, path: str):
         pass
 
+    @abstractmethod
+    def exists(self, path: str) -> bool:
+        pass
+
     def __enter__(self):
         return self
 

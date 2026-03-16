@@ -4,6 +4,7 @@ from gui.services.request_context import RequestContext
 from domain.person_filter import PersonSearchFilter
 from datetime import date
 from gui.services.auth_manager import AuthManager
+from service.processing.DocumentProcessingService import DocumentProcessingService
 from service.processing.MyWorkFlow import MyWorkFlow
 
 
@@ -32,6 +33,10 @@ class ReportController:
     def get_daily_added_files_report(self, ctx: RequestContext, target_date: date = None, exclude_names: List[str] = None):
         return self.reporter.get_daily_returns_report(target_date, exclude_names)
 
+    def get_daily_archive_files(self, target_date, known_names: list):
+        dservice = DocumentProcessingService(self.log_manager)
+        return dservice.get_daily_archive_files(target_date, known_names)
+
     def get_dupp_names_report(self, ctx: RequestContext):
         self.logger.debug('UI:' + ctx.user_name + ': Генеруємо репорт дублікатів прізвищ в системі: ')
         results = self.reporter.get_dupp_names_report()
@@ -41,6 +46,9 @@ class ReportController:
         self.logger.debug('UI:' + ctx.user_name + ': Генеруємо репорт - справи очікуючі ЄРДР: ')
         results = self.reporter.get_waiting_for_erdr_report(search_filter)
         return results
+
+    def get_brief_report(self, ctx: RequestContext):
+        return self.reporter.get_brief_summary()
 
     def is_admin(self):
         return self.auth_manager.has_access('admin_panel', 'read')

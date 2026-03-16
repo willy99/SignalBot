@@ -21,12 +21,8 @@ class DocProcessor:
     def __init__(self, log_manager: LoggerManager, file_path, original_filename, insertion_date=datetime.now(), use_ml=True):
         self.file_path = file_path
         self.original_filename = original_filename
-        self.insertion_date = insertion_date
         self.logger = log_manager.get_logger()
         self.log_manager = log_manager
-        self.response = {
-            'insertionDate' :None,
-        }
         if file_path:
             self.extension = Path(self.file_path).suffix
             self.engine = ParserFactory.get_parser(file_path, self.log_manager)
@@ -34,12 +30,9 @@ class DocProcessor:
 
     def process(self):
         self.logger.debug(f"--- Обробка тексту... {self.extension}")
-        doc_pieces = {}
-
-        # Отримуємо основні блоки
-        doc_pieces[self.__PIECE_HEADER] = self.engine.extract_text_between(PATTERN_PIECE_HEADER_START, PATTERN_PIECE_HEADER_END, True)
-        doc_pieces[self.__PIECE_1] = self.engine.extract_text_between(PATTERN_PIECE_1_START, PATTERN_PIECE_1_END, True)
-        doc_pieces[self.__PIECE_4] = self.engine.extract_text_between(PATTERN_PIECE_4_START, PATTERN_PIECE_4_END, True)
+        doc_pieces = {self.__PIECE_HEADER: self.engine.extract_text_between(PATTERN_PIECE_HEADER_START, PATTERN_PIECE_HEADER_END, True),
+                      self.__PIECE_1: self.engine.extract_text_between(PATTERN_PIECE_1_START, PATTERN_PIECE_1_END, True),
+                      self.__PIECE_4: self.engine.extract_text_between(PATTERN_PIECE_4_START, PATTERN_PIECE_4_END, True)}
 
         raw_piece_3 = self.engine.extract_text_between(PATTERN_PIECE_3_START, PATTERN_PIECE_3_END, True) or ""
 
@@ -74,7 +67,7 @@ class DocProcessor:
         result = []
 
         fields = {
-            col.COLUMN_INSERT_DATE: format_to_excel_date(self.insertion_date),
+            col.COLUMN_INSERT_DATE: format_to_excel_date(datetime.now()),
             col.COLUMN_MIL_UNIT: DEFAULT_MIL_UNIT,
         }
 
@@ -129,7 +122,7 @@ class DocProcessor:
         if self._check_error_sign(text_pieces[self.__PIECE_HEADER]):
             fields[col.COLUMN_DESERTION_TYPE] = REVIEW_STATUS_ERROR
             fields[col.COLUMN_REVIEW_STATUS] = REVIEW_STATUS_ERROR
-            fields[col.COLUMN_RETURN_DATE] = format_to_excel_date(self.insertion_date),
+            fields[col.COLUMN_RETURN_DATE] = format_to_excel_date(datetime.now()),
 
         text = text_pieces[self.__PIECE_4]
         fields[col.COLUMN_EXECUTOR] = self._extract_name(text)
@@ -494,7 +487,6 @@ class DocProcessor:
         return des_type
 
     def _extract_cc_article(self, desertion_type):
-        print('>>> desertion_type ' + str(desertion_type))
         if desertion_type == 'СЗЧ зброя':
             return "429"
         if desertion_type == 'відмова':

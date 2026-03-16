@@ -609,6 +609,7 @@ class ExcelReporter:
         name_idx = self.excelProcessor.header.get(COLUMN_NAME, 1) - 1
         ins_date_idx = self.excelProcessor.header.get(COLUMN_INSERT_DATE, 1) - 1
         des_date_idx = self.excelProcessor.header.get(COLUMN_DESERTION_DATE, 1) - 1
+        ret_date_idx = self.excelProcessor.header.get(COLUMN_RETURN_DATE, 1) - 1
         title_idx = self.excelProcessor.header.get(COLUMN_TITLE_2, 1) - 1
         subunit_idx = self.excelProcessor.header.get(COLUMN_SUBUNIT, 1) - 1
         call_idx = self.excelProcessor.header.get(COLUMN_ENLISTMENT_DATE, 1) - 1
@@ -637,21 +638,26 @@ class ExcelReporter:
                 # 1. Безпечно дістаємо сирі значення з перевіркою довжини рядка
                 raw_ins = row[ins_date_idx] if len(row) > ins_date_idx else None
                 raw_des = row[des_date_idx] if len(row) > des_date_idx else None
+                raw_ret = row[ret_date_idx] if len(row) > ret_date_idx else None
                 raw_call = row[call_idx] if len(row) > call_idx else None
 
                 # 2. Пробуємо розпізнати (якщо не вийде - функція поверне None)
                 parsed_ins = self._parse_date(raw_ins) if raw_ins else None
                 parsed_des = self._parse_date(raw_des) if raw_des else None
+                parsed_ret = self._parse_date(raw_ret) if raw_ret else None
                 parsed_call = self._parse_date(raw_call) if raw_call else None
 
                 # 3. Беремо .date() тільки там, де парсинг пройшов успішно
                 ins_date = parsed_ins.date() if parsed_ins else None
                 des_date = parsed_des.date() if parsed_des else None
+                ret_date = parsed_ret.date() if parsed_ret else None
                 call_date = parsed_call.date() if parsed_call else None
                 term_days = row[days_idx]
+                raw_place = row[des_place_idx] if len(row) > des_place_idx else None
+                des_place_clean = str(raw_place).strip() if raw_place else 'Не вказано'
 
                 # Якщо дата знайдена і вона збігається з цільовою (наприклад, сьогоднішньою)
-                if ins_date == target_date:
+                if ins_date == target_date and ret_date is None:
                     results.append({
                         'sheet_name': sheet_name,
                         'ins_date': ins_date,
@@ -661,7 +667,7 @@ class ExcelReporter:
                         'subunit': row[subunit_idx] if len(row) > subunit_idx else 'Не вказано',
                         'call_date': call_date,
                         'term_days': get_strint_fromfloat(term_days),
-                        'desertion_place': row[des_place_idx]
+                        'desertion_place': des_place_clean
                     })
 
         return results
@@ -756,6 +762,46 @@ class ExcelReporter:
             })
 
         return final_returns
+
+    # from 2022-up to now, the total brief summary, - desertion number, returns number
+    def get_brief_summary(self) -> list[dict]:
+        """Рахує загальну макро-статистику для таблиці командувача (ВЧ А0224)"""
+        des_date_idx = self.excelProcessor.header.get(COLUMN_DESERTION_DATE, 1) - 1
+        return_date_idx = self.excelProcessor.header.get(COLUMN_RETURN_DATE, 1) - 1
+
+        total_awol = 0
+        returned = 0
+
+        try:
+            sheet = self.excelProcessor.sheet.book.sheets['А0224']
+            last_row = sheet.range('A' + str(sheet.cells.last_cell.row)).end('up').row
+            data = sheet.range(f"A2:BB{last_row}").value
+
+            for row in data:
+                if not row: continue
+
+                # Перевіряємо, чи є значення у відповідних клітинках
+                has_des = len(row) > des_date_idx and row[des_date_idx]
+                has_ret = len(row) > return_date_idx and row[return_date_idx]
+
+                if has_des:
+                    total_awol += 1
+                if has_ret:
+                    returned += 1
+
+        except Exception as e:
+            print(f"Помилка формування таблиці командувача: {e}")
+
+        # Ті, хто ще не повернувся
+        in_search = total_awol - returned
+
+        # Повертаємо масив з одним словником (щоб ui.table легко це з'їв)
+        return [{
+            'total_awol': total_awol,
+            'in_search': in_search,
+            'returned': returned,
+            'in_disposal': 0
+        }]
 
     def get_dupp_names_report(self) -> Dict[str, List[Dict[str, Any]]]:
         # Отримуємо індекси колонок (переконайтеся, що константи імпортовані)

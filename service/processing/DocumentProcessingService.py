@@ -1,12 +1,15 @@
 # service/processing/DocumentProcessingService.py
+import logging
 import os
 import config
+from dics.deserter_xls_dic import COLUMN_NAME
 from service.processing.processors.DocProcessor import DocProcessor
+from service.storage.LoggerManager import LoggerManager
 from utils.utils import get_effective_date
 import unicodedata
 import traceback
 from service.storage.StorageFactory import StorageFactory
-import shutil
+from datetime import datetime
 import tempfile
 
 class DocumentProcessingService:
@@ -97,3 +100,65 @@ class DocumentProcessingService:
         self.make_backup()
         self.archive_document(source_file_path, original_filename)
         return self.process_to_excel(source_file_path, original_filename)
+
+    def get_daily_archive_files(self, target_date, known_names: list) -> list[dict]:
+
+        # Примусово створюємо datetime на 12:00 цільового дня.
+        # Це гарантує, що get_target_folder_path поверне папку саме за цей день, ігноруючи правило 16:00
+        dt = datetime.combine(target_date, datetime.min.time()).replace(hour=12)
+        target_path = self.fileProxy.get_target_folder_path(dt, config.DOCUMENT_STORAGE_PATH)
+
+        archive_list = []
+        # Залишаємо тільки перше слово (прізвище) у нижньому регістрі для надійного пошуку
+        known_surnames = [name.split()[0].lower() for name in known_names if name]
+
+        try:
+            with StorageFactory.create_client(config.DOCUMENT_STORAGE_PATH, self.log_manager) as client:
+                if not client.exists(target_path):
+                    return []
+
+                files = client.list_files(target_path)
+                for filename in files:
+                    file_path = f"{target_path}{client.separator}{filename}"
+
+                    # Створюємо тимчасовий локальний файл для парсера
+                    _, ext = os.path.splitext(filename)
+                    fd, local_temp_path = tempfile.mkstemp(suffix=ext)
+                    os.close(fd)
+                    try:
+                        client.copy_file(file_path, local_temp_path)
+                        log_manager = LoggerManager(logging_level=logging.ERROR)
+                        doc_processor = DocProcessor(log_manager, local_temp_path, filename)
+                        parsed_data_list = doc_processor.process()  # Тепер це список словників
+
+                        is_known = False
+                        found_names = []
+
+                        if parsed_data_list:
+                            # Збираємо всі непусті ПІБ з результатів парсингу цього файлу
+                            found_names = [item.get(COLUMN_NAME) for item in parsed_data_list if item.get(COLUMN_NAME)]
+
+                            # Перевіряємо кожне знайдене прізвище
+                            for name in found_names:
+                                found_surname = name.split()[0].lower()
+                                # Якщо хоча б одне прізвище з файлу є у відомих СЗЧ/поверненнях
+                                if any(found_surname in k_surname for k_surname in known_surnames):
+                                    is_known = True
+                                    break  # Файл ідентифіковано як релевантний, далі перевіряти не треба
+
+                        # Якщо файл не містить жодного відомого прізвища АБО взагалі не розпізнався (сміття)
+                        if not is_known:
+                            archive_list.append({
+                                # Якщо імен декілька, з'єднуємо їх через кому для красивого відображення в таблиці
+                                'name': ", ".join(found_names) if found_names else 'Не вдалося розпізнати',
+                                'filename': filename
+                            })
+                    finally:
+                        if os.path.exists(local_temp_path):
+                            os.remove(local_temp_path)
+
+        except Exception as e:
+            self.logger.error(f"❌ Помилка отримання архівних файлів: {e}")
+            self.logger.debug(traceback.format_exc())
+
+        return archive_list

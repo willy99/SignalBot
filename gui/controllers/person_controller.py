@@ -34,6 +34,25 @@ class PersonController:
             print(f"Помилка при збереженні: {e}")
             return False
 
+    def delete_record(self, ctx: RequestContext, person_model):
+        self.logger.debug('UI:' + ctx.user_name + ': Видаляємо персону ' + str(person_model))
+        try:
+            id = person_model.id
+
+            if id is None:
+                print("Помилка: не знайдено ID рядка для оновлення")
+                return False
+            success = self.processor.delete_record(id)
+            if success:
+                self.processor.save()
+                return True
+            return False
+
+        except Exception as e:
+            print(f"Помилка при видаленні: {e}")
+            return False
+
+
     def find_person(self, ctx: RequestContext, person_key: PersonKey):
         return self.processor.find_person(person_key)
 

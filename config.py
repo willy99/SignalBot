@@ -25,7 +25,7 @@ else:
 PROCESS_DOC : Final = True   # copy doc file from signal to date-folder
 PROCESS_XLS : Final = True # immediate process doc to excel. if false, batch can be applied later on
 DAILY_BACKUPS: Final = True # do daily backups of excel db
-SIGNAL_BOT: Final = True # connect to signal and process attachments
+SIGNAL_BOT: Final = False # connect to signal and process attachments
 SAVE_EXCEL_AT_CLOSE = False # по закриттю зберігати всі зміни в ексельчику
 
 

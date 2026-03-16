@@ -1,6 +1,8 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 from nicegui import app
 from gui.services.request_context import RequestContext
+from security_config import PERM_READ, PERM_EDIT, PERM_DELETE
+
 
 class AuthManager:
     def __init__(self, db):
@@ -41,13 +43,13 @@ class AuthManager:
         for r in rows:
             module_name = r[0]
             perms[module_name] = {
-                'read': bool(r[1]),
-                'write': bool(r[2]),
-                'delete': bool(r[3])
+                PERM_READ: bool(r[1]),
+                PERM_EDIT: bool(r[2]),
+                PERM_DELETE: bool(r[3])
             }
         return perms
 
-    def has_access(self, module_name: str, action: str = 'read') -> bool:
+    def has_access(self, module_name: str, action: str = PERM_READ) -> bool:
         from nicegui import app
 
         user_info = app.storage.user.get('user_info')

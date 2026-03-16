@@ -5,11 +5,11 @@ from dics.deserter_xls_dic import VALID_PATTERN_DATE
 from typing import Any
 from datetime import datetime
 
-def date_input(label: str, bind_obj: Any, field: str, blur_handler=None):
+def date_input(label: str, bind_obj: Any, field: str, blur_handler=None, default_value=None):
     """
     Кастомний компонент вводу дати з календариком та валідацією.
     """
-    inp = ui.input(label=label, placeholder='dd.mm.YYYY', validation={
+    inp = ui.input(label=label, value=default_value, placeholder='dd.mm.YYYY', validation={
         'Формат має бути dd.mm.YYYY': lambda v: bool(re.match(VALID_PATTERN_DATE, str(v))) if v else True
     }).bind_value(bind_obj, field).props('mask="##.##.####" hide-bottom-space')
 

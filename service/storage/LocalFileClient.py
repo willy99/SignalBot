@@ -123,5 +123,13 @@ class LocalFileClient(FileStorageClient):
             self.logger.error(f"❌ Помилка читання JSON локально з {path}: {e}")
             raise
 
+    def exists(self, path: str) -> bool:
+        """Перевіряє, чи існує файл або папка локально."""
+        try:
+            return os.path.exists(path)
+        except Exception as e:
+            self.logger.error(f"❌ Помилка перевірки шляху {path}: {e}")
+            return False
+
     def close(self):
         pass
