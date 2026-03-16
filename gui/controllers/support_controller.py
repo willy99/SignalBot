@@ -3,6 +3,8 @@ from gui.services.request_context import RequestContext
 from domain.person_filter import PersonSearchFilter
 from domain.person import Person
 from typing import List, Optional, Dict, Any
+
+from service.constants import DOC_PACKAGE_STANDART
 from service.docworkflow.DocSupportService import DocSupportService, SupportDoc
 from gui.controllers.person_controller import PersonController
 from service.processing.MyWorkFlow import MyWorkFlow
@@ -29,7 +31,17 @@ class SupportController:
         if not supp_number:
             raise ValueError("Будь ласка, введіть загальний номер супроводу.")
 
-        return self.doc_templator.generate_support_batch(city, supp_number, supp_date, buffer_data)
+        return self.doc_templator.generate_support_batch_detailed(city, supp_number, supp_date, buffer_data)
+
+    def generate_standard_support_document(self, ctx, city: str, supp_number: str, supp_date: str, buffer_data: list):
+        self.logger.debug('UI:' + ctx.user_name + ': Генеруємо супровід: ' + str(city) + ', number:' + supp_number + ':' + str(buffer_data))
+
+        if not buffer_data:
+            raise ValueError("Буфер порожній. Додайте хоча б один запис.")
+        if not supp_number:
+            raise ValueError("Будь ласка, введіть загальний номер супроводу.")
+
+        return self.doc_templator.generate_support_batch_standart(city, supp_number, supp_date, buffer_data)
 
     def generate_logs(self, ctx: RequestContext, city: str, supp_number: str, supp_date: str, buffer_data: list) -> str:
         self.logger.debug('UI:' + ctx.user_name + ': Генеруємо супровід: ' + str(city) + ', number:' + supp_number + ':' + str(buffer_data))
@@ -45,16 +57,18 @@ class SupportController:
         return [Person.from_excel_dict(item['data']) for item in results]
 
     def save_support_doc(self, ctx: RequestContext, city: str, support_number: str, support_date: str, buffer_data: list,
-                         draft_id: Optional[int] = None) -> int:
+                         draft_id: Optional[int] = None, package_type:str=DOC_PACKAGE_STANDART) -> int:
         self.logger.debug('UI:' + ctx.user_name + ': Запис змін для пакету супроводів: ' + str(draft_id))
         dservice = DocSupportService(self.db, ctx)
 
         doc_model = SupportDoc(
             id=draft_id,
+            created_by=ctx.user_id,
             city=city,
             support_number=support_number,
             support_date=support_date,
-            payload=buffer_data
+            payload=buffer_data,
+            package_type=package_type
         )
 
         return dservice.save_support_doc(doc_model)
@@ -102,12 +116,13 @@ class SupportController:
             logical_id = person_dict.get(COLUMN_INCREMEMTAL)
 
             print(f'Знайдено логічний ID: {logical_id}')
-
+            package_type = draft.get('package_type')
             if logical_id is not None:
+                individual_support_number = ('/' + str(row_seq_num) if row_seq_num else '') if package_type != DOC_PACKAGE_STANDART else ''
                 p = Person(
                     id=logical_id,
                     dbr_date=support_date,
-                    dbr_num=support_number + '/' + str(row_seq_num)
+                    dbr_num=support_number + individual_support_number
                 )
                 persons_to_update.append(p)
 

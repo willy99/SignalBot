@@ -7,13 +7,19 @@ class DocTemplator:
     def __init__(self, templates_dir: Path):
 
         self.templates_dir = Path(templates_dir)
-        self.support_dir = os.path.join(self.templates_dir, 'support-form')
+        self.support_detailed_dir = os.path.join(self.templates_dir, 'support-form-detailed')
+        self.support_standart_dir = os.path.join(self.templates_dir, 'support-form-standart')
         self.notif_dir = os.path.join(self.templates_dir, 'notif-form')
 
-        self.templates = {
-            'Миколаїв': self.support_dir + '/Мико.docx',
-            'Дніпро': self.support_dir + '/Дніпро.docx',
-            'Донецьк': self.support_dir + '/Донецьк.docx'
+        self.templates_detailed = {
+            'Миколаїв': self.support_detailed_dir + '/Мико.docx',
+            'Дніпро': self.support_detailed_dir + '/Дніпро.docx',
+            'Донецьк': self.support_detailed_dir + '/Донецьк.docx'
+        }
+        self.templates_standart = {
+            'Миколаїв': self.support_standart_dir + '/Мико.docx',
+            'Дніпро': self.support_standart_dir + '/Дніпро.docx',
+            'Донецьк': self.support_standart_dir + '/Донецьк.docx'
         }
         self.region_templates = {
             'Миколаївська область': self.notif_dir + '/Мико.docx',
@@ -60,11 +66,68 @@ class DocTemplator:
             lines.append(f"{idx}. {name}")
         return "\n".join(lines)
 
-    def generate_support_batch(self, city: str, supp_number: str, supp_date: str, raw_documents: list) -> tuple[bytes, str]:
-        if city not in self.templates:
+    def _format_military_name(self, full_name_gen: str) -> str:
+        """
+        Допоміжний метод: робить прізвище ВЕЛИКИМИ літерами,
+        а ім'я та по батькові - з великої (напр. КУЛІЦИ Олега Володимировича).
+        """
+        if not full_name_gen:
+            return ""
+
+        parts = full_name_gen.strip().split()
+        if not parts:
+            return ""
+
+        parts[0] = parts[0].upper()
+        for i in range(1, len(parts)):
+            parts[i] = parts[i].capitalize()
+
+        return " ".join(parts)
+
+    def generate_support_batch_standart(self, city: str, supp_number: str, supp_date: str, raw_documents: list) -> tuple[bytes, str]:
+        if city not in self.templates_standart:
             raise FileNotFoundError(f"Шаблон для міста {city} не знайдено.")
 
-        template_path = self.templates[city]
+        template_path = self.templates_standart[city]
+        doc = DocxTemplate(str(template_path))
+
+        formatted_docs = []
+        for idx, raw in enumerate(raw_documents):
+            if not raw:
+                continue
+
+            title_gen = raw.get('title_gen') or ''
+            name_gen = raw.get('name_gen') or ''
+
+            formatted_doc = {
+                'NUMBER': raw.get('seq_num'),
+                'TITLE': title_gen.lower(),
+                'NAME': self._format_military_name(name_gen),
+                'TOTAL_PAGES': raw.get('total', 0)
+            }
+            formatted_docs.append(formatted_doc)
+
+        context = {
+            'SUPP_DATE': supp_date,
+            'SUPP_NUMBER': supp_number,
+            'CITY': city,
+            'documents': formatted_docs
+        }
+
+        doc.render(context)
+
+        byte_io = io.BytesIO()
+        doc.save(byte_io)
+        byte_io.seek(0)
+
+        file_name = f"Пакет_Супроводів_{city}_{len(formatted_docs)}шт.docx"
+        return byte_io.getvalue(), file_name
+
+    def generate_support_batch_detailed(self, city: str, supp_number: str, supp_date: str, raw_documents: list) -> tuple[bytes, str]:
+        if city not in self.templates_detailed:
+            raise FileNotFoundError(f"Шаблон для міста {city} не знайдено.")
+
+        template_path = self.templates_detailed[city]
         doc = DocxTemplate(str(template_path))
 
         formatted_docs = []

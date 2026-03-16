@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS support_docs (
     created_by INTEGER NOT NULL,
     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status TEXT DEFAULT 'DRAFT',
+    package_type TEXT DEFAULT 'Standart',
     city TEXT,
     support_number TEXT,
     payload TEXT,

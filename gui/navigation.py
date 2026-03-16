@@ -12,7 +12,7 @@ from gui.controllers.inbox_controller import InboxController
 from gui.views.person import search_view
 from gui.views.person import batch_search_view
 from gui.views.home_view import render_home_page
-from gui.views.documentation import support_doc_view, notif_doc_list_view, notif_doc_edit_view, support_doc_list_view, dbr_doc_list_view, dbr_doc_edit_view
+from gui.views.documentation import support_doc_standart_view, support_doc_detailed_view, notif_doc_list_view, notif_doc_edit_view, support_doc_list_view, dbr_doc_list_view, dbr_doc_edit_view
 from gui.views.report import subunits_report_view
 from gui.views.report import yearly_report_view
 from gui.views.report import dups_report_view
@@ -140,13 +140,21 @@ def init_nicegui(workflow_obj):
         app_menu.render(ctx)
         support_doc_list_view.render_drafts_list_page(support_ctrl, ctx)
 
-    @ui.page('/doc_support/create')
-    @ui.page('/doc_support/edit/{draft_id}')
+    @ui.page('/doc_support/d_create')
+    @ui.page('/doc_support/d_edit/{draft_id}')
     @require_access(auth_manager, 'doc_support', 'read')
     def support_doc_edit(draft_id: int = None):
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
-        support_doc_view.render_document_page(support_ctrl, person_ctrl, file_manager, ctx, draft_id)
+        support_doc_detailed_view.render_document_page(support_ctrl, person_ctrl, file_manager, ctx, draft_id)
+
+    @ui.page('/doc_support/s_create')
+    @ui.page('/doc_support/s_edit/{draft_id}')
+    @require_access(auth_manager, 'doc_support', 'read')
+    def support_doc_edit(draft_id: int = None):
+        ctx = auth_manager.get_current_context()
+        app_menu.render(ctx)
+        support_doc_standart_view.render_support_standard_page(support_ctrl, person_ctrl, file_manager, ctx, draft_id)
 
     @ui.page('/doc_notif')
     @require_access(auth_manager, 'doc_notif', 'read')

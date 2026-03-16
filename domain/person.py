@@ -54,6 +54,7 @@ class Person(BaseModel):
     dbr_num: Optional[Union[str, int]] = Field("", alias=COLUMN_DBR_NUMBER)
     erdr_notation: Optional[Union[str, int]] = Field("", alias=COLUMN_ERDR_NOTATION)
     notation: Optional[Union[str, int]] = Field("", alias=COLUMN_NOTATION)
+    experience: Optional[Union[str, int]] = Field("", alias=COLUMN_EXPERIENCE)
 
     # Великі текстові поля (Textarea)
     desertion_conditions: Optional[str] = Field("", alias=COLUMN_DESERT_CONDITIONS)

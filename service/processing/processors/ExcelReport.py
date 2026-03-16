@@ -615,6 +615,7 @@ class ExcelReporter:
         call_idx = self.excelProcessor.header.get(COLUMN_ENLISTMENT_DATE, 1) - 1
         days_idx = self.excelProcessor.header.get(COLUMN_SERVICE_DAYS, 1) - 1
         des_place_idx = self.excelProcessor.header.get(COLUMN_DESERTION_PLACE, 1) - 1
+        exp_idx = self.excelProcessor.header.get(COLUMN_EXPERIENCE, 1) - 1
 
         results = []
         target_sheets = ['А0224', 'А7018']  # Назви ваших аркушів в Excel
@@ -667,7 +668,8 @@ class ExcelReporter:
                         'subunit': row[subunit_idx] if len(row) > subunit_idx else 'Не вказано',
                         'call_date': call_date,
                         'term_days': get_strint_fromfloat(term_days),
-                        'desertion_place': des_place_clean
+                        'desertion_place': des_place_clean,
+                        'experience': row[exp_idx] if (row[exp_idx]) else 'Невідомо'
                     })
 
         return results
@@ -768,9 +770,11 @@ class ExcelReporter:
         """Рахує загальну макро-статистику для таблиці командувача (ВЧ А0224)"""
         des_date_idx = self.excelProcessor.header.get(COLUMN_DESERTION_DATE, 1) - 1
         return_date_idx = self.excelProcessor.header.get(COLUMN_RETURN_DATE, 1) - 1
+        return_reserve_date_idx = self.excelProcessor.header.get(COLUMN_RETURN_TO_RESERVE_DATE, 1) - 1
 
         total_awol = 0
         returned = 0
+        res_returned = 0
 
         try:
             sheet = self.excelProcessor.sheet.book.sheets['А0224']
@@ -783,23 +787,27 @@ class ExcelReporter:
                 # Перевіряємо, чи є значення у відповідних клітинках
                 has_des = len(row) > des_date_idx and row[des_date_idx]
                 has_ret = len(row) > return_date_idx and row[return_date_idx]
+                has_res_ret = len(row) > return_reserve_date_idx and row[return_reserve_date_idx]
 
                 if has_des:
                     total_awol += 1
                 if has_ret:
                     returned += 1
+                if has_res_ret:
+                    res_returned += 1
 
         except Exception as e:
             print(f"Помилка формування таблиці командувача: {e}")
 
         # Ті, хто ще не повернувся
-        in_search = total_awol - returned
+        in_search = total_awol - (returned + res_returned)
 
         # Повертаємо масив з одним словником (щоб ui.table легко це з'їв)
         return [{
             'total_awol': total_awol,
             'in_search': in_search,
             'returned': returned,
+            'res_returned': res_returned,
             'in_disposal': 0
         }]
 

@@ -166,6 +166,20 @@
     letter-spacing: 0.5px;
 }
 
+
+
+.analytics-table thead tr th {
+    background-color: #e5e7eb !important; /* Сірий фон для шапки */
+    font-size: 15px !important;
+    font-weight: bold !important;
+    color: #1f2937 !important;
+}
+.analytics-table tbody tr:last-child td {
+    background-color: #e5e7eb !important; /* Сірий фон для останнього рядка (Всього) */
+    font-size: 15px !important;
+    font-weight: bold !important;
+}
+
 /* Акценти для підсумкових рядків та колонок */
 .bg-grand-total {
     background-color: #ffe0b2 !important; /* Ніжно-помаранчевий */

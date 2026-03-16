@@ -150,6 +150,28 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
             m2_summary_row['total'] = m2_grand_total if m2_grand_total > 0 else '-'
             state['matrix2_rows'].append(m2_summary_row)
 
+            # --- ТАБЛИЦЯ 3: Досвід ---
+            experienced_count = 0
+            newcomer_count = 0
+
+            for item in data_A0224:
+                # Враховано можливу опечатку в назві поля (experince / experience)
+                exp = item.get('experience', item.get('experince', '')).strip().lower()
+                if exp == 'experienced':
+                    experienced_count += 1
+                elif exp == 'newcomer':
+                    newcomer_count += 1
+
+            state['exp_summary_rows'] = [
+                {'category': 'З бойовим досвідом', 'count': experienced_count},
+                {'category': 'Новачки', 'count': newcomer_count},
+                {'category': 'Повернень', 'count': len(return_data)}
+            ]
+            state['exp_summary_cols'] = [
+                {'name': 'category', 'label': 'Категорія', 'field': 'category', 'align': 'left', 'classes': 'font-bold'},
+                {'name': 'count', 'label': 'Кількість', 'field': 'count', 'align': 'center'}
+            ]
+
             with table_container:
 
                 # ==============================
@@ -160,6 +182,7 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
                         {'name': 'total_awol', 'label': 'Здійснили СЗЧ', 'field': 'total_awol', 'align': 'center', 'classes': 'text-xl font-bold'},
                         {'name': 'in_search', 'label': 'Знаходяться в розшуку', 'field': 'in_search', 'align': 'center', 'classes': 'text-xl font-bold text-red-600'},
                         {'name': 'returned', 'label': 'Повернулися з СЗЧ', 'field': 'returned', 'align': 'center', 'classes': 'text-xl font-bold text-green-600'},
+                        {'name': 'res_returned', 'label': 'Повернулися в БРЕЗ', 'field': 'res_returned', 'align': 'center', 'classes': 'text-xl font-bold text-green-600'},
                         {'name': 'in_disposal', 'label': 'Перебувають в розпорядженні', 'field': 'in_disposal', 'align': 'center', 'classes': 'text-xl font-bold'},
                     ]
 
@@ -177,15 +200,21 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
                     with ui.row().classes('w-full bg-indigo-50 p-3 border-b items-center justify-between'):
                         ui.label('📊 Аналітична довідка за день').classes('font-bold text-indigo-800 text-lg')
 
-                    with ui.row().classes('w-full p-4 gap-6 items-start'):
-                        with ui.column().classes('flex-1 min-w-[300px]'):
-                            ui.label('Розподіл по підрозділах').classes('font-bold text-gray-700 mb-2')
-                            ui.table(columns=state['matrix1_cols'], rows=state['matrix1_rows']).classes('w-full').props('dense flat bordered')
+                    with ui.column().classes('w-full p-4 gap-4'):
 
-                        with ui.column().classes('flex-1 min-w-[300px]'):
-                            ui.label('Розподіл за складом').classes('font-bold text-gray-700 mb-2')
-                            ui.table(columns=state['matrix2_cols'], rows=state['matrix2_rows']).classes('w-full').props('dense flat bordered')
+                        with ui.row().classes('w-full gap-6 items-start'):
+                            with ui.column().classes('flex-1 min-w-[300px]'):
+                                ui.label('Розподіл по підрозділах').classes('font-bold text-gray-700 mb-2')
+                                ui.label('Бажаю здоровʼя, за добу станом на 18:00').classes('font-bold text-gray-900 mb-2')
+                                ui.table(columns=state['matrix1_cols'], rows=state['matrix1_rows']).classes('w-full analytics-table').props('dense flat bordered')
 
+                            with ui.column().classes('flex-1 min-w-[300px]'):
+                                ui.label('Розподіл за складом').classes('font-bold text-gray-700 mb-2')
+                                ui.label('Бажаю здоровʼя, за добу станом на 18:00').classes('font-bold text-gray-900 mb-2')
+                                ui.table(columns=state['matrix2_cols'], rows=state['matrix2_rows']).classes('w-full analytics-table').props('dense flat bordered')
+
+                        with ui.row().classes('flex-1 mt-2'):
+                            ui.table(columns=state['exp_summary_cols'], rows=state['exp_summary_rows']).classes('w-72').props('dense flat bordered hide-header')
                     # ==============================
                     # РЕНДЕР ДЕТАЛЬНИХ СПИСКІВ
                     # ==============================

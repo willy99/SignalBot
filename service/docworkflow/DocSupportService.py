@@ -27,21 +27,36 @@ class DocSupportService:
             self.db.update_record(self.table_name, doc.id, doc_data)
             return doc.id
 
+    from typing import List, Optional
+    import json
+
     def get_all_support_docs(self, created_by: Optional[int] = None) -> List[SupportDoc]:
-        query = f"SELECT * FROM {self.table_name}"
+        # Використовуємо аліаси: s для таблиці документів, u для користувачів
+        query = f"""
+            SELECT s.*, u.username
+            FROM {self.table_name} s
+            LEFT JOIN users u ON u.id = s.created_by
+        """
         params = []
 
+        # Важливо: явно вказуємо s.created_by, щоб база не плуталась (ambiguous column)
         if created_by:
-            query += " WHERE created_by = ?"
+            query += " WHERE s.created_by = ?"
             params.append(created_by)
 
-        query += " ORDER BY created_date DESC"
+        query += " ORDER BY s.created_date DESC"
 
         rows = self.db.__execute_fetchall__(query, tuple(params))
         result = []
 
         for r in rows:
             r_dict = dict(r)
+
+            # Витягуємо username і підміняємо ним id у полі created_by
+            username = r_dict.pop('username', None)
+            if username:
+                r_dict['created_by'] = username
+
             r_dict['payload'] = json.loads(r_dict['payload']) if r_dict.get('payload') else []
             result.append(SupportDoc(**r_dict))
 
