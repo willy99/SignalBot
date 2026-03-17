@@ -86,9 +86,20 @@ class PersonController:
             self.logger.error(f"Помилка при пакетному збереженні: {e}")
             return False
 
+
     def search(self, ctx: RequestContext, filter_obj: PersonSearchFilter) -> List[Person]:
         self.logger.debug('UI:' + ctx.user_name + ': Шукаємо: ' + str(filter_obj))
-        results = self.processor.search_people(filter_obj)
+        mil_unit = MIL_UNITS[0]
+        filter_obj.mil_unit = mil_unit
+        results_a0224 = self.processor.search_people(filter_obj)
+        for item in results_a0224:
+            item['data'][COLUMN_MIL_UNIT] = mil_unit
+        mil_unit = MIL_UNITS[1]
+        filter_obj.mil_unit = mil_unit # спроба знайти на другому табі
+        results_a7018 = self.processor.search_people(filter_obj)
+        for item in results_a7018:
+            item['data'][COLUMN_MIL_UNIT] = mil_unit
+        results = results_a0224 + results_a7018
         return [Person.from_excel_dict(item['data']) for item in results]
 
     def get_column_options(self) -> Dict[str, List[str]]:

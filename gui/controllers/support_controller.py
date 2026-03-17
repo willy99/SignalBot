@@ -10,7 +10,7 @@ from gui.controllers.person_controller import PersonController
 from service.processing.MyWorkFlow import MyWorkFlow
 from service.processing.processors.DocTemplator import DocTemplator
 from utils.utils import get_person_key_from_str
-from dics.deserter_xls_dic import COLUMN_INCREMEMTAL
+from dics.deserter_xls_dic import COLUMN_INCREMEMTAL, MIL_UNITS, COLUMN_MIL_UNIT
 from gui.services.auth_manager import AuthManager
 
 
@@ -48,13 +48,6 @@ class SupportController:
         log_text = self.doc_templator.generate_support_logs(city, supp_number, supp_date, buffer_data)
         print(str(log_text))
         return log_text
-
-    def search_persons(self, ctx: RequestContext, query: str) -> List[Person]:
-        search_filter = PersonSearchFilter(
-            query=query
-        )
-        results = self.excel_processor.search_people(search_filter)
-        return [Person.from_excel_dict(item['data']) for item in results]
 
     def save_support_doc(self, ctx: RequestContext, city: str, support_number: str, support_date: str, buffer_data: list,
                          draft_id: Optional[int] = None, package_type:str=DOC_PACKAGE_STANDART) -> int:

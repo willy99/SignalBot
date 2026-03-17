@@ -258,6 +258,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                         for p in results:
                             id_num = f"{p.rnokpp}_{p.name}_{p.desertion_date}"
                             is_in_buffer = any(doc['id_number'] == id_num for doc in state['buffer'])
+                            mil_unit_val = getattr(p, 'mil_unit', '')
 
                             row_class = 'w-full items-center py-1 border-b border-gray-100 hover:bg-gray-100 flex-nowrap gap-2'
                             if is_in_buffer:
@@ -272,7 +273,10 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                                     candidate_checkboxes[id_num] = cb
 
                                     with ui.column().classes('gap-0 flex-1 overflow-hidden'):
-                                        ui.label(p.name).classes('font-bold text-sm truncate w-full')
+                                        with ui.row().classes('items-center gap-1'):
+                                            ui.label(p.name).classes('font-bold text-sm truncate')
+                                            if mil_unit_val == 'А7018':
+                                                ui.badge('БРЕЗ', color='orange').classes('text-[10px] px-1 py-0')
                                         ui.label(str(p.rnokpp)).classes('text-xs text-gray-500 truncate w-full')
 
                                     ui.label(getattr(p, 'title', '')).classes('w-32 shrink-0 text-sm truncate')
@@ -312,6 +316,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                                 'name': p.name,
                                 'title': getattr(p, 'title', ''),
                                 'review_status': getattr(p, 'review_status', ''),
+                                'mil_unit': getattr(p, 'mil_unit', ''),
                                 'desertion_date': format_to_excel_date(p.desertion_date),
                                 'birthday': format_to_excel_date(getattr(p, 'birthday', '')),
                                 'desertion_conditions': getattr(p, 'desertion_conditions', ''),
@@ -372,6 +377,12 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                                     ui.label(f"{p['seq_num']}. {p['name']}").classes('font-bold text-sm truncate w-full')
                                     info_str = f"РНОКПП: {p.get('rnokpp', '—')} | СЗЧ: {p.get('desertion_date', '—')}"
                                     ui.label(info_str).classes('text-xs text-gray-500')
+
+                                    with ui.row().classes('gap-1 mt-1'):
+                                        if p.get('review_status') == 'ЄРДР':
+                                            ui.badge('ЄРДР', color='red').classes('text-[10px] px-1 py-0 w-min')
+                                        if p.get('mil_unit') == 'А7018':
+                                            ui.badge('БРЕЗ', color='orange').classes('text-[10px] px-1 py-0 w-min')
 
                                 with ui.row().classes('gap-1'):
                                     delete_button = ui.button(icon='close', color='red', on_click=lambda idx=i: on_remove_click(idx)).props('flat dense size=sm')

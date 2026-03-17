@@ -1,6 +1,7 @@
 from nicegui import ui, run
 
 from dics.deserter_xls_dic import VALID_PATTERN_DOC_NUM
+from domain.person_filter import PersonSearchFilter
 from gui.services.request_context import RequestContext
 from utils.utils import to_genitive_case, to_genitive_title
 from gui.tools.validation import is_valid_doc_number
@@ -196,16 +197,21 @@ def render_support_standard_page(controller: SupportController, person_controlle
                     'clearable autofocus')
                 search_btn = ui.button('Шукати', icon='search').props('elevated color="primary"')
 
-            def update_review_badge(status_val):
+            def update_review_badge(status_val, mil_unit_val):
                 if not status_val:
                     review_status_badge.set_visibility(False)
-                    return
-                review_status_badge.set_text(f"Статус: {status_val}")
-                if status_val.strip().upper() == 'ЄРДР':
-                    review_status_badge.props('color="red"')
                 else:
-                    review_status_badge.props('color="green"')
-                review_status_badge.set_visibility(True)
+                    review_status_badge.set_text(f"Статус: {status_val}")
+                    if status_val.strip().upper() == 'ЄРДР':
+                        review_status_badge.props('color="red"')
+                    else:
+                        review_status_badge.props('color="green"')
+                    review_status_badge.set_visibility(True)
+
+                if mil_unit_val == 'А7018':
+                    mil_unit_badge.set_visibility(True)
+                else:
+                    mil_unit_badge.set_visibility(False)
 
             def on_person_change(e):
                 selected_id = e.value
@@ -213,9 +219,9 @@ def render_support_standard_page(controller: SupportController, person_controlle
                     person_data = state['current_search_results'][selected_id]
                     real_name = person_data['name']
                     name_gen_input.value = to_genitive_case(real_name)
-                    update_review_badge(person_data.get('review_status', ''))
+                    update_review_badge(person_data.get('review_status', ''), person_data.get('mil_unit', ''))
                 else:
-                    update_review_badge('')
+                    update_review_badge('', '')
 
             with ui.row().classes('w-full items-center gap-4 mb-4'):
                 person_select = ui.select(
@@ -228,8 +234,12 @@ def render_support_standard_page(controller: SupportController, person_controlle
                 name_gen_input = ui.input('ПІБ (Родовий відмінок)').classes('flex-1 text-blue-800 font-bold')
                 name_gen_input.visible = False
 
-                review_status_badge = ui.badge('', color='green').classes('text-xs font-bold px-2 py-1 shadow-sm mt-3')
-                review_status_badge.set_visibility(False)
+                with ui.column().classes('gap-1 mt-2'):
+                    review_status_badge = ui.badge('', color='green').classes('text-xs font-bold px-2 py-1 shadow-sm')
+                    review_status_badge.set_visibility(False)
+
+                    mil_unit_badge = ui.badge('БРЕЗ', color='orange').classes('text-xs font-bold px-2 py-1 shadow-sm')
+                    mil_unit_badge.set_visibility(False)
 
             async def perform_search(e=None):
                 query = search_input.value
@@ -239,7 +249,8 @@ def render_support_standard_page(controller: SupportController, person_controlle
 
                 search_btn.disable()
                 try:
-                    results = await run.io_bound(controller.search_persons, ctx, query)
+                    search_filter = PersonSearchFilter(query=query)
+                    results = await run.io_bound(person_controller.search, ctx, search_filter)
 
                     state['current_search_results'].clear()
                     options = {}
@@ -251,6 +262,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
 
                         id_num = f"{person.rnokpp}_{person.name}_{des_date_val}"
                         title_val = getattr(person, 'title', '')
+                        mil_unit_val = getattr(person, 'mil_unit', '')
 
                         state['current_search_results'][id_num] = {
                             'name': person.name,
@@ -258,9 +270,12 @@ def render_support_standard_page(controller: SupportController, person_controlle
                             'desertion_date': des_date_val,
                             'review_status': getattr(person, 'review_status', ''),
                             'title': title_val,
+                            'mil_unit': mil_unit_val,
                             'id_number': id_num
                         }
-                        options[id_num] = f"{person.name} (РНОКПП: {person.rnokpp} СЗЧ: {des_date_val})"
+                        unit_str = " [БРЕЗ]" if mil_unit_val == 'А7018' else ""
+
+                        options[id_num] = f"{person.name}{unit_str} (РНОКПП: {person.rnokpp} СЗЧ: {des_date_val})"
 
                     person_select.options = options
                     person_select.visible = True
@@ -273,7 +288,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                     else:
                         ui.notify('За цим запитом нікого не знайдено', type='warning')
                         person_select.visible = False
-                        update_review_badge('')
+                        update_review_badge('', '')
 
                 except Exception as ex:
                     ui.notify(f'Помилка пошуку: {ex}', type='negative')
@@ -307,7 +322,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                 person_select.visible = False
                 name_gen_input.value = ''
                 name_gen_input.visible = False
-                update_review_badge('')
+                update_review_badge('', '')
                 total_input.value = 0
                 update_btn_state()
 
@@ -334,6 +349,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                 name_val = selected_person.get('name', 'Невідоме ПІБ')
                 title_val = selected_person.get('title', '')
                 title_gen_val = to_genitive_title(title_val)
+                mil_unit_val = selected_person.get('mil_unit', '') # 💡 Беремо значення
 
                 if edit_idx is not None:
                     assigned_seq_num = buffer_data[edit_idx].get('seq_num', edit_idx + 1)
@@ -352,6 +368,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                     'rnokpp': selected_person.get('rnokpp', ''),
                     'desertion_date': selected_person.get('desertion_date', ''),
                     'review_status': selected_person.get('review_status', ''),
+                    'mil_unit': mil_unit_val,  # 💡 Зберігаємо у payload
                     'total': total_val
                 }
 
@@ -396,14 +413,16 @@ def render_support_standard_page(controller: SupportController, person_controlle
                 state['current_search_results'][id_num] = doc
                 rnokpp_str = doc.get('rnokpp', 'Невідомо')
                 des_date_str = doc.get('desertion_date', 'Невідомо')
+                mil_unit_val = doc.get('mil_unit', '')
 
-                person_select.options = {id_num: f"{doc['name']} (РНОКПП: {rnokpp_str} СЗЧ: {des_date_str})"}
+                unit_str = " [БРЕЗ]" if mil_unit_val == 'А7018' else ""
+                person_select.options = {id_num: f"{doc['name']}{unit_str} (РНОКПП: {rnokpp_str} СЗЧ: {des_date_str})"}
                 person_select.value = id_num
                 person_select.visible = True
                 name_gen_input.value = doc.get('name_gen', to_genitive_case(doc['name']))
                 name_gen_input.visible = True
 
-                update_review_badge(doc.get('review_status', ''))
+                update_review_badge(doc.get('review_status', ''), mil_unit_val)
                 total_input.value = doc['total']
 
                 update_btn_state()
@@ -424,8 +443,12 @@ def render_support_standard_page(controller: SupportController, person_controlle
                                     seq = doc.get('seq_num', i + 1)
                                     ui.label(f"{seq}. {doc['name']} ({doc['total']} стор.)").classes(
                                         'font-medium text-sm truncate w-full')
-                                    if doc.get('review_status') == 'ЄРДР':
-                                        ui.badge('ЄРДР', color='red').classes('text-[10px] px-1 py-0 mt-1 w-min')
+
+                                    with ui.row().classes('gap-1 mt-1'):
+                                        if doc.get('review_status') == 'ЄРДР':
+                                            ui.badge('ЄРДР', color='red').classes('text-[10px] px-1 py-0 w-min')
+                                        if doc.get('mil_unit') == 'А7018':
+                                            ui.badge('БРЕЗ', color='orange').classes('text-[10px] px-1 py-0 w-min')
 
                                 with ui.row().classes('gap-1'):
                                     edit_button = ui.button(icon='edit', color='blue',
@@ -475,8 +498,11 @@ def render_support_standard_page(controller: SupportController, person_controlle
 
                     if draft.get('city') in city.options:
                         city.value = draft['city']
-                    supp_date_input.value = draft.get('support_date', '')
-                    supp_number_input.value = draft.get('support_number', '')
+                    state['support_date'] = draft.get('support_date', '')
+                    supp_date_input.set_value(state['support_date'])
+
+                    state['support_number'] = draft.get('support_number', '')
+                    supp_number_input.set_value(state['support_number'])
 
                     state['buffer'] = draft.get('payload', [])
                     state['status'] = draft.get('status', DOC_STATUS_DRAFT)
