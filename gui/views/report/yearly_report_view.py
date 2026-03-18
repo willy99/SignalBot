@@ -243,7 +243,7 @@ def results_ui(data):
         {'name': 'o_diff', 'label': 'Кількість СЗЧ (Офіц.)', 'field': 'o_diff', 'headerClasses': 'bg-blue-100'},
         {'name': 'expl_not_ass', 'label': 'Не призначено', 'field': 'expl_not_ass'},
         {'name': 'expl_not_exe', 'label': 'Проводяться', 'field': 'expl_not_exe'},
-        {'name': 'expl_not_cls', 'label': 'Завершено', 'field': 'expl_not_cls'},
+        {'name': 'expl_not_cls', 'label': 'Закрито', 'field': 'expl_not_cls'},
         {'name': 's_dupl', 'label': 'Всього', 'field': 's_dupl'},
         {'name': 'o_dupl', 'label': 'Офіцерів', 'field': 'o_dupl'},
         {'name': 'un_sold_des', 'label': 'СЗЧ Солдат', 'field': 'un_sold_des'},

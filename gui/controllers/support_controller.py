@@ -112,10 +112,12 @@ class SupportController:
             package_type = draft.get('package_type')
             if logical_id is not None:
                 individual_support_number = ('/' + str(row_seq_num) if row_seq_num else '') if package_type != DOC_PACKAGE_STANDART else ''
+                mil_unit = doc.get('mil_unit') if doc.get('mil_unit') else MIL_UNITS[0]
                 p = Person(
                     id=logical_id,
                     dbr_date=support_date,
-                    dbr_num=support_number + individual_support_number
+                    dbr_num=support_number + individual_support_number,
+                    mil_unit=mil_unit
                 )
                 persons_to_update.append(p)
 

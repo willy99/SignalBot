@@ -63,24 +63,41 @@ class PersonController:
     def save_persons(self, ctx: RequestContext, person_list: list, partial_update=False, paint_color=None):
         self.logger.debug(f'UI:{ctx.user_name}: Зберігаємо пакет персон ({len(person_list)} шт.)')
         try:
-            success_count = 0
+            with self.processor.lock:
+                success_count = 0
 
-            for person_model in person_list:
+                # 1. Групуємо людей за військовою частиною (щоб не стрибати між табами)
+                grouped_persons = {}
+                for person_model in person_list:
+                    # Якщо з якихось причин mil_unit немає, ставимо дефолтний
+                    m_unit = getattr(person_model, 'mil_unit', None) or 'А0224'
 
-                updated_data = person_model.to_excel_dict(partial_update)
-                print('>>> updated_data ' + str(updated_data))
-                idx = updated_data[COLUMN_INCREMEMTAL]
-                # updated_data[COLUMN_INCREMEMTAL] = None
-                if self.processor.update_row_by_id(idx, updated_data, paint_color):
-                    success_count += 1
+                    if m_unit not in grouped_persons:
+                        grouped_persons[m_unit] = []
+                    grouped_persons[m_unit].append(person_model)
 
-            # Якщо хоча б один рядок було успішно оновлено, зберігаємо файл ОДИН раз
-            if success_count > 0:
-                self.processor.save()
-                self.logger.debug(f'Успішно оновлено та збережено {success_count} рядків в Excel.')
-                return True
+                # 2. Обробляємо кожну групу на своєму аркуші
+                for mil_unit, persons in grouped_persons.items():
 
-            return False
+                    # Перемикаємо аркуш ОДИН РАЗ для всієї групи!
+                    self.processor.switch_to_sheet(mil_unit, silent=True)
+
+                    for person_model in persons:
+                        updated_data = person_model.to_excel_dict(partial_update)
+                        print(f'>>> updated_data [{mil_unit}]: {updated_data}')
+                        idx = updated_data[COLUMN_INCREMEMTAL]
+
+                        # Відправляємо на збереження у процесор (він вже стоїть на правильному аркуші)
+                        if self.processor.update_row_by_id(idx, updated_data, paint_color):
+                            success_count += 1
+
+                # Якщо хоча б один рядок було успішно оновлено, зберігаємо файл ОДИН раз
+                if success_count > 0:
+                    self.processor.save()
+                    self.logger.debug(f'Успішно оновлено та збережено {success_count} рядків в Excel.')
+                    return True
+
+                return False
 
         except Exception as e:
             self.logger.error(f"Помилка при пакетному збереженні: {e}")

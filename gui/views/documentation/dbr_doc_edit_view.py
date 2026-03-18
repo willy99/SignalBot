@@ -21,7 +21,7 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
 
     state = {
         'status': DOC_STATUS_DRAFT,
-        'out_date': None,
+        'out_date': '',
         'out_number': '',
         'buffer': [],
         'current_search_results': {},
@@ -56,6 +56,7 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                     .bind_value(state, 'out_number') \
                     .on_value_change(lambda e: state['current_person'].update({'dbr_num': e.value + '/'})) \
                     .classes('flex-1').props('hide-bottom-space')
+
                 out_date_input = date_input(
                     'Дата відправки', state, 'out_date',
                     blur_handler=fix_date,
@@ -170,18 +171,25 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                         person_details_container.set_visibility(False)
                         return
 
+                    has_dbr = False
                     for p in results:
                         raw_dbr = getattr(p, 'dbr_num', '')
                         dbr_num = str(raw_dbr).strip() if raw_dbr else ''
                         if dbr_num and dbr_num != '0' and dbr_num.lower() != 'none':
-                            continue
+                            has_dbr = True
 
-                        id_num = f"{p.rnokpp}_{p.name}_{p.desertion_date}"
+                        des_date_val = getattr(p, 'desertion_date', 'Невідомо')
+                        if not des_date_val:
+                            des_date_val = 'Невідомо'
+                        title_val = getattr(p, 'title', '')
                         mil_unit_val = getattr(p, 'mil_unit', '')
+                        id_num = f"{p.rnokpp}_{p.name}_{des_date_val}_{mil_unit_val}"
 
                         state['current_search_results'][id_num] = {
                             'rnokpp': p.rnokpp,
                             'name': p.name,
+                            'desertion_date': des_date_val,
+                            'title': title_val,
                             'o_ass_num': getattr(p, 'o_ass_num', ''),
                             'o_ass_date': format_to_excel_date(getattr(p, 'o_ass_date', '')),
                             'o_res_num': getattr(p, 'o_res_num', ''),
@@ -195,13 +203,10 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                         }
 
                         unit_str = " [БРЕЗ]" if mil_unit_val == 'А7018' else ""
-                        options[id_num] = f"{p.name}{unit_str} (РНОКПП: {p.rnokpp} СЗЧ: {p.desertion_date})"
+                        options[id_num] = f"{p.name}{unit_str} (РНОКПП: {p.rnokpp} СЗЧ: {des_date_val})"
 
-                    if not options:
-                        ui.notify('Всі знайдені особи вже мають вихідний номер на ДБР!', type='warning')
-                        person_select.visible = False
-                        person_details_container.set_visibility(False)
-                        return
+                    if has_dbr:
+                        ui.notify('Деякі знайдені особи вже мають вихідний номер на ДБР!', type='warning')
 
                     person_select.options = options
                     person_select.visible = True
@@ -391,8 +396,8 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                     dbr_doc_id = await run.io_bound(
                         dbr_ctrl.save_dbr_doc,
                         ctx,
-                        state['out_number'],
-                        state['out_date'],
+                        state.get('out_number', ''),
+                        state.get('out_date', ''),
                         state['buffer'],
                         state['dbr_doc_id']
                     )
@@ -404,7 +409,7 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                     save_draft_btn.enable()
 
             async def on_send_dbr_click():
-                out_num = out_number_input.value.strip()
+                out_num = state.get('out_number', '').strip()
                 if not is_valid_doc_number(out_num):
                     ui.notify('❌ Увага! Невірний формат вихідного номера. Має бути 642/ХХХХ', type='negative')
                     return
@@ -420,8 +425,8 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                         ctx,
                         state['dbr_doc_id'],
                         state['buffer'],
-                        state['out_number'],
-                        state['out_date'],
+                        state.get('out_number', ''),
+                        state.get('out_date', ''),
                         person_ctrl
                     )
 

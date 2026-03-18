@@ -30,7 +30,8 @@ class ExcelProcessor:
         self.abs_path = os.path.abspath(file_path)
         self.app = xw.App(visible=False, add_book=False)
         self._load_workbook(DESERTER_TAB_NAME) #default tab name
-        self.lock = threading.Lock()
+        # self.lock = threading.Lock()
+        self.lock = threading.RLock()
 
         self.column_values: Dict[str, List[str]] = {} # для комбіков
 
@@ -367,177 +368,182 @@ class ExcelProcessor:
         return self.column_values
 
     def search_people(self, filter_obj: PersonSearchFilter) -> list:
-        self.switch_to_sheet(filter_obj.mil_unit if filter_obj.mil_unit else DESERTER_TAB_NAME , silent=True)
+        with self.lock:
+            self.switch_to_sheet(filter_obj.mil_unit if filter_obj.mil_unit else DESERTER_TAB_NAME , silent=True)
 
-        results = []
-        last_row = self.get_last_row()
+            results = []
+            last_row = self.get_last_row()
 
-        data = self.sheet.range(f"A2:BB{last_row}").value
-        if data is None:
-            return results
+            data = self.sheet.range(f"A2:BB{last_row}").value
+            if data is None:
+                return results
 
-        q_text = (filter_obj.query or "").lower().strip()
-        q_des_year = filter_obj.des_year
+            q_text = (filter_obj.query or "").lower().strip()
+            q_des_year = filter_obj.des_year
 
-        q_des_date_from = date.fromisoformat(filter_obj.des_date_from) if filter_obj.des_date_from else None
-        q_des_date_to = date.fromisoformat(filter_obj.des_date_to) if filter_obj.des_date_to else None
+            q_des_date_from = date.fromisoformat(filter_obj.des_date_from) if filter_obj.des_date_from else None
+            q_des_date_to = date.fromisoformat(filter_obj.des_date_to) if filter_obj.des_date_to else None
 
-        q_order = filter_obj.o_ass_num
-        q_title2 = filter_obj.title2
-        q_service = filter_obj.service_type
-        pib_idx = self.header.get(COLUMN_NAME, 1) - 1
-        rnokpp_idx = self.header.get(COLUMN_ID_NUMBER, 1) - 1
-        des_date_idx = self.header.get(COLUMN_DESERTION_DATE, 1) - 1
-        o_ass_num_idx = self.header.get(COLUMN_ORDER_ASSIGNMENT_NUMBER, 1) - 1
-        title2_idx = self.header.get(COLUMN_TITLE_2, 1) - 1
-        service_idx = self.header.get(COLUMN_SERVICE_TYPE, 1) - 1
-        kpp_num_idx = self.header.get(COLUMN_KPP_NUMBER, 1) - 1
-        review_status_idx = self.header.get(COLUMN_REVIEW_STATUS, 1) - 1
-        des_region_idx = self.header.get(COLUMN_DESERTION_REGION, 1) - 1
+            q_order = filter_obj.o_ass_num
+            q_title2 = filter_obj.title2
+            q_service = filter_obj.service_type
+            pib_idx = self.header.get(COLUMN_NAME, 1) - 1
+            rnokpp_idx = self.header.get(COLUMN_ID_NUMBER, 1) - 1
+            des_date_idx = self.header.get(COLUMN_DESERTION_DATE, 1) - 1
+            o_ass_num_idx = self.header.get(COLUMN_ORDER_ASSIGNMENT_NUMBER, 1) - 1
+            title2_idx = self.header.get(COLUMN_TITLE_2, 1) - 1
+            service_idx = self.header.get(COLUMN_SERVICE_TYPE, 1) - 1
+            kpp_num_idx = self.header.get(COLUMN_KPP_NUMBER, 1) - 1
+            review_status_idx = self.header.get(COLUMN_REVIEW_STATUS, 1) - 1
+            des_region_idx = self.header.get(COLUMN_DESERTION_REGION, 1) - 1
 
 
-        for i, row in enumerate(data):
-            if not row[pib_idx]: continue
+            for i, row in enumerate(data):
+                if not row[pib_idx]: continue
 
-            pib_val = str(row[pib_idx]).lower()
-            rnokpp_val = get_strint_fromfloat(row[rnokpp_idx])
-            o_ass_num_val = get_strint_fromfloat(row[o_ass_num_idx], "")
+                pib_val = str(row[pib_idx]).lower()
+                rnokpp_val = get_strint_fromfloat(row[rnokpp_idx])
+                o_ass_num_val = get_strint_fromfloat(row[o_ass_num_idx], "")
 
-            des_date = row[des_date_idx]  # mandatory field
+                des_date = row[des_date_idx]  # mandatory field
 
-            des_date_year = None
-            if isinstance(des_date, (datetime, date)):
-                des_date_year = str(des_date.year)
+                des_date_year = None
+                if isinstance(des_date, (datetime, date)):
+                    des_date_year = str(des_date.year)
 
-            # === ЛОГІКА ФІЛЬТРАЦІЇ ===
+                # === ЛОГІКА ФІЛЬТРАЦІЇ ===
 
-            match_text = True
-            if q_text:
-                match_text = (q_text in pib_val or q_text in rnokpp_val)
+                match_text = True
+                if q_text:
+                    match_text = (q_text in pib_val or q_text in rnokpp_val)
 
-            match_des_year = True
-            if q_des_year:
-                if isinstance(q_des_year, list):
-                    match_des_year = (des_date_year in q_des_year)
-                else:
-                    match_des_year = (des_date_year == str(q_des_year))
-
-            match_des_year_from = True
-            match_des_year_to = True
-
-            if q_des_date_from or q_des_date_to:
-                if des_date:
-                    if isinstance(des_date, datetime):
-                        row_des_date = des_date.date()
-                    elif isinstance(des_date, date):
-                        row_des_date = des_date
+                match_des_year = True
+                if q_des_year:
+                    if isinstance(q_des_year, list):
+                        match_des_year = (des_date_year in q_des_year)
                     else:
-                        row_des_date = None
+                        match_des_year = (des_date_year == str(q_des_year))
 
-                    if row_des_date:
-                        if q_des_date_from:
-                            match_des_year_from = (row_des_date >= q_des_date_from)
-                        if q_des_date_to:
-                            match_des_year_to = (row_des_date <= q_des_date_to)
+                match_des_year_from = True
+                match_des_year_to = True
+
+                if q_des_date_from or q_des_date_to:
+                    if des_date:
+                        if isinstance(des_date, datetime):
+                            row_des_date = des_date.date()
+                        elif isinstance(des_date, date):
+                            row_des_date = des_date
+                        else:
+                            row_des_date = None
+
+                        if row_des_date:
+                            if q_des_date_from:
+                                match_des_year_from = (row_des_date >= q_des_date_from)
+                            if q_des_date_to:
+                                match_des_year_to = (row_des_date <= q_des_date_to)
+                        else:
+                            match_des_year_from = False
+                            match_des_year_to = False  # Додано скидання для дати "До"
                     else:
                         match_des_year_from = False
-                        match_des_year_to = False  # Додано скидання для дати "До"
-                else:
-                    match_des_year_from = False
-                    match_des_year_to = False
+                        match_des_year_to = False
 
-            match_order = True
-            if q_order:
-                match_order = (o_ass_num_val == str(q_order))
+                match_order = True
+                if q_order:
+                    match_order = (o_ass_num_val == str(q_order))
 
-            match_title2 = True
-            if q_title2:
-                row_title = str(row[title2_idx]) if row[title2_idx] else ""
-                match_title2 = (row_title == q_title2)
+                match_title2 = True
+                if q_title2:
+                    row_title = str(row[title2_idx]) if row[title2_idx] else ""
+                    match_title2 = (row_title == q_title2)
 
-            match_service = True
-            if q_service:
-                row_service = str(row[service_idx]) if row[service_idx] else ""
-                match_service = (row_service == q_service)
+                match_service = True
+                if q_service:
+                    row_service = str(row[service_idx]) if row[service_idx] else ""
+                    match_service = (row_service == q_service)
 
-            match_kpp = True
-            if filter_obj.empty_kpp == YES:
-                kpp_num = str(row[kpp_num_idx])
-                safe_val = str(kpp_num).strip().lower()
-                match_kpp = safe_val in ['none', 'nan', 'null', '', '0', '0.0']
+                match_kpp = True
+                if filter_obj.empty_kpp == YES:
+                    kpp_num = str(row[kpp_num_idx])
+                    safe_val = str(kpp_num).strip().lower()
+                    match_kpp = safe_val in ['none', 'nan', 'null', '', '0', '0.0']
 
-            match_status = True
-            if filter_obj.review_statuses:
-                review_status = str(row[review_status_idx]).strip()
-                match_status = review_status in filter_obj.review_statuses
+                match_status = True
+                if filter_obj.review_statuses:
+                    review_status = str(row[review_status_idx]).strip()
+                    match_status = review_status in filter_obj.review_statuses
 
-            match_des_region = True
-            if filter_obj.desertion_region:
-                desertion_region = str(row[des_region_idx]).strip().lower() if row[des_region_idx] else ''
-                match_des_region = desertion_region == filter_obj.desertion_region.lower()
+                match_des_region = True
+                if filter_obj.desertion_region:
+                    desertion_region = str(row[des_region_idx]).strip().lower() if row[des_region_idx] else ''
+                    match_des_region = desertion_region == filter_obj.desertion_region.lower()
 
-            if (match_text and match_des_year and match_des_year_from and match_des_year_to and
-                    match_order and match_title2 and match_service and match_kpp and match_status and match_des_region):
-                serialized_row = []
-                for cell in row:
-                    self._transform_cell(cell, serialized_row)
+                if (match_text and match_des_year and match_des_year_from and match_des_year_to and
+                        match_order and match_title2 and match_service and match_kpp and match_status and match_des_region):
+                    serialized_row = []
+                    for cell in row:
+                        self._transform_cell(cell, serialized_row)
 
-                results.append({
-                    'row_idx': i + 2,
-                    'data': dict(zip(self.header, serialized_row))
-                })
+                    results.append({
+                        'row_idx': i + 2,
+                        'data': dict(zip(self.header, serialized_row))
+                    })
 
-        return results
+            return results
 
     def find_person(self, key: PersonKey) -> dict:
-        # self.switch_to_sheet(DESERTER_TAB_NAME, silent=True)
+        with self.lock:
+            if key.mil_unit:
+                self.switch_to_sheet(key.mil_unit, silent=True)
+            else:
+                self.switch_to_sheet(DESERTER_TAB_NAME, silent=True)
 
-        last_row = self.get_last_row()
-        data = self.sheet.range(f"A2:BB{last_row}").value
+            last_row = self.get_last_row()
+            data = self.sheet.range(f"A2:BB{last_row}").value
 
-        print('find, last row = ' + str(last_row))
+            print('find, last row = ' + str(last_row))
 
-        if data is None:
+            if data is None:
+                return None
+
+            pib_idx = self.header.get(COLUMN_NAME, 1) - 1
+            rnokpp_idx = self.header.get(COLUMN_ID_NUMBER, 1) - 1
+            des_date_idx = self.header.get(COLUMN_DESERTION_DATE, 1) - 1
+
+            target_name = (key.name or "").lower().strip()
+            target_rnokpp = (key.rnokpp or "").strip()
+            target_des_date = (key.des_date or "").strip()
+
+            for i, row in enumerate(data):
+                if not row[pib_idx]:
+                    continue
+
+                pib_val = str(row[pib_idx]).lower().strip()
+                rnokpp_val = get_strint_fromfloat(row[rnokpp_idx], "").strip()
+
+                match_name = (target_name == pib_val) if target_name else True
+                match_rnokpp = (target_rnokpp == rnokpp_val) if target_rnokpp else True
+
+                match_bday = True
+                if target_des_date:
+                    des_date_val = format_ukr_date(row[des_date_idx])
+
+                    if isinstance(des_date_val, (datetime, date)):
+                        match_bday = (target_des_date == str(des_date_val.date()) or target_des_date == des_date_val.strftime("%d.%m.%Y"))
+                    else:
+                        match_bday = (target_des_date == str(des_date_val).strip())
+
+                if match_name and match_rnokpp and match_bday:
+                    serialized_row = []
+                    for cell in row:
+                        self._transform_cell(cell, serialized_row)
+
+                    return {
+                        'row_idx': i + 2,
+                        'data': dict(zip(self.header, serialized_row))
+                    }
+
             return None
-
-        pib_idx = self.header.get(COLUMN_NAME, 1) - 1
-        rnokpp_idx = self.header.get(COLUMN_ID_NUMBER, 1) - 1
-        des_date_idx = self.header.get(COLUMN_DESERTION_DATE, 1) - 1
-
-        target_name = (key.name or "").lower().strip()
-        target_rnokpp = (key.rnokpp or "").strip()
-        target_des_date = (key.des_date or "").strip()
-
-        for i, row in enumerate(data):
-            if not row[pib_idx]:
-                continue
-
-            pib_val = str(row[pib_idx]).lower().strip()
-            rnokpp_val = get_strint_fromfloat(row[rnokpp_idx], "").strip()
-
-            match_name = (target_name == pib_val) if target_name else True
-            match_rnokpp = (target_rnokpp == rnokpp_val) if target_rnokpp else True
-
-            match_bday = True
-            if target_des_date:
-                des_date_val = format_ukr_date(row[des_date_idx])
-
-                if isinstance(des_date_val, (datetime, date)):
-                    match_bday = (target_des_date == str(des_date_val.date()) or target_des_date == des_date_val.strftime("%d.%m.%Y"))
-                else:
-                    match_bday = (target_des_date == str(des_date_val).strip())
-
-            if match_name and match_rnokpp and match_bday:
-                serialized_row = []
-                for cell in row:
-                    self._transform_cell(cell, serialized_row)
-
-                return {
-                    'row_idx': i + 2,
-                    'data': dict(zip(self.header, serialized_row))
-                }
-
-        return None
 
     def _transform_cell(self, cell, serialized_row):
         if isinstance(cell, (datetime, date)):
@@ -578,6 +584,7 @@ class ExcelProcessor:
     def update_row_by_id(self, row_id: int, updated_data: dict, paint_with_color=None):
         try:
             with self.lock:
+
                 headers = self.sheet.range('A1').expand('right').value
                 header_map = {name: idx for idx, name in enumerate(headers)}
 

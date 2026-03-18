@@ -74,6 +74,7 @@ class NotifController:
             kpp_number = doc.get('kpp_num')
             kpp_date = doc.get('kpp_date')
             row_seq_num = doc.get('seq_num')
+            mil_unit = doc.get('mil_unit') if doc.get('mil_unit') else MIL_UNITS[0]
 
             if not found_person_data:
                 self.logger.warning(f"Пропущено: не знайдено людину за ключем {row_key}")
@@ -89,6 +90,7 @@ class NotifController:
                     id=logical_id,
                     kpp_num=kpp_number + '/' + str(row_seq_num),
                     kpp_date=kpp_date,
+                    mil_unit=mil_unit
                 )
                 persons_to_update.append(p)
 

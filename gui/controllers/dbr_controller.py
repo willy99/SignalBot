@@ -68,6 +68,7 @@ class DbrController:
             o_ass_date = doc.get('o_ass_date')
             o_res_num = doc.get('o_res_num')
             o_res_date = doc.get('o_res_date')
+            mil_unit = doc.get('mil_unit') if doc.get('mil_unit') else MIL_UNITS[0]
 
             if not found_person_data:
                 self.logger.warning(f"Пропущено: не знайдено людину за ключем {row_key}")
@@ -89,7 +90,8 @@ class DbrController:
                     o_ass_date=o_ass_date,
                     o_res_num=o_res_num,
                     o_res_date=o_res_date,
-                    review_status=REVIEW_STATUS_WAITING
+                    review_status=REVIEW_STATUS_WAITING,
+                    mil_unit=mil_unit
                 )
                 persons_to_update.append(p)
 

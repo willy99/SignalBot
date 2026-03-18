@@ -234,7 +234,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                                 state['selected_candidates'].clear()
                                 if e.value:
                                     for p in state['search_results']:
-                                        id_num = f"{p.rnokpp}_{p.name}_{p.desertion_date}"
+                                        id_num = f"{p.rnokpp}_{p.name}_{p.desertion_date}_{p.mil_unit}"
                                         state['selected_candidates'].add(id_num)
                                 for cb in candidate_checkboxes.values():
                                     cb.value = e.value
@@ -256,7 +256,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                             update_selection_ui()
 
                         for p in results:
-                            id_num = f"{p.rnokpp}_{p.name}_{p.desertion_date}"
+                            id_num = f"{p.rnokpp}_{p.name}_{p.desertion_date}_{p.mil_unit}"
                             is_in_buffer = any(doc['id_number'] == id_num for doc in state['buffer'])
                             mil_unit_val = getattr(p, 'mil_unit', '')
 
@@ -305,7 +305,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                 added_count = 0
 
                 for p in state['search_results']:
-                    id_num = f"{p.rnokpp}_{p.name}_{p.desertion_date}"
+                    id_num = f"{p.rnokpp}_{p.name}_{p.desertion_date}_{p.mil_unit}"
 
                     if id_num in state['selected_candidates']:
                         if not any(doc['id_number'] == id_num for doc in buffer_data):

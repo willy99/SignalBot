@@ -149,12 +149,14 @@ def get_strint_fromfloat(value, default = None) -> str:
 
 # 029384902_ІМЯ Прізвище по-батькові_24.02.1979
 def get_person_key_from_str(glued_key: str) -> PersonKey:
-    key = PersonKey(rnokpp=None, name=None, des_date=None)
+    key = PersonKey(rnokpp=None, name=None, des_date=None, mil_unit=None)
     if not glued_key: return key
     spl = glued_key.split("_")
     key.rnokpp = spl[0]
     key.name = spl[1]
     key.des_date = spl[2]
+    if len(spl) > 3:
+        key.mil_unit = spl[3]
     return key
 
 

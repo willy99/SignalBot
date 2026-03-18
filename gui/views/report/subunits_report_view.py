@@ -456,7 +456,7 @@ def results_ui(data, report_ctrl):
 
         {'name': 'expl_not_ass', 'label': 'Не призначено', 'field': 'expl_not_ass'},
         {'name': 'expl_not_exe', 'label': 'Проводяться', 'field': 'expl_not_exe'},
-        {'name': 'expl_not_cls', 'label': 'Завершено', 'field': 'expl_not_cls'},
+        {'name': 'expl_not_cls', 'label': 'Закрито', 'field': 'expl_not_cls'},
 
         {'name': 's_dupl', 'label': 'Всього', 'field': 's_dupl'},
         {'name': 'o_dupl', 'label': 'Офіцерів', 'field': 'o_dupl'},
