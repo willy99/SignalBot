@@ -30,8 +30,8 @@ class ReportController:
         results = self.reporter.get_daily_report(target_date)
         return results
 
-    def get_daily_added_files_report(self, ctx: RequestContext, target_date: date = None, exclude_names: List[str] = None):
-        return self.reporter.get_daily_returns_report(target_date, exclude_names)
+    def get_daily_added_files_report(self, ctx: RequestContext, target_date: date = None, exclude_names: List[str] = None, pre_fetched_archive=None):
+        return self.reporter.get_daily_returns_report(target_date, exclude_names, pre_fetched_archive)
 
     def get_daily_archive_files(self, target_date, known_names: list):
         dservice = DocumentProcessingService(self.log_manager)

@@ -76,6 +76,7 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, auth_manager: 
                 with ui.tab_panel(main_tab):
                     with ui.card().classes('w-full max-w-5xl mx-auto p-6 shadow-sm border border-gray-200'):
                         with ui.row().classes('w-full gap-6'):
+                            search_select(MIL_UNITS, COLUMN_MIL_UNIT, person, 'mil_unit').classes('w-32')
                             ui.input(COLUMN_NAME).bind_value(person, 'name').classes('flex-grow')
                             ui.input(COLUMN_ID_NUMBER, placeholder='xxxxxxxxxx', validation={
                                 'Формат має бути xxxxxxxxxx': lambda v: bool(re.match(VALID_PATTERN_ID_NUMBER, str(v))) if v else True
@@ -101,6 +102,7 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, auth_manager: 
                         with ui.row().classes('w-full gap-6'):
                             ui.input(COLUMN_TZK).bind_value(person, 'tzk').classes('flex-grow')
                             date_input(COLUMN_ENLISTMENT_DATE, person, 'enlistment_date',blur_handler=fix_date).classes('w-1/3')
+                            ui.input(COLUMN_SERVICE_DAYS).bind_value(person, 'service_days').classes('flex-grow')
 
                         with ui.row().classes('w-full gap-6 mt-4'):
                             search_select(ui_options.get(COLUMN_TZK_REGION, []), COLUMN_TZK_REGION, person,'tzk_region').classes('w-1/3')
@@ -115,6 +117,7 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, auth_manager: 
 
                         with ui.row().classes('w-full gap-6 mt-4'):
                             date_input(COLUMN_DESERTION_DATE, person, 'desertion_date', blur_handler=fix_date).classes('w-1/3')
+                            ui.input(COLUMN_DESERTION_TERM).bind_value(person, 'desertion_term').classes('flex-grow')
 
                         with ui.row().classes('w-full mt-4'):
                             ui.input(COLUMN_EXECUTOR).bind_value(person, 'executor').classes('flex-grow')
@@ -191,6 +194,7 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, auth_manager: 
                         del_btn.tooltip('Видалення можливе лише для записів, які були додані сьогодні або вчора.')
 
     dialog.open()
+    return dialog
 
 
 def edit_erdr(person: Person, person_ctrl, ctx: RequestContext, on_close=None):

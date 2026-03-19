@@ -602,9 +602,7 @@ class ExcelReporter:
             traceback.print_exc()
             return {}
 
-
     def get_daily_report(self, target_date: date = None) -> List[Dict[str, Any]]:
-        # Якщо дату не передали, беремо сьогоднішню
         if target_date is None:
             target_date = datetime.now().date()
 
@@ -622,12 +620,10 @@ class ExcelReporter:
         des_type_idx = self.excelProcessor.header.get(COLUMN_DESERTION_TYPE, 1) - 1
 
         results = []
-        target_sheets = ['А0224', 'А7018']  # Назви ваших аркушів в Excel
+        target_sheets = ['А0224', 'А7018']
         for sheet_name in target_sheets:
             try:
-                # Звертаємося до конкретного аркуша через книгу (book)
                 sheet = self.excelProcessor.sheet.book.sheets[sheet_name]
-                # Шукаємо останній заповнений рядок саме на цьому аркуші
                 last_row = sheet.range('A' + str(sheet.cells.last_cell.row)).end('up').row
                 data = sheet.range(f"A2:BB{last_row}").value
             except Exception as e:
@@ -640,7 +636,6 @@ class ExcelReporter:
                 if not row:
                     continue
 
-                # 1. Безпечно дістаємо сирі значення з перевіркою довжини рядка
                 raw_ins = row[ins_date_idx] if len(row) > ins_date_idx else None
                 raw_des = row[des_date_idx] if len(row) > des_date_idx else None
                 raw_ret = row[ret_date_idx] if len(row) > ret_date_idx else None
@@ -648,23 +643,30 @@ class ExcelReporter:
 
                 raw_des_type = row[des_type_idx] if len(row) > des_type_idx else None
 
-                # 2. Пробуємо розпізнати (якщо не вийде - функція поверне None)
                 parsed_ins = self._parse_date(raw_ins) if raw_ins else None
                 parsed_des = self._parse_date(raw_des) if raw_des else None
                 parsed_ret = self._parse_date(raw_ret) if raw_ret else None
                 parsed_call = self._parse_date(raw_call) if raw_call else None
 
-                # 3. Беремо .date() тільки там, де парсинг пройшов успішно
                 ins_date = parsed_ins.date() if parsed_ins else None
                 des_date = parsed_des.date() if parsed_des else None
                 ret_date = parsed_ret.date() if parsed_ret else None
                 call_date = parsed_call.date() if parsed_call else None
                 term_days = row[days_idx]
                 raw_place = row[des_place_idx] if len(row) > des_place_idx else None
-                des_place_clean = str(raw_place).strip() if raw_place else 'Не вказано'
 
-                # Якщо дата знайдена і вона збігається з цільовою (наприклад, сьогоднішньою)
-                if ins_date == target_date and ret_date is None:
+                des_place_clean = str(raw_place).strip() if raw_place else 'Не вказано'
+                des_type_clean = str(raw_des_type).strip().lower() if raw_des_type else ''
+
+                # ==========================================
+                # 💡 ДОДАНО: Перевірка на "Подвійну подію"
+                # Якщо це несвоєчасне повернення або без поважних причин, людина має потрапити
+                # в СЗЧ навіть якщо в неї вже заповнена дата повернення.
+                # ==========================================
+                is_dual_event = 'сзч' not in des_type_clean
+
+                # Якщо дата знайдена і вона збігається з цільовою
+                if ins_date == target_date and (ret_date is None or is_dual_event):
                     results.append({
                         'sheet_name': sheet_name,
                         'ins_date': ins_date,
@@ -676,51 +678,45 @@ class ExcelReporter:
                         'term_days': get_strint_fromfloat(term_days),
                         'desertion_place': des_place_clean,
                         'experience': row[exp_idx] if (row[exp_idx]) else 'Невідомо',
-                        'desertion_type': str(raw_des_type).strip() if raw_des_type else ''
+                        'desertion_type': des_type_clean
                     })
 
         return results
 
-    def get_daily_returns_report(self, target_date: date, exclude_names: List[str] = None) -> List[Dict[str, Any]]:
+    def get_daily_returns_report(self, target_date: date, exclude_names: List[str] = None, pre_fetched_archive: list = None) -> List[Dict[str, Any]]:
         if exclude_names is None:
             exclude_names = []
 
-        # ---------------------------------------------------------
-        # 1. ОТРИМУЄМО ПОВЕРНЕННЯ З АРХІВУ (замість логів)
-        # ---------------------------------------------------------
-        # Викликаємо існуючу функцію, передаючи порожній known_names,
-        # оскільки нас зараз цікавить просто список розпарсених людей з файлів "повернення"
-        dservice = DocumentProcessingService(self.log_manager)
-        archive_files = dservice.get_daily_archive_files(target_date, known_names=[])
+        # 💡 ОПТИМІЗАЦІЯ: Якщо файли вже передані з UI, не читаємо їх знову!
+        if pre_fetched_archive is not None:
+            archive_files = pre_fetched_archive
+        else:
+            dservice = DocumentProcessingService(self.log_manager)
+            archive_files = dservice.get_daily_archive_files(target_date, known_names=[])
 
         returns_from_files = []
         for file_info in archive_files:
             filename = file_info.get('filename', '').lower()
 
-            # Перевіряємо, чи це файл про повернення
-            if 'повернення' in filename and 'неповернення' not in filename and 'не повернення' not in filename:
-                # В archive_list імена склеєні через кому, якщо їх кілька
+            is_return_doc = bool(re.search(PATTERN_RETURN_SIGN_IN_FILE, filename)) if PATTERN_RETURN_SIGN_IN_FILE else ('повернення' in filename)
+            is_dual_event_doc = 'без поважних' in filename or 'несвоєчасн' in filename
+
+            if (is_return_doc or is_dual_event_doc) and 'неповернення' not in filename and 'не повернення' not in filename:
                 names_str = file_info.get('name', '')
-                if names_str and names_str != 'Не вдалося розпізнати':
-                    # Розділяємо імена, якщо їх кілька в одному файлі
+                if names_str and names_str not in ('Не вдалося розпізнати', 'Не текстовий документ'):
                     names_list = [n.strip() for n in names_str.split(',')]
 
                     for name in names_list:
                         last_name = name.split()[0].lower()
                         if not any(last_name in excl_name.lower() for excl_name in exclude_names):
-                            # Ми не маємо ID з файлу (на відміну від логів), тому ID знайдемо в Excel
                             returns_from_files.append({
                                 'name': name,
-                                'ret_date': target_date.strftime('%d.%m.%Y')  # Ставимо дату звіту як дату повернення
+                                'ret_date': target_date.strftime('%d.%m.%Y')
                             })
 
         if not returns_from_files:
             return []
 
-        # ---------------------------------------------------------
-        # 2. ЗБАГАЧУЄМО ДАНИМИ З EXCEL (Звання, Підрозділ, Дата СЗЧ, ID)
-        # ---------------------------------------------------------
-        # Перемикаємось на аркуш СЗЧ (про всяк випадок)
         self.excelProcessor.switch_to_sheet(DESERTER_TAB_NAME, silent=True)
 
         name_idx = self.excelProcessor.header.get(COLUMN_NAME, 1) - 1
@@ -732,8 +728,6 @@ class ExcelReporter:
         last_row = self.excelProcessor.get_last_row()
         data = self.excelProcessor.sheet.range(f"A2:BB{last_row}").value
 
-        # Створюємо словник Excel не за ID, а за прізвищем (першим словом ПІБ),
-        # оскільки з файлу ми гарантовано маємо тільки ПІБ
         excel_dict_by_lastname = {}
         if data:
             for row in data:
@@ -743,7 +737,6 @@ class ExcelReporter:
                 if full_name and full_name != 'None':
                     last_name = full_name.split()[0].lower()
 
-                    # Якщо є кілька людей з однаковим прізвищем, зберігаємо їх у список
                     if last_name not in excel_dict_by_lastname:
                         excel_dict_by_lastname[last_name] = []
                     excel_dict_by_lastname[last_name].append(row)
@@ -753,10 +746,7 @@ class ExcelReporter:
             person_name = ret['name']
             last_name = person_name.split()[0].lower()
 
-            # Шукаємо людину в Excel за прізвищем
             matching_rows = excel_dict_by_lastname.get(last_name, [])
-
-            # Якщо знайшли точний збіг по ПІБ (або беремо перший збіг по прізвищу)
             best_match_row = None
             if len(matching_rows) == 1:
                 best_match_row = matching_rows[0]

@@ -176,6 +176,8 @@ PATTERN_RETURN_SIGN: Final[List[str]] = [
     r'(?i)(?<!не\s)(?<!не)(?:доповідь\s+про|факт)?\s*(поверн(?:увся|ення)|присутн(?:ості|ість))\s+'
 ]
 
+PATTERN_RETURN_SIGN_IN_FILE: Final[str] = r'(?<!не)(?<!не )повернення|відсутність(?:\s+на\s+військовій\s+службі)?\s+без\s+поважних\s+причин'
+
 PATTERN_ERROR_SIGN: Final[List[str]] = [
     r'(?i)(?:доповідь\s+про|факт)?\s*(помилк[ового|и]+|відміни)\s+(?:повідомлення|поданих даних)?'
 ]
@@ -402,6 +404,8 @@ SUSPENDED_KEYWORD:Final[str] = 'призупинено В/С'
 DESERTION_TYPE_WEAPON_KEYWORD: Final[str] = 'СЗЧ зброя'
 
 MIL_UNITS: Final[List[str]] = ['А0224', 'А7018']
+
+EXPERIENCED_MORE_THAN_DAYS: Final[int] = 82
 
 TASK_TYPES: Final[Dict[str, str]] = {
     'Документація': 'description',

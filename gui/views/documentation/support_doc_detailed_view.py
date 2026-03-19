@@ -194,7 +194,7 @@ def render_document_page(controller: SupportController, person_controller: Perso
                     'clearable autofocus')
                 search_btn = ui.button('Шукати', icon='search').props('elevated color="primary"')
 
-            def update_badges(status_val, mil_unit_val):
+            def update_badges(status_val, mil_unit_val, has_multiple_events=False):
                 if not status_val:
                     review_status_badge.set_visibility(False)
                 else:
@@ -210,15 +210,29 @@ def render_document_page(controller: SupportController, person_controller: Perso
                 else:
                     mil_unit_badge.set_visibility(False)
 
+                if has_multiple_events:
+                    multiple_events_badge.set_visibility(True)
+                else:
+                    multiple_events_badge.set_visibility(False)
             def on_person_change(e):
                 selected_id = e.value
                 if selected_id and selected_id in state['current_search_results']:
                     person_data = state['current_search_results'][selected_id]
                     real_name = person_data['name']
                     name_gen_input.value = to_genitive_case(real_name)
-                    update_badges(person_data.get('review_status', ''), person_data.get('mil_unit', ''))
+                    rnokpp = person_data.get('rnokpp')
+
+                    # 💡 ДОДАНО: Рахуємо скільки подій у цієї людини в поточних результатах пошуку
+                    match_count = sum(
+                        1 for p in state['current_search_results'].values()
+                        if p.get('name') == real_name and p.get('rnokpp') == rnokpp
+                    )
+                    has_multiple = match_count > 1
+
+                    name_gen_input.value = to_genitive_case(real_name)
+                    update_badges(person_data.get('review_status', ''), person_data.get('mil_unit', ''), has_multiple)
                 else:
-                    update_badges('', '')
+                    update_badges('', '', False)
 
             with ui.row().classes('w-full items-center gap-4 mb-4'):
                 person_select = ui.select(
@@ -237,6 +251,9 @@ def render_document_page(controller: SupportController, person_controller: Perso
 
                     mil_unit_badge = ui.badge('БРЕЗ', color='orange').classes('text-xs font-bold px-2 py-1 shadow-sm')
                     mil_unit_badge.set_visibility(False)
+
+                    multiple_events_badge = ui.badge('⚠️ Кілька епізодів СЗЧ!', color='purple').classes('text-xs font-bold px-2 py-1 shadow-sm')
+                    multiple_events_badge.set_visibility(False)
 
             async def perform_search(e=None):
                 query = search_input.value
@@ -341,7 +358,7 @@ def render_document_page(controller: SupportController, person_controller: Perso
                 person_select.visible = False
                 name_gen_input.value = ''
                 name_gen_input.visible = False
-                update_badges('', '')
+                update_badges('', '', False)
 
                 total_input.value = 0
                 notif.value = DEF_NOTIF

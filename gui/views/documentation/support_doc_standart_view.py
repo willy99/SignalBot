@@ -198,7 +198,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                     'clearable autofocus')
                 search_btn = ui.button('Шукати', icon='search').props('elevated color="primary"')
 
-            def update_review_badge(status_val, mil_unit_val):
+            def update_badges(status_val, mil_unit_val, has_multiple_events=False):
                 if not status_val:
                     review_status_badge.set_visibility(False)
                 else:
@@ -214,15 +214,30 @@ def render_support_standard_page(controller: SupportController, person_controlle
                 else:
                     mil_unit_badge.set_visibility(False)
 
+                if has_multiple_events:
+                    multiple_events_badge.set_visibility(True)
+                else:
+                    multiple_events_badge.set_visibility(False)
+
             def on_person_change(e):
                 selected_id = e.value
                 if selected_id and selected_id in state['current_search_results']:
                     person_data = state['current_search_results'][selected_id]
                     real_name = person_data['name']
+                    rnokpp = person_data.get('rnokpp')
                     name_gen_input.value = to_genitive_case(real_name)
-                    update_review_badge(person_data.get('review_status', ''), person_data.get('mil_unit', ''))
+
+                    # 💡 ДОДАНО: Рахуємо скільки подій у цієї людини в поточних результатах пошуку
+                    match_count = sum(
+                        1 for p in state['current_search_results'].values()
+                        if p.get('name') == real_name and p.get('rnokpp') == rnokpp
+                    )
+                    has_multiple = match_count > 1
+
+                    name_gen_input.value = to_genitive_case(real_name)
+                    update_badges(person_data.get('review_status', ''), person_data.get('mil_unit', ''), has_multiple)
                 else:
-                    update_review_badge('', '')
+                    update_badges('', '', False)
 
             with ui.row().classes('w-full items-center gap-4 mb-4'):
                 person_select = ui.select(
@@ -242,6 +257,8 @@ def render_support_standard_page(controller: SupportController, person_controlle
                     mil_unit_badge = ui.badge('БРЕЗ', color='orange').classes('text-xs font-bold px-2 py-1 shadow-sm')
                     mil_unit_badge.set_visibility(False)
 
+                    multiple_events_badge = ui.badge('⚠️ Кілька епізодів СЗЧ!', color='purple').classes('text-xs font-bold px-2 py-1 shadow-sm')
+                    multiple_events_badge.set_visibility(False)
             async def perform_search(e=None):
                 query = search_input.value
                 if not query or len(query) < 2:
@@ -289,7 +306,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                     else:
                         ui.notify('За цим запитом нікого не знайдено', type='warning')
                         person_select.visible = False
-                        update_review_badge('', '')
+                        update_badges('', '')
 
                 except Exception as ex:
                     ui.notify(f'Помилка пошуку: {ex}', type='negative')
@@ -323,7 +340,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                 person_select.visible = False
                 name_gen_input.value = ''
                 name_gen_input.visible = False
-                update_review_badge('', '')
+                update_badges('', '', False)
                 total_input.value = 0
                 update_btn_state()
 
@@ -425,7 +442,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                 name_gen_input.value = doc.get('name_gen', to_genitive_case(doc['name']))
                 name_gen_input.visible = True
 
-                update_review_badge(doc.get('review_status', ''), mil_unit_val)
+                update_badges(doc.get('review_status', ''), mil_unit_val)
                 total_input.value = doc['total']
 
                 update_btn_state()

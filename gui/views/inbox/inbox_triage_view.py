@@ -267,13 +267,17 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
             for raw_dict in parsed_data_list:
                 new_person = Person.from_excel_dict(raw_dict)
                 new_person.id = None
-                edit_person(
+                dialog = edit_person(
                     person=new_person,
                     person_ctrl=person_ctrl,
                     ctx=ctx,
                     auth_manager=auth_manager,
-                    on_close=load_data
+                    on_close=None
                 )
+                await dialog
+            ui.notify('✅ Всіх знайдених осіб оброблено!', type='positive')
+            clear_selection()
+            await load_data()
 
         except Exception as e:
             ui.notify(f'Помилка обробки: {e}', type='negative')

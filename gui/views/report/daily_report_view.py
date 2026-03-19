@@ -1,6 +1,7 @@
 from nicegui import ui, run, background_tasks
 from datetime import datetime
 from dics.deserter_xls_dic import *
+from gui.controllers.person_controller import PersonController
 from gui.controllers.report_controller import ReportController
 from gui.services.request_context import RequestContext
 from gui.controllers.task_controller import TaskController
@@ -21,10 +22,14 @@ def get_rank_category(title: str) -> str:
     return 'Солдати'
 
 
-def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskController, ctx: RequestContext):
+def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskController, person_ctrl:PersonController, ctx: RequestContext):
     ui.label('Щоденний звіт').classes('w-full text-center text-3xl font-bold mb-6')
+    raw_place_options = person_ctrl.get_column_options().get(COLUMN_DESERTION_PLACE, [])
+    place_options = [opt for opt in raw_place_options if str(opt).strip()]
+    if 'Не вказано' not in place_options:
+        place_options.append('Не вказано')
 
-    state = {'data': [], 'returns': [], 'archive': [], 'matrix1_rows': [], 'matrix1_cols': [], 'matrix2_rows': [], 'matrix2_cols': []}
+    state = {'data': [], 'returns': [], 'archive': [], 'matrix1_rows': [], 'matrix1_cols': [], 'matrix2_rows': [], 'matrix2_cols': [], 'selected_places': place_options.copy()}
 
     with ui.row().classes('w-full items-center justify-between mb-4 px-4 max-w-7xl mx-auto bg-gray-50 p-4 rounded-lg border'):
         with ui.row().classes('items-center gap-4'):
@@ -37,6 +42,11 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
                 ui.icon('edit_calendar').classes('cursor-pointer')
                 with ui.menu():
                     ui.date().bind_value(date_filter).props('mask="DD.MM.YYYY"')
+
+            ui.select(options=place_options, multiple=True, label='Обставини (місце)') \
+                .bind_value(state, 'selected_places') \
+                .classes('w-64').props('use-chips dense')
+
             under_3_days_cb = ui.checkbox('СЗЧ < 3 діб', value=True).classes('font-bold text-gray-700 mt-1')
 
         generate_btn = ui.button('Сформувати звіт', icon='analytics', on_click=lambda: load_data()).props('color="primary" elevated')
@@ -58,21 +68,28 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
             # 1. СЗЧ
             raw_data = await run.io_bound(report_ctrl.get_daily_added_records_report, ctx, target_date)
 
-            # 💡 ДОДАНО: Логіка фільтрації "СЗЧ < 3 діб"
             data = []
             filter_active = under_3_days_cb.value
+            allowed_places = state.get('selected_places', [])
+
             for item in raw_data:
                 keep = True
-                if filter_active:
+
+                item_place = str(item.get('desertion_place') or '').strip()
+                if not item_place:
+                    item_place = 'Не вказано'
+
+                if item_place not in allowed_places:
+                    keep = False
+
+                if keep and filter_active:
                     des_date_val = item.get('des_date')
-                    # Перевіряємо чи є дата і чи це об'єкт дати
                     if des_date_val and hasattr(des_date_val, 'toordinal'):
                         days_diff = (target_date - des_date_val).days
-                        # Якщо різниця 0, 1 або 2 дні (сьогодні, вчора, позавчора)
                         if not (0 <= days_diff <= 2):
                             keep = False
                     else:
-                        keep = False  # Якщо дати СЗЧ немає, відкидаємо
+                        keep = False
 
                 if keep:
                     data.append(item)
@@ -88,14 +105,39 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
             data_A7018 = [r for r in data if r.get('sheet_name') == 'А7018']
             added_names = [item['name'] for item in data]
 
-            # 2. ПОВЕРНЕННЯ
-            return_data = await run.io_bound(report_ctrl.get_daily_added_files_report, ctx, target_date, added_names)
+            # ==========================================
+            # 💡 ОПТИМІЗАЦІЯ ПЕРФОРМАНСУ:
+            # Запитуємо парсинг ВСІХ файлів з папки лише 1 РАЗ!
+            # ==========================================
+            all_daily_files = await run.io_bound(report_ctrl.get_daily_archive_files, target_date, [])
+
+            # 2. ПОВЕРНЕННЯ (передаємо сюди вже розпарсені файли)
+            return_data = await run.io_bound(report_ctrl.get_daily_added_files_report, ctx, target_date, [], all_daily_files)
             state['returns'] = return_data
             returned_names = [item['name'] for item in return_data]
 
-            # 3. АРХІВ (Інші документи)
+            # 3. АРХІВ (Фільтруємо файли в пам'яті, без повторного звернення до диску)
             all_known_names = added_names + returned_names
-            archive_data = await run.io_bound(report_ctrl.get_daily_archive_files, target_date, all_known_names)
+            known_surnames = [name.split()[0].lower() for name in all_known_names if name]
+
+            archive_data = []
+            for file_info in all_daily_files:
+                names_str = file_info.get('name', '')
+                is_known = False
+
+                # Якщо файл успішно розпарсився, перевіряємо, чи немає його імені у верхніх таблицях
+                if names_str and names_str not in ('Не вдалося розпізнати', 'Не текстовий документ'):
+                    names_list = [n.strip() for n in names_str.split(',')]
+                    for name in names_list:
+                        last_name = name.split()[0].lower()
+                        if any(last_name in k_surname for k_surname in known_surnames):
+                            is_known = True
+                            break
+
+                # Якщо файл битий ("Мисик") або людина не з верхніх таблиць — кидаємо в архів
+                if not is_known:
+                    archive_data.append(file_info)
+
             state['archive'] = archive_data
 
             # ==========================================

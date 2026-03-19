@@ -126,6 +126,8 @@ class DocProcessor:
 
         text = text_pieces[self.__PIECE_4]
         fields[col.COLUMN_EXECUTOR] = self._extract_name(text)
+        fields[col.COLUMN_EXPERIENCE] = self._extract_experience(fields[COLUMN_SERVICE_DAYS])
+        fields[col.COLUMN_DESERTION_TERM] = self._extract_desertion_term(fields)
 
         if self.is_desertion_case(fields):
             # validate the case
@@ -495,6 +497,24 @@ class DocProcessor:
         if desertion_type == 'відмова':
             return "402"
         return "407"
+
+    def _extract_experience(self, days: int):
+        if days > EXPERIENCED_MORE_THAN_DAYS:
+            return 'experienced'
+        return 'newcomer'
+
+    def _extract_desertion_term(self, fields):
+        ret_date_str = fields.get(COLUMN_RETURN_DATE)
+        des_date_str = fields.get(COLUMN_DESERTION_DATE)
+        if not ret_date_str or not des_date_str:
+            return 'більше 3 діб'
+        try:
+            ret_date = datetime.strptime(str(ret_date_str).strip(), '%d.%m.%Y').date()
+            des_date = datetime.strptime(str(des_date_str).strip(), '%d.%m.%Y').date()
+            days_between = (ret_date - des_date).days
+            return 'до 3 діб' if days_between <= 3 else 'більше 3 діб'
+        except ValueError:
+            return 'більше 3 діб'
 
 
     def check_for_errors(self, data_for_excel) -> list[str]:

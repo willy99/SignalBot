@@ -115,7 +115,7 @@ def init_nicegui(workflow_obj):
     def report_daily():
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
-        daily_report_view.render_daily_report_page(report_ctrl, task_ctrl, ctx)
+        daily_report_view.render_daily_report_page(report_ctrl, task_ctrl, person_ctrl, ctx)
 
     @ui.page('/doc_dbr')
     @require_access(auth_manager, 'doc_dbr', 'read')
