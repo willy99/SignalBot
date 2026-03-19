@@ -206,7 +206,7 @@ def init_nicegui(workflow_obj):
     def inbox_page():
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
-        inbox_triage_view.render_inbox_page(inbox_ctrl, task_ctrl, auth_manager, ctx)
+        inbox_triage_view.render_inbox_page(inbox_ctrl, task_ctrl, person_ctrl, auth_manager, ctx)
 
     @ui.page('/calendar')
     @require_access(auth_manager, 'search', 'read')

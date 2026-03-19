@@ -58,6 +58,17 @@ class NotifController:
 
         return self.doc_templator.generate_notif_batch(region, out_number, out_date, buffer_data)
 
+    def generate_individual_documents(self, ctx: RequestContext, region: str, out_num: str, out_date: str, buffer: list) -> tuple[bytes, str]:
+        self.logger.debug(f'UI:{ctx.user_name}: Формуємо ZIP-архів індивідуальних повідомлень для {len(buffer)} осіб.')
+
+        if not buffer:
+            raise ValueError("Буфер порожній. Немає даних для генерації.")
+        if not out_num:
+            raise ValueError("Введіть вихідний номер.")
+
+        # Передаємо роботу в темплейтер
+        return self.doc_templator.generate_notif_zip_archive(region, out_num, out_date, buffer)
+
     def mark_as_completed(self, ctx: RequestContext, doc_id: int, payload: list, out_number: str, out_date: str, person_controller=None) -> bool:
         self.logger.debug(f'UI:{ctx.user_name}: Помічаємо комплект документів як COMPLETED: {doc_id}')
 

@@ -29,3 +29,5 @@ class PersonSearchFilter:
     review_statuses: Optional[list] = None
 
     desertion_region:[str] = None
+
+    include_402:[str] = None

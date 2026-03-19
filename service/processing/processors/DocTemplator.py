@@ -2,6 +2,7 @@ import io
 from pathlib import Path
 from docxtpl import DocxTemplate
 import os
+import zipfile
 
 class DocTemplator:
     def __init__(self, templates_dir: Path):
@@ -10,6 +11,7 @@ class DocTemplator:
         self.support_detailed_dir = os.path.join(self.templates_dir, 'support-form-detailed')
         self.support_standart_dir = os.path.join(self.templates_dir, 'support-form-standart')
         self.notif_dir = os.path.join(self.templates_dir, 'notif-form')
+        self.notif_dir_separate = os.path.join(self.templates_dir, 'notif-form-separate')
 
         self.templates_detailed = {
             'Миколаїв': self.support_detailed_dir + '/Мико.docx',
@@ -23,8 +25,13 @@ class DocTemplator:
         }
         self.region_templates = {
             'Миколаївська область': self.notif_dir + '/Мико.docx',
-            'Дніпро': self.notif_dir + '/Дніпро.docx',
-            'Донецьк': self.notif_dir + '/Донецьк.docx'
+            'Дніпропетровська область': self.notif_dir + '/Дніпро.docx',
+            'Донецька область': self.notif_dir + '/Донецьк.docx'
+        }
+        self.region_templates_separate = {
+            'Миколаївська область': self.notif_dir_separate + '/Мико.docx',
+            'Дніпропетровська область': self.notif_dir_separate + '/Дніпро.docx',
+            'Донецька область': self.notif_dir_separate + '/Донецьк.docx'
         }
 
     @staticmethod
@@ -120,7 +127,7 @@ class DocTemplator:
         doc.save(byte_io)
         byte_io.seek(0)
 
-        file_name = f"Пакет_Супроводів_{city}_{len(formatted_docs)}шт.docx"
+        file_name = f"Пакет_Супроводів_{city}_{supp_number.replace('/','_')}_({supp_date.replace('.','_')})_{len(formatted_docs)}шт.docx"
         return byte_io.getvalue(), file_name
 
     def generate_support_batch_detailed(self, city: str, supp_number: str, supp_date: str, raw_documents: list) -> tuple[bytes, str]:
@@ -197,3 +204,62 @@ class DocTemplator:
 
         file_name = f"Пакет_Повідомлень_{region}_{len(formatted_docs)}шт.docx"
         return byte_io.getvalue(), file_name
+
+    def generate_notif_zip_archive(self, region: str, out_num: str, out_date: str, buffer: list) -> tuple[bytes, str]:
+        if region not in self.region_templates:
+            print('>>> шаблон не знайдено ' + str(region))
+            raise FileNotFoundError(f"Шаблон для регіону {region} не знайдено.")
+
+        template_path = self.region_templates_separate[region]
+
+        zip_buffer = io.BytesIO()
+
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for doc_data in buffer:
+                indiv_doc = DocxTemplate(template_path)
+
+                # Контекст для однієї людини (використовуйте ваші теги з Word)
+                context = {
+                    'REGION': region,
+                    'NOTIF_NUMBER': out_num,
+                    'NOTIF_DATE': out_date,
+                    'INCREMENTAL': doc_data.get('seq_num', 0),
+                    'NOTIF_CONDITIONS': doc_data.get('desertion_conditions', ''),
+                }
+                indiv_doc.render(context)
+
+                temp_word_io = io.BytesIO()
+                indiv_doc.save(temp_word_io)
+                temp_word_io.seek(0)
+
+                seq = doc_data.get('seq_num', 0)
+                safe_name = str(doc_data.get('name', 'Невідомо')).replace(' ', '_').replace('/', '_')
+                file_name = f"{seq}_{safe_name}.docx"
+
+                zip_file.writestr(file_name, temp_word_io.getvalue())
+
+            appendix_path = self.notif_dir_separate + '/appendix.docx'
+            appendix_doc = DocxTemplate(appendix_path)
+
+            appendix_context = {
+                'NOTIF_NUMBER': out_num,
+                'NOTIF_DATE': out_date,
+                'REGION': region,
+                'documents': buffer
+            }
+            appendix_doc.render(appendix_context)
+
+            app_io = io.BytesIO()
+            appendix_doc.save(app_io)
+            app_io.seek(0)
+
+            safe_out_num = out_num.replace('/', '_')
+            appendix_filename = f"Додаток_{safe_out_num}_{out_date}.docx"
+
+            zip_file.writestr(appendix_filename, app_io.getvalue())
+
+        zip_buffer.seek(0)
+
+        zip_filename = f"Повідомлення_{safe_out_num}_{out_date}.zip"
+
+        return zip_buffer.getvalue(), zip_filename

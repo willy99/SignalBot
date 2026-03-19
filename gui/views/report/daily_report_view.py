@@ -1,4 +1,4 @@
-from nicegui import ui, run
+from nicegui import ui, run, background_tasks
 from datetime import datetime
 from dics.deserter_xls_dic import *
 from gui.controllers.report_controller import ReportController
@@ -7,6 +7,7 @@ from gui.controllers.task_controller import TaskController
 from service.constants import TASK_STATUS_IN_PROGRESS
 from domain.task import Task
 from gui.tools.ui_components import date_input, fix_date
+
 
 def get_rank_category(title: str) -> str:
     """Визначає категорію військовослужбовця за званням."""
@@ -32,11 +33,11 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
             date_filter = date_input('Дата формування', state, 'support_date', default_value=datetime.now().strftime('%d.%m.%Y'),
                                      blur_handler=fix_date).classes('flex-1')
 
-            #di = ui.input(value=datetime.now().strftime('%d.%m.%Y')).props('outlined dense')
             with date_filter.add_slot('append'):
                 ui.icon('edit_calendar').classes('cursor-pointer')
                 with ui.menu():
                     ui.date().bind_value(date_filter).props('mask="DD.MM.YYYY"')
+            under_3_days_cb = ui.checkbox('СЗЧ < 3 діб', value=True).classes('font-bold text-gray-700 mt-1')
 
         generate_btn = ui.button('Сформувати звіт', icon='analytics', on_click=lambda: load_data()).props('color="primary" elevated')
         export_btn = ui.button('В задачу', icon='add_task', on_click=lambda: create_report_task()) \
@@ -55,8 +56,34 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
             state['cmd_summary'] = cmd_summary
 
             # 1. СЗЧ
-            data = await run.io_bound(report_ctrl.get_daily_added_records_report, ctx, target_date)
+            raw_data = await run.io_bound(report_ctrl.get_daily_added_records_report, ctx, target_date)
+
+            # 💡 ДОДАНО: Логіка фільтрації "СЗЧ < 3 діб"
+            data = []
+            filter_active = under_3_days_cb.value
+            for item in raw_data:
+                keep = True
+                if filter_active:
+                    des_date_val = item.get('des_date')
+                    # Перевіряємо чи є дата і чи це об'єкт дати
+                    if des_date_val and hasattr(des_date_val, 'toordinal'):
+                        days_diff = (target_date - des_date_val).days
+                        # Якщо різниця 0, 1 або 2 дні (сьогодні, вчора, позавчора)
+                        if not (0 <= days_diff <= 2):
+                            keep = False
+                    else:
+                        keep = False  # Якщо дати СЗЧ немає, відкидаємо
+
+                if keep:
+                    data.append(item)
+
             state['data'] = data
+            for item in data:
+                if hasattr(item.get('ins_date'), 'strftime'):
+                    item['ins_date'] = item['ins_date'].strftime('%d.%m.%Y')
+                if hasattr(item.get('des_date'), 'strftime'):
+                    item['des_date'] = item['des_date'].strftime('%d.%m.%Y')
+
             data_A0224 = [r for r in data if r.get('sheet_name') == 'А0224']
             data_A7018 = [r for r in data if r.get('sheet_name') == 'А7018']
             added_names = [item['name'] for item in data]
@@ -107,7 +134,6 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
                 m1_grand_total += total
                 state['matrix1_rows'].append(row)
 
-            # Додаємо фінальний рядок "Підсумок" для Таблиці 1
             m1_summary_row = {'subunit': 'Всього:'}
             for p in unique_places:
                 m1_summary_row[p] = m1_col_totals[p] if m1_col_totals[p] > 0 else '-'
@@ -116,28 +142,31 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
 
             # --- ТАБЛИЦЯ 2: Звідки СЗЧ / Склад ---
             m2_data = {p: {r: 0 for r in rank_categories} for p in unique_places}
+            m2_col_totals = {r: 0 for r in rank_categories}  # Акумулятор для колонок
+
             for item in data_A0224:
                 p = item.get('desertion_place', 'Не вказано')
                 r = get_rank_category(item.get('title'))
                 m2_data[p][r] += 1
+                m2_col_totals[r] += 1  # 💡 Одразу рахуємо загальну кількість по колонці
+
+            active_rank_categories = [r for r in rank_categories if m2_col_totals[r] > 0]
 
             state['matrix2_cols'] = [{'name': 'place', 'label': 'Обставини', 'field': 'place', 'align': 'left', 'classes': 'font-bold bg-gray-100'}]
-            for r in rank_categories:
+            for r in active_rank_categories:  # 💡 Використовуємо відфільтрований список
                 state['matrix2_cols'].append({'name': r, 'label': r, 'field': r, 'align': 'center'})
             state['matrix2_cols'].append({'name': 'total', 'label': 'Всього', 'field': 'total', 'align': 'center', 'classes': 'font-bold bg-gray-100'})
 
             state['matrix2_rows'] = []
-            m2_col_totals = {r: 0 for r in rank_categories}  # Акумулятор для колонок
             m2_grand_total = 0  # Загальна сума
 
             for p in unique_places:
                 row = {'place': p}
                 total = 0
-                for r in rank_categories:
+                for r in active_rank_categories:  # 💡 Ітеруємось тільки по активних колонках
                     val = m2_data[p][r]
                     row[r] = val if val > 0 else '-'
                     total += val
-                    m2_col_totals[r] += val  # Додаємо до підсумку колонки
 
                 row['total'] = total if total > 0 else '-'
                 m2_grand_total += total
@@ -145,7 +174,7 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
 
             # Додаємо фінальний рядок "Підсумок" для Таблиці 2
             m2_summary_row = {'place': 'Всього:'}
-            for r in rank_categories:
+            for r in active_rank_categories:  # 💡 І тут теж тільки активні
                 m2_summary_row[r] = m2_col_totals[r] if m2_col_totals[r] > 0 else '-'
             m2_summary_row['total'] = m2_grand_total if m2_grand_total > 0 else '-'
             state['matrix2_rows'].append(m2_summary_row)
@@ -153,18 +182,24 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
             # --- ТАБЛИЦЯ 3: Досвід ---
             experienced_count = 0
             newcomer_count = 0
+            weapon_count = 0  # 💡 ДОДАНО: Лічильник зброї
 
             for item in data_A0224:
-                # Враховано можливу опечатку в назві поля (experince / experience)
                 exp = item.get('experience', item.get('experince', '')).strip().lower()
                 if exp == 'experienced':
                     experienced_count += 1
                 elif exp == 'newcomer':
                     newcomer_count += 1
 
+                # 💡 ДОДАНО: Перевірка на СЗЧ зі зброєю (по константі або ключовому слову)
+                des_type = str(item.get('desertion_type', '')).strip().lower()
+                if des_type == DESERTION_TYPE_WEAPON_KEYWORD.lower() or 'зброя' in des_type:
+                    weapon_count += 1
+
             state['exp_summary_rows'] = [
                 {'category': 'З бойовим досвідом', 'count': experienced_count},
                 {'category': 'Новачки', 'count': newcomer_count},
+                {'category': 'Зі зброєю', 'count': weapon_count},  # 💡 ДОДАНО
                 {'category': 'Повернень', 'count': len(return_data)}
             ]
             state['exp_summary_cols'] = [
@@ -215,6 +250,7 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
 
                         with ui.row().classes('flex-1 mt-2'):
                             ui.table(columns=state['exp_summary_cols'], rows=state['exp_summary_rows']).classes('w-72').props('dense flat bordered hide-header')
+
                     # ==============================
                     # РЕНДЕР ДЕТАЛЬНИХ СПИСКІВ
                     # ==============================
@@ -276,7 +312,8 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
         finally:
             generate_btn.props(remove='loading')
 
-    ui.timer(0.1, load_data, once=True)
+    # 💡 Захист від помилки відсутності слота (await замість ui.timer)
+    ui.timer(0.1, lambda: background_tasks.create(load_data()), once=True)
 
     async def create_report_task():
         if not state.get('data') and not state.get('returns'):
@@ -315,6 +352,12 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
                 for row in state['matrix2_rows']:
                     details += "<tr>" + "".join([f"<td align='{c.get('align', 'left')}'>{row.get(c['name'], '')}</td>" for c in state['matrix2_cols']]) + "</tr>"
                 details += "</table><br>"
+
+                # 💡 ДОДАНО: Експорт таблиці досвіду та зброї в текст задачі
+                details += "<b>Додаткова інформація:</b><ul>"
+                for row in state.get('exp_summary_rows', []):
+                    details += f"<li>{row['category']}: <b>{row['count']}</b></li>"
+                details += "</ul><br>"
 
             # 2. ДЕТАЛІЗАЦІЯ ПІШЛИ
             added_data = state.get('data', [])

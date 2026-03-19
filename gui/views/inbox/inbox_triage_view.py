@@ -1,11 +1,16 @@
 from nicegui import ui, run, events
+
+from gui.controllers.inbox_controller import InboxController
+from gui.controllers.task_controller import TaskController
+from gui.services.auth_manager import AuthManager
 from gui.services.request_context import RequestContext
 import config
 from service.processing.parsers.ParserFactory import ParserFactory
-import asyncio
+from domain.person import Person
+from gui.controllers.person_controller import PersonController
+from gui.views.person.person_view import edit_person
 
-
-def render_inbox_page(inbox_ctrl, task_ctrl, auth_manager, ctx: RequestContext):
+def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, person_ctrl:PersonController, auth_manager:AuthManager, ctx: RequestContext):
     can_assign = auth_manager.has_access('task', 'delete')
     users_list = task_ctrl.get_available_users()
     user_options = {u['username']: u.get('full_name') or u['username'] for u in users_list if 'username' in u}
@@ -48,6 +53,7 @@ def render_inbox_page(inbox_ctrl, task_ctrl, auth_manager, ctx: RequestContext):
                 atype = action['type']
 
                 try:
+                    '''
                     if atype == 'excel':
                         ui.notify(f'⏳ Ексель: обробка {fname}...', type='info')
                         process_messages = await run.io_bound(inbox_ctrl.process_file_to_excel, ctx, fname)
@@ -55,8 +61,8 @@ def render_inbox_page(inbox_ctrl, task_ctrl, auth_manager, ctx: RequestContext):
                             ui.notify(f'⚠️ ' + str(process_messages), type='warning')
                             ui.notify(f'✅ {fname} занесено в Ексель!', type='positive')
                         await run.io_bound(inbox_ctrl.delete_file, ctx, None, folder, fname)
-
-                    elif atype == 'archive':
+                    '''
+                    if atype == 'archive':
                         ui.notify(f'⏳ Архів: збереження {fname}...', type='info')
                         success = await run.io_bound(inbox_ctrl.archive_file, ctx, fname)
                         if success:
@@ -243,6 +249,36 @@ def render_inbox_page(inbox_ctrl, task_ctrl, auth_manager, ctx: RequestContext):
                                 ui.icon(icon_name, color=icon_color)
                                 ui.label(f).classes('text-sm truncate flex-grow font-medium' if is_sel or in_queue else 'text-sm truncate flex-grow text-gray-700')
 
+    async def on_process_excel_click(filename: str):
+        ui.notify('⏳ Розпізнаю документ...', type='info')
+        try:
+            parsed_data_list, messages = await run.io_bound(inbox_ctrl.parse_file_for_review, ctx, filename)
+
+            if messages:
+                for msg in messages:
+                    ui.notify(msg, type='warning')
+
+            if not parsed_data_list:
+                ui.notify('❌ Не вдалося знайти дані людей у документі', type='warning')
+                clear_selection()
+                await load_data()
+                return
+
+            for raw_dict in parsed_data_list:
+                new_person = Person.from_excel_dict(raw_dict)
+                new_person.id = None
+                edit_person(
+                    person=new_person,
+                    person_ctrl=person_ctrl,
+                    ctx=ctx,
+                    auth_manager=auth_manager,
+                    on_close=load_data
+                )
+
+        except Exception as e:
+            ui.notify(f'Помилка обробки: {e}', type='negative')
+            print(f"Error parsing file: {e}")
+
     def refresh_right_panel():
         right_panel.clear()
         with right_panel:
@@ -270,41 +306,47 @@ def render_inbox_page(inbox_ctrl, task_ctrl, auth_manager, ctx: RequestContext):
                 else:
                     with ui.row().classes('items-center gap-2 shrink-0 flex-nowrap'):
                         if f_type == 'inbox_personal':
-                            ui.button('Завантажити', icon='download', on_click=lambda: download_file(f_name)) \
-                                .props('color="green" size="sm" stack').classes('w-24 h-14')
+                            ui.button('Завантажити', icon='download', on_click=lambda: download_file(f_name, f_type)) \
+                                .props('color="blue" size="sm" stack').classes('w-24 h-14')
                             ui.button('Задача', icon='add_task', on_click=lambda: ui.notify('TODO: Задача', type='info')) \
                                 .props('color="primary" size="sm" stack').classes('w-24 h-14')
 
                             if can_assign:
                                 sel_assign = ui.select(user_options, label='Кому').props('dense outlined hide-bottom-space').classes('w-32 h-14')
-                                ui.button('Віддати', icon='switch_account',
+                                ui.button('Призначити', icon='switch_account',
                                           on_click=lambda: add_to_queue('assign', config.INBOX_DIR_PATH, f_name, target=sel_assign.value, is_personal=True)) \
-                                    .props('color="secondary" size="sm" stack').classes('w-24 h-14')
+                                    .props('color="blue" size="sm" stack').classes('w-24 h-14')
 
                             ui.button('Видалити', icon='delete', on_click=lambda: confirm_and_queue_delete(config.INBOX_DIR_PATH, f_name, True)) \
                                 .props('color="red" size="sm" stack').classes('w-20 h-14')
 
                         elif f_type == 'inbox_shared':
+                            ui.button('Завантажити', icon='download', on_click=lambda: download_file(f_name, f_type)) \
+                                .props('color="blue" size="sm" stack').classes('w-24 h-14')
                             ui.button('Архів', icon='archive', on_click=lambda: add_to_queue('archive', config.INBOX_DIR_PATH, f_name)) \
                                 .props('color="blue" size="sm" stack').classes('w-24 h-14')
-                            ui.button('Ексель', icon='table_chart', on_click=lambda: add_to_queue('excel', config.INBOX_DIR_PATH, f_name)) \
+                            ui.button('В базу', icon='person_add', on_click=lambda: on_process_excel_click(f_name)) \
                                 .props('color="green" size="sm" stack').classes('w-24 h-14')
+                            #ui.button('Ексель', icon='table_chart', on_click=lambda: add_to_queue('excel', config.INBOX_DIR_PATH, f_name)) \
+                            #    .props('color="green" size="sm" stack').classes('w-24 h-14')
 
                             if can_assign:
                                 sel_assign = ui.select(user_options, label='Оберіть юзера').props('dense outlined hide-bottom-space').classes('w-40 h-14')
                                 ui.button('Призначити', icon='person_add',
                                           on_click=lambda: add_to_queue('assign', config.INBOX_DIR_PATH, f_name, target=sel_assign.value, is_personal=False)) \
-                                    .props('color="secondary" size="sm" stack').classes('w-28 h-14')
+                                    .props('color="blue" size="sm" stack').classes('w-28 h-14')
 
                             ui.button('Видалити', icon='delete', on_click=lambda: confirm_and_queue_delete(config.INBOX_DIR_PATH, f_name, False)) \
                                 .props('color="red" size="sm" stack').classes('w-20 h-14')
 
                         elif f_type == 'outbox_personal':
+                            ui.button('Завантажити', icon='download', on_click=lambda: download_file(f_name, f_type)) \
+                                .props('color="blue" size="sm" stack').classes('w-24 h-14')
                             if can_assign:
                                 sel_assign = ui.select(user_options, label='Кому').props('dense outlined hide-bottom-space').classes('w-32 h-14')
                                 ui.button('Призначити', icon='switch_account',
                                           on_click=lambda: add_to_queue('assign', config.OUTBOX_DIR_PATH, f_name, target=sel_assign.value, is_personal=True)) \
-                                    .props('color="secondary" size="sm" stack').classes('w-28 h-14')
+                                    .props('color="blue" size="sm" stack').classes('w-28 h-14')
 
                             ui.button('Видалити', icon='delete', on_click=lambda: confirm_and_queue_delete(config.OUTBOX_DIR_PATH, f_name, True)) \
                                 .props('color="red" size="sm" stack').classes('w-20 h-14')
@@ -320,12 +362,24 @@ def render_inbox_page(inbox_ctrl, task_ctrl, auth_manager, ctx: RequestContext):
                         'whitespace-pre-wrap text-gray-800 font-mono text-sm'
                     )
 
-    async def download_file(filename: str):
+    async def download_file(filename: str, f_type: str):
         try:
-            file_buffer = await run.io_bound(inbox_ctrl.download_personal_file, ctx, filename)
-            if file_buffer: ui.download(file_buffer.getvalue(), filename)
-        except Exception:
-            pass
+            if f_type == 'inbox_personal':
+                # Для персональних вхідних/вихідних
+                file_buffer = await run.io_bound(inbox_ctrl.download_file, ctx, filename, config.INBOX_DIR_PATH, True)
+            elif f_type == 'outbox_personal':
+                file_buffer = await run.io_bound(inbox_ctrl.download_file, ctx, filename, config.OUTBOX_DIR_PATH, True)
+            else:
+                # Для спільних (root) файлів
+                file_buffer = await run.io_bound(inbox_ctrl.download_file, ctx, filename, config.INBOX_DIR_PATH, False)
+            if file_buffer:
+                ui.download(file_buffer.getvalue(), filename)
+                ui.notify(f'Завантаження {filename} почалося.', type='positive')
+            else:
+                ui.notify('Не вдалося завантажити файл.', type='negative')
+        except Exception as e:
+            ui.notify(f'Помилка завантаження: {e}', type='negative')
+
 
     async def confirm_and_queue_delete(folder: str, filename: str, is_personal: bool):
         dialog = ui.dialog()

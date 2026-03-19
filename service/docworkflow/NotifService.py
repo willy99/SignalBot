@@ -43,6 +43,8 @@ class NotifService:
             doc_data['created_date'] = datetime.now().strftime(DB_DATETIME_FORMAT)
             return self.db.insert_record(self.table_name, doc_data)
         else:
+            doc_data.pop('created_by', None)
+            doc_data.pop('created_date', None)
             self.db.update_record(self.table_name, doc.id, doc_data)
             return doc.id
 

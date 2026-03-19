@@ -47,10 +47,14 @@ class InboxService:
 
         return result
 
-    def get_personal_file(self, user_login: str, filename: str) -> io.BytesIO:
+    def download_file(self, user_login: str, filename: str, root_dir: str) -> io.BytesIO:
         """Завантажує файл з SMB та повертає його як BytesIO буфер."""
-        client = StorageFactory.create_client(config.INBOX_DIR_PATH, self.log_manager)
-        target_path = f"{config.INBOX_DIR_PATH}{client.get_separator()}{user_login}{client.get_separator()}{filename}"
+        client = StorageFactory.create_client(root_dir, self.log_manager)
+        if user_login:
+            target_path = f"{root_dir}{client.get_separator()}{user_login}{client.get_separator()}{filename}"
+        else:
+            target_path = f"{root_dir}{client.get_separator()}{filename}"
+
         with client:
             try:
                 # get_file_buffer вже реалізований у вас в SMBFileClient

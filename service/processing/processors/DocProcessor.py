@@ -229,7 +229,10 @@ class DocProcessor:
     def _extract_title_2(canonical_title):
         if canonical_title is None: return NA
         parts = canonical_title.split()
-        return parts[-1] if parts else NA
+        part = parts[-1] if parts else NA
+        if part == 'лейтенант':
+            part = 'офіцер'
+        return part
 
     @staticmethod
     def _extract_service_type(text):

@@ -16,22 +16,34 @@ class PersonController:
         self.logger = worklow.log_manager.get_logger()
 
     def save_person(self, ctx: RequestContext, person_model, paint_color=None):
-        self.logger.debug('UI:' + ctx.user_name + ': Зберігаємо персону ' + str(person_model))
+        self.logger.debug(f'UI:{ctx.user_name}: Зберігаємо персону {person_model.name}')
         try:
-            id = person_model.id
+            person_id = person_model.id
 
-            if id is None:
-                print("Помилка: не знайдено ID рядка для оновлення")
-                return False
+            # Перетворюємо модель на словник для запису
             updated_data = person_model.to_excel_dict()
-            success = self.processor.update_row_by_id(id, updated_data, paint_color)
+
+            if person_id is None:
+                self.logger.debug("ID відсутній: створюємо новий запис в Excel.")
+
+                success = self.processor.upsert_record([updated_data])
+
+            else:
+                self.logger.debug(f"Оновлюємо існуючий запис (ID: {person_id})")
+                success = self.processor.update_row_by_id(person_id, updated_data, paint_color)
+
             if success:
                 self.processor.save()
+                self.logger.debug('✅ Дані успішно збережено в Excel.')
                 return True
+
+            self.logger.error('❌ Процесор повернув False при збереженні.')
             return False
 
         except Exception as e:
-            print(f"Помилка при збереженні: {e}")
+            self.logger.error(f"Помилка при збереженні персони: {e}")
+            import traceback
+            self.logger.debug(traceback.format_exc())
             return False
 
     def delete_record(self, ctx: RequestContext, person_model):

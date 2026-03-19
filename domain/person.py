@@ -15,7 +15,7 @@ class Person(BaseModel):
     # Дати (тепер використовуємо Union, щоб бути гнучкими)
     insert_date: Optional[Union[date, str]] = Field(None, alias=COLUMN_INSERT_DATE)
     desertion_date: Optional[Union[date, str]] = Field(None, alias=COLUMN_DESERTION_DATE)
-    raport_date: Optional[Union[date, str]] = Field(None, alias=COLUMN_RAPORT_DATE)
+    raport_date: Optional[Union[date, str]] = Field(None, alias=COLUMN_REPORT_DATE)
     birthday: Optional[Union[date, str]] = Field(None, alias=COLUMN_BIRTHDAY)
     enlistment_date: Optional[Union[date, str]] = Field(None, alias=COLUMN_ENLISTMENT_DATE)
     return_date: Optional[Union[date, str]] = Field(None, alias=COLUMN_RETURN_DATE)

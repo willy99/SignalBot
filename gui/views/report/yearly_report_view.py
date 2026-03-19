@@ -11,6 +11,7 @@ import random
 
 def render_yearly_report_page(report_ctrl, ctx: RequestContext):
     state = {'rows': [], 'columns': []}
+    lie_slider = None
 
     with ui.column().classes('w-full items-center p-4'):
         with ui.row().classes('w-full justify-center items-center gap-8 mb-6'):
@@ -61,7 +62,7 @@ def render_yearly_report_page(report_ctrl, ctx: RequestContext):
              # ========================================================
             # 🪄 МАГІЯ: ЗАСТОСУВАННЯ "КОЕФІЦІЄНТУ БРЕХНІ"
             # ========================================================
-            if lie_slider:
+            if report_ctrl.is_admin() and lie_slider is not None:
                 lie_percent = lie_slider.value
                 if lie_percent > 0:
                     variance = lie_percent / 100.0  # від 0.01 до 1.0

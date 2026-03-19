@@ -20,10 +20,10 @@ class InboxController:
         service = InboxService(self.log_manager, ctx)
         return service.get_user_inbox_messages()
 
-    def download_personal_file(self, ctx: RequestContext, filename: str) -> io.BytesIO:
+    def download_file(self, ctx: RequestContext, filename: str, root_dir: str, is_personal: bool) -> io.BytesIO:
         """Отримує буфер файлу з персональної папки користувача."""
         service = InboxService(self.log_manager, ctx)
-        return service.get_personal_file(ctx.user_login, filename)
+        return service.download_file(ctx.user_login if is_personal else None, filename, root_dir)
 
     def assign_file(self, ctx: RequestContext, filename: str, is_personal: bool, target_username: str):
         """Викликається з UI для переміщення файлу."""
@@ -61,3 +61,19 @@ class InboxController:
         processor = DocumentProcessingService(self.log_manager, backuper, excel_processor)
 
         return processor.process_full_workflow(source_file, filename)
+
+    def parse_file_for_review(self, ctx, filename: str) -> tuple[list[dict], list[str]]:
+        """Бекап, архівація та повернення розпарсених даних для рев'ю в UI."""
+        client = StorageFactory.create_client(config.INBOX_DIR_PATH, self.log_manager)
+        source_file = f"{config.INBOX_DIR_PATH}{client.get_separator()}{filename}"
+
+        excel_processor = self.workflow.excelProcessor
+        backuper = self.workflow.backuper
+        processor = DocumentProcessingService(self.log_manager, backuper, excel_processor)
+
+        # Робимо бекап і переносимо файл в архів (як і раніше)
+        processor.make_backup()
+        processor.archive_document(source_file, filename)
+
+        # Але замість process_to_excel викликаємо наш новий метод
+        return processor.parse_document_only(source_file, filename)

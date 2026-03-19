@@ -6,7 +6,7 @@ from gui.services.request_context import RequestContext
 from utils.utils import to_genitive_case, to_genitive_title
 from gui.tools.validation import is_valid_doc_number
 from config import OUTBOX_DIR_PATH
-from gui.tools.ui_components import fix_date, date_input
+from gui.tools.ui_components import fix_date, date_input, mark_clean, mark_dirty
 from service.storage.FileCacher import FileCacheManager
 import io
 from gui.controllers.person_controller import PersonController
@@ -51,6 +51,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
             )
             state['current_support_doc_id'] = draft_new_id
             ui.notify(f'Чернетку №{draft_new_id} збережено!', type='positive', icon='cloud_done')
+            mark_clean()
         except Exception as e:
             ui.notify(f'Помилка БД: {e}', type='negative')
         finally:
@@ -381,6 +382,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
 
                 refresh_buffer_ui()
                 clear_inputs()
+                mark_dirty()
 
             with ui.row().classes('w-full mt-4 gap-2'):
                 add_btn = ui.button('Додати до списку', on_click=on_add_click, icon='add').classes(
@@ -402,6 +404,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                 elif state['edit_idx'] is not None and state['edit_idx'] > idx:
                     state['edit_idx'] -= 1
                 refresh_buffer_ui()
+                mark_dirty()
 
             def on_edit_click(idx):
                 state['edit_idx'] = idx

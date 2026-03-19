@@ -9,7 +9,8 @@ from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED, DB_DATE_FO
 from utils.utils import format_to_excel_date
 from gui.tools.validation import is_valid_doc_number
 import re
-from gui.tools.ui_components import date_input, fix_date
+from gui.tools.ui_components import date_input, fix_date, mark_clean, mark_dirty
+
 
 def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController,
                       ctx: RequestContext, notif_doc_id: int = None):
@@ -31,6 +32,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
 
     async def on_save_draft_click():
         save_draft_btn.disable()
+        mark_clean()
         current_out_num = state.get('out_number', '').strip()
         current_out_date = state.get('out_date', '')
         current_region = state.get('filter_des_region', '')
@@ -82,6 +84,33 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
         finally:
             generate_docs_btn.props(remove='loading')
 
+    async def on_generate_indiv_docs_click():
+        out_num = state.get('out_number', '').strip()
+        region = state.get('filter_des_region', '')
+
+        if not out_num or not state['out_date']:
+            ui.notify('Заповніть дату та номер на КПП!', type='warning')
+            return
+        if not is_valid_doc_number(out_num):
+            ui.notify('❌ Формат номера має бути 642/ХХХХ', type='negative')
+            return
+
+        await on_save_draft_click()
+
+        generate_indiv_docs_btn.props('loading')
+        ui.notify('⏳ Формуємо архів з документами...', type='info')
+        try:
+            file_bytes, file_name = await run.io_bound(
+                notif_ctrl.generate_individual_documents,  # 💡 Виклик нового методу контролера
+                ctx, region, out_num, state['out_date'], state['buffer']
+            )
+            ui.download(file_bytes, file_name)
+            ui.notify('✅ Архів успішно згенеровано!', type='positive')
+        except Exception as e:
+            ui.notify(f'❌ Помилка генерації: {e}', type='negative')
+        finally:
+            generate_indiv_docs_btn.props(remove='loading')
+
     async def on_send_kpp_click():
         out_num = state.get('out_number', '').strip()
         if not is_valid_doc_number(out_num):
@@ -120,8 +149,11 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
             save_draft_btn = ui.button('ЗБЕРЕГТИ ЧЕРНЕТКУ', icon='save', on_click=on_save_draft_click).props('outline color="primary"').classes('h-10')
             save_draft_btn.disable()
 
-            generate_docs_btn = ui.button('СФОРМУВАТИ (WORD)', icon='description', on_click=on_generate_docs_click).props('color="blue"').classes('h-10')
+            generate_docs_btn = ui.button('WORD: Разом', icon='description', on_click=on_generate_docs_click).props('color="blue"').classes('h-10')
             generate_docs_btn.disable()
+
+            generate_indiv_docs_btn = ui.button('WORD (Окремо)', icon='file_copy', on_click=on_generate_indiv_docs_click).props('color="blue"').classes('h-10')
+            generate_indiv_docs_btn.disable()
 
             complete_btn = ui.button('ВІДПРАВКА', icon='send', on_click=on_send_kpp_click).props('color="green"').classes('h-10')
             complete_btn.disable()
@@ -327,6 +359,9 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                             buffer_data.append(raw_data)
                             added_count += 1
 
+                if added_count > 0:
+                    mark_dirty()
+
                 state['selected_candidates'].clear()
                 ui.timer(0.1, perform_search, once=True)
                 refresh_buffer_ui()
@@ -352,6 +387,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                     if 0 <= idx < len(state['buffer']):
                         state['buffer'].pop(idx)
                     await perform_search()
+                    mark_dirty()
                     refresh_buffer_ui()
 
             def refresh_buffer_ui():
@@ -393,11 +429,13 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                 if len(buffer_data) > 0 and state['status'] != DOC_STATUS_COMPLETED:
                     save_draft_btn.enable()
                     generate_docs_btn.enable()
+                    generate_indiv_docs_btn.enable()
                     complete_btn.enable()
                 else:
                     if state['status'] != DOC_STATUS_COMPLETED:
                         save_draft_btn.disable()
                         generate_docs_btn.disable()
+                        generate_indiv_docs_btn.disable()
                         complete_btn.disable()
 
             def refresh_status_ui():
@@ -409,12 +447,14 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                     complete_btn.disable()
                     save_draft_btn.disable()
                     generate_docs_btn.disable()
+                    generate_indiv_docs_btn.disable()
                 else:
                     status_badge.props('color="grey"')
                     if state['buffer']:
                         complete_btn.enable()
                         save_draft_btn.enable()
                         generate_docs_btn.enable()
+                        generate_indiv_docs_btn.enable()
 
             def load_draft(d_id: int):
                 try:

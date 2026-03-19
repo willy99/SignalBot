@@ -4,7 +4,7 @@ import sys
 
 import warnings
 from domain.person_filter import YES
-from config import DESERTER_TAB_NAME, EXCEL_CHUNK_SIZE, EXCEL_DATE_FORMAT, DESERTER_RESERVE_TAB_NAME
+from config import DESERTER_TAB_NAME, EXCEL_CHUNK_SIZE, EXCEL_DATE_FORMAT, DESERTER_RESERVE_TAB_NAME, EXCEL_LAST_COL_NUMBER
 from dics.deserter_xls_dic import *
 from dics.deserter_xls_dic import NA
 from typing import List, Dict, Any
@@ -30,7 +30,6 @@ class ExcelProcessor:
         self.abs_path = os.path.abspath(file_path)
         self.app = xw.App(visible=False, add_book=False)
         self._load_workbook(DESERTER_TAB_NAME) #default tab name
-        # self.lock = threading.Lock()
         self.lock = threading.RLock()
 
         self.column_values: Dict[str, List[str]] = {} # для комбіков
@@ -43,9 +42,9 @@ class ExcelProcessor:
             return DESERTER_RESERVE_TAB_NAME
         return sheet_name
 
-    def upsert_record(self, records_list: List[Dict[str, Any]]) -> None:
+    def upsert_record(self, records_list: List[Dict[str, Any]]) -> bool:
         if not records_list:
-            return
+            False
         sheet_name = self.get_correct_sheet_name(records_list[0].get(COLUMN_MIL_UNIT, None))
         print('>>>> sheet name: ' + sheet_name + ' and mil unit ' + str(records_list[0].get(COLUMN_MIL_UNIT, None)))
         self._load_workbook(sheet_name)
@@ -54,12 +53,14 @@ class ExcelProcessor:
             self._processRow(records_list)
             if not self.batch_processing:
                 self.save()
+            return True
         except Exception as e:
             self.logger.error(f"❌ Помилка під час upsert_record: {e}")
             traceback.print_exc()
             if self.workbook:
                 self.workbook.close()
                 self.workbook = None
+            return False
 
     def _processRow(self, records_list):
         id_col_idx = self.column_map.get(COLUMN_INCREMEMTAL.lower())
@@ -75,7 +76,6 @@ class ExcelProcessor:
 
         try:
             if last_val is not None:
-                # Спершу перетворюємо на float (на випадок 11164.0), а потім на int
                 current_id = int(float(last_val))
             else:
                 current_id = 0
@@ -83,6 +83,8 @@ class ExcelProcessor:
             raise ValueError(f'--- ⚠️ Помилка отримання поточного ID. Останнє значення: {last_val}')
 
         self.logger.debug(f'--- Визначено останній ID: {current_id} (з рядка {last_row_with_data})')
+
+        last_col_idx = EXCEL_LAST_COL_NUMBER
 
         # 3. Перебір кожного словника в масиві
         for data_dict in records_list:
@@ -102,13 +104,16 @@ class ExcelProcessor:
                 current_id += 1
 
                 # Вставляємо новий рядок через native Excel API
-                # Це автоматично копіює стилі та формули з рядка вище
                 try:
                     self.sheet.range((target_insert_row, 1)).api.entire_row.insert()
                 except Exception as e:
                     self.sheet.range(f'{target_insert_row - 1}:{target_insert_row - 1}').copy()
-                    # 2. Вставляємо скопійоване зі зсувом вниз (це створить новий рядок з форматом)
                     self.sheet.range(f'{target_insert_row}:{target_insert_row}').insert(shift='down')
+
+                # Зачистка строки від сміття
+                new_row_range = self.sheet.range((target_insert_row, 1), (target_insert_row, last_col_idx))
+                new_row_range.color = (255, 255, 255)  # Робимо білим
+                new_row_range.clear_contents()
 
                 # 1. Записуємо ID в першу колонку
                 self.sheet.range((target_insert_row, id_col_idx)).value = current_id
@@ -116,6 +121,8 @@ class ExcelProcessor:
                 # 2. Записуємо всі інші дані
                 for col_name, value in data_dict.items():
                     idx = self.column_map.get(col_name.lower())
+                    if idx == id_col_idx:
+                        continue
                     if idx:
                         self.sheet.range((target_insert_row, idx)).value = get_typed_value(value)
 
@@ -136,8 +143,6 @@ class ExcelProcessor:
                     pass
 
                 self.logger.debug(f'--- [+] Додано новий запис ID:{current_id} у рядок {target_insert_row}')
-
-                # Переходимо до наступного рядка
                 target_insert_row += 1
 
     def _find_existing_row(self, data_dict: Dict[str, Any]):

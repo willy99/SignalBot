@@ -12,7 +12,7 @@ DEFAULT_SERVICE_TYPE: Final[str] = 'призивом'
 COLUMN_INCREMEMTAL : Final[str] = '№'
 COLUMN_INSERT_DATE : Final[str] = 'Дата внесення'
 COLUMN_DESERTION_DATE : Final[str] = 'Дата СЗЧ'
-COLUMN_RAPORT_DATE : Final[str] = 'Дата Рапорт'
+COLUMN_REPORT_DATE : Final[str] = 'Дата Рапорт'
 COLUMN_MIL_UNIT : Final[str] = 'Військова частина'
 COLUMN_SERVICE_TYPE : Final[str] = 'Від служби'
 COLUMN_TITLE : Final[str] = 'Військове звання'
@@ -393,6 +393,7 @@ REVIEW_STATUS_MAP: Final[Dict[str, List[str]]] = {
     REPORT_REVIEW_STATUS_NON_ERDR: [REVIEW_STATUS_ASSIGNED, REVIEW_STATUS_NOT_ASSIGNED, REVIEW_STATUS_CLOSED, REVIEW_STATUS_WAITING],
     REPORT_REVIEW_STATUS_ERDR: [REVIEW_STATUS_ERDR],
     REPORT_REVIEW_STATUS_NON_EVIL: [REVIEW_STATUS_ERROR, REVIEW_STATUS_NOT_DIRECTED]
+
 }
 
 REPORT_SUBUNIT_EXCLUDE_ARTICLES = ['402']

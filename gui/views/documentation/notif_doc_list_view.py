@@ -1,6 +1,7 @@
 from nicegui import ui
 from gui.services.request_context import RequestContext
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
+from datetime import datetime  # 💡 ДОДАНО: імпорт datetime
 
 def render_notif_drafts_list_page(notif_ctrl, ctx: RequestContext):
     ui.label('Список пакетів для відправки повідомлень').classes('w-full text-center text-3xl font-bold mb-8')
@@ -17,6 +18,14 @@ def render_notif_drafts_list_page(notif_ctrl, ctx: RequestContext):
         # Безпечно отримуємо список людей (може бути порожнім, якщо JSON не розпарсився)
         payload = d.get('payload') or []
 
+        # 💡 БЕЗПЕЧНА ОБРОБКА ДАТИ
+        c_date = d.get('created_date')
+        if isinstance(c_date, datetime):
+            created_str = c_date.strftime('%Y-%m-%d %H:%M')
+        elif isinstance(c_date, str):
+            created_str = c_date[:16]
+        else:
+            created_str = '—'
 
         rows.append({
             'id': d.get('id'),
@@ -24,14 +33,14 @@ def render_notif_drafts_list_page(notif_ctrl, ctx: RequestContext):
             'out_number': d.get('out_number') or '—',
             'out_date': d.get('out_date') or '—',
             'people_count': len(payload),
-            'created_date': d.get('created_date', '—')[:16],  # Відрізаємо секунди для краси
+            'created_date': created_str,  # 💡 ВИПРАВЛЕНО: використовуємо оброблену змінну
             'status': d.get('status', DOC_STATUS_DRAFT),
         })
 
     # 2. Визначаємо колонки
     columns = [
         {'name': 'id', 'label': 'ID', 'field': 'id', 'align': 'center', 'sortable': True},
-        {'name': 'region', 'label': 'Звідки СЗЧ', 'field': 'region', 'left': 'center', 'sortable': True},
+        {'name': 'region', 'label': 'Звідки СЗЧ', 'field': 'region', 'align': 'center', 'sortable': True}, # 💡 ВИПРАВЛЕНО: 'left' змінено на 'align'
         {'name': 'out_number', 'label': 'Вихідний номер', 'field': 'out_number', 'align': 'left', 'sortable': True},
         {'name': 'out_date', 'label': 'Дата відправки', 'field': 'out_date', 'align': 'left', 'sortable': True},
         {'name': 'people_count', 'label': 'Осіб у пакеті', 'field': 'people_count', 'align': 'center',

@@ -183,7 +183,10 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, auth_manager: 
                                         on_click=lambda: handle_delete(person, person_ctrl, ctx, dialog, on_close=on_close)) \
                         .classes('bg-red-600 text-white px-8 h-12 text-lg font-bold shadow-md hover:bg-red-700 transition-colors').props('color="red"')
 
-                    if not is_delete_allowed(person):
+                    if getattr(person, 'id', None) is None:
+                        del_btn.disable()
+                        del_btn.tooltip('Неможливо видалити запис, який ще не збережено в базі.')
+                    elif not is_delete_allowed(person):
                         del_btn.disable()
                         del_btn.tooltip('Видалення можливе лише для записів, які були додані сьогодні або вчора.')
 

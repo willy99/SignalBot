@@ -35,3 +35,12 @@ def fix_date(e):
     if len(parts) == 2:
         current_year = datetime.now().year
         e.sender.value = f"{clean_val}.{current_year}"
+
+
+def mark_dirty(*args):
+    """Позначає, що на сторінці є незбережені зміни."""
+    ui.run_javascript('window.isDirty = true;')
+
+def mark_clean(*args):
+    """Скидає статус незбережених змін (наприклад, після успішного збереження)."""
+    ui.run_javascript('window.isDirty = false;')

@@ -162,3 +162,30 @@ class DocumentProcessingService:
             self.logger.debug(traceback.format_exc())
 
         return archive_list
+
+    def parse_document_only(self, source_file_path: str, original_filename: str) -> tuple[list[dict], list[str]]:
+        """
+        Тільки розпізнає документ і повертає сирі словники.
+        БЕЗ запису в Excel!
+        """
+        if not os.path.exists(source_file_path):
+            self.logger.warning(f"⚠️ Шлях {source_file_path} недоступний локально.")
+
+        local_temp_path = None
+        try:
+            _, ext = os.path.splitext(original_filename)
+            fd, local_temp_path = tempfile.mkstemp(suffix=ext)
+            os.close(fd)
+
+            with StorageFactory.create_client(config.DOCUMENT_STORAGE_PATH, self.log_manager) as client:
+                client.copy_file(source_file_path, local_temp_path)
+
+            doc_processor = DocProcessor(self.log_manager, local_temp_path, original_filename)
+            data_for_excel = doc_processor.process()  # Це список словників
+            file_parse_messages = doc_processor.check_for_errors(data_for_excel)
+
+            return data_for_excel, file_parse_messages
+
+        finally:
+            if local_temp_path and os.path.exists(local_temp_path):
+                os.remove(local_temp_path)

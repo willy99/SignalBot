@@ -28,6 +28,19 @@ class AppMenu:
         """Цей метод викликається на кожній сторінці для малювання меню"""
         ui.add_head_html('<link rel="stylesheet" href="/static/style.css">')
 
+        # DIRTY Status registrant
+        ui.add_head_html('''
+                <script>
+                    window.isDirty = false; // За замовчуванням сторінка "чиста"
+                    window.addEventListener('beforeunload', function (e) {
+                        if (window.isDirty) {
+                            e.preventDefault();
+                            e.returnValue = ''; // Тригер для нативного вікна браузера
+                        }
+                    });
+                </script>
+            ''')
+
         # Отримуємо дані юзера
         user_info = app.storage.user.get('user_info', {})
         user_role = user_info.get('role', '')

@@ -17,7 +17,6 @@ MODULE_REPORT_UNITS:Final[str] = 'report_units'
 MODULE_REPORT_GENERAL:Final[str] = 'report_general'
 MODULE_ADMIN:Final[str] = 'admin_panel'
 
-# Словник модулів (ІД в базі -> Красива назва для екрану)
 AVAILABLE_MODULES:Final[dict[str, str]] = {
     MODULE_SEARCH: 'Пошук (Головна)',
     MODULE_PERSON: 'База СЗЧ',

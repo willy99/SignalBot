@@ -6,6 +6,7 @@ from dics.deserter_xls_dic import *
 from collections import defaultdict
 
 from service.constants import DB_DATE_FORMAT
+from service.processing.DocumentProcessingService import DocumentProcessingService
 from service.storage.LoggerManager import LoggerManager
 from config import DESERTER_TAB_NAME, EXCEL_DATE_FORMAT
 from utils.utils import get_strint_fromfloat, get_year_safe
@@ -149,9 +150,10 @@ class ExcelReporter:
                 suspended = str(row[suspended_idx]).strip()
 
                 # ЛОГІКА ФІЛЬТРАЦІЇ ДЛЯ СЗЧ
-                match_exclude_article = cc_article in REPORT_SUBUNIT_EXCLUDE_ARTICLES
-                if match_exclude_article:
-                    continue
+                if not search_filter.include_402:
+                    match_exclude_article = cc_article in REPORT_SUBUNIT_EXCLUDE_ARTICLES
+                    if match_exclude_article:
+                        continue
 
                 match_des_year = True
                 des_year_less_equal = True
@@ -225,7 +227,6 @@ class ExcelReporter:
                     })
 
                 if match_period:
-
                     try:
                         if ret_mu_date:
                             days = (ret_mu_date -  des_date).days
@@ -407,6 +408,7 @@ class ExcelReporter:
             article_idx: Final[int] = self.excelProcessor.header.get(COLUMN_CC_ARTICLE) - 1
 
             last_row = self.excelProcessor.get_last_row()
+
             data = self.excelProcessor.sheet.range(f"A2:BB{last_row}").value
             people_history = defaultdict(list)
 
@@ -420,8 +422,8 @@ class ExcelReporter:
                 des_date_year = get_year_safe(des_date) or "Невідомо"
 
                 cc_article = get_strint_fromfloat(str(row[article_idx]))
-                if cc_article in REPORT_SUBUNIT_EXCLUDE_ARTICLES:
-                    continue
+                #if cc_article in REPORT_SUBUNIT_EXCLUDE_ARTICLES:
+                #    continue
 
                 ret_mu_date = row[ret_mu_idx]
                 ret_mu_date_year = get_year_safe(ret_mu_date)
@@ -429,6 +431,7 @@ class ExcelReporter:
                 ret_res_date_year = get_year_safe(ret_res_date)
 
                 name = str(row[name_idx]).strip()
+
                 id_number = get_strint_fromfloat(row[id_idx], "")
                 where = str(row[where_idx] or "Не вказано").strip()
                 service_type = str(row[service_type_idx] or "Не вказано").strip()
@@ -470,11 +473,11 @@ class ExcelReporter:
 
                 # 2. ПОВЕРНЕННЯ
                 ret_mu_str = str(ret_mu_date).strip()
-                if ret_mu_str and ret_mu_str != 'None' and ret_mu_date_year == des_date_year:
+                if ret_mu_str and ret_mu_str != 'None':
                     stats[des_date_year][rank_key]['ret_mu'] += 1
 
                 ret_res_str = str(ret_res_date).strip()
-                if ret_res_str and ret_res_str != 'None' and ret_res_date_year == des_date_year:
+                if ret_res_str and ret_res_str != 'None':
                     stats[des_date_year][rank_key]['ret_res'] += 1
 
                 # 3. ІНШІ СТАТУСИ. Відмови ми не рахуємо, памʼятай! 402 статя - лісом!
@@ -616,6 +619,7 @@ class ExcelReporter:
         days_idx = self.excelProcessor.header.get(COLUMN_SERVICE_DAYS, 1) - 1
         des_place_idx = self.excelProcessor.header.get(COLUMN_DESERTION_PLACE, 1) - 1
         exp_idx = self.excelProcessor.header.get(COLUMN_EXPERIENCE, 1) - 1
+        des_type_idx = self.excelProcessor.header.get(COLUMN_DESERTION_TYPE, 1) - 1
 
         results = []
         target_sheets = ['А0224', 'А7018']  # Назви ваших аркушів в Excel
@@ -641,6 +645,8 @@ class ExcelReporter:
                 raw_des = row[des_date_idx] if len(row) > des_date_idx else None
                 raw_ret = row[ret_date_idx] if len(row) > ret_date_idx else None
                 raw_call = row[call_idx] if len(row) > call_idx else None
+
+                raw_des_type = row[des_type_idx] if len(row) > des_type_idx else None
 
                 # 2. Пробуємо розпізнати (якщо не вийде - функція поверне None)
                 parsed_ins = self._parse_date(raw_ins) if raw_ins else None
@@ -669,7 +675,8 @@ class ExcelReporter:
                         'call_date': call_date,
                         'term_days': get_strint_fromfloat(term_days),
                         'desertion_place': des_place_clean,
-                        'experience': row[exp_idx] if (row[exp_idx]) else 'Невідомо'
+                        'experience': row[exp_idx] if (row[exp_idx]) else 'Невідомо',
+                        'desertion_type': str(raw_des_type).strip() if raw_des_type else ''
                     })
 
         return results
@@ -678,50 +685,45 @@ class ExcelReporter:
         if exclude_names is None:
             exclude_names = []
 
-        # Форматуємо дату так, як вона записана в логах на початку рядка (напр. "2026-03-04")
-        log_date_prefix = target_date.strftime(DB_DATE_FORMAT)
+        # ---------------------------------------------------------
+        # 1. ОТРИМУЄМО ПОВЕРНЕННЯ З АРХІВУ (замість логів)
+        # ---------------------------------------------------------
+        # Викликаємо існуючу функцію, передаючи порожній known_names,
+        # оскільки нас зараз цікавить просто список розпарсених людей з файлів "повернення"
+        dservice = DocumentProcessingService(self.log_manager)
+        archive_files = dservice.get_daily_archive_files(target_date, known_names=[])
 
-        log_path = self.log_manager.get_log_path()
-        unique_returns = {}
-        if os.path.exists(log_path):
-            with open(log_path, 'r', encoding='utf-8') as f:
-                current_person = {}
+        returns_from_files = []
+        for file_info in archive_files:
+            filename = file_info.get('filename', '').lower()
 
-                for line in f:
-                    if not line.startswith(log_date_prefix):
-                        continue
-                    match_name = re.search(r'ПЕРСОНА:\s*(.*)', line)
-                    if match_name:
-                        current_person = {'name': match_name.group(1).strip(), 'is_return': False}
-                    if 'ВИЯВЛЕНО ПОВЕРНЕННЯ' in line and current_person:
-                        current_person['is_return'] = True
+            # Перевіряємо, чи це файл про повернення
+            if 'повернення' in filename and 'неповернення' not in filename and 'не повернення' not in filename:
+                # В archive_list імена склеєні через кому, якщо їх кілька
+                names_str = file_info.get('name', '')
+                if names_str and names_str != 'Не вдалося розпізнати':
+                    # Розділяємо імена, якщо їх кілька в одному файлі
+                    names_list = [n.strip() for n in names_str.split(',')]
 
-                    match_ret_date = re.search(r'Дата повернення до в/частини:\s*(.*)', line)
-                    if match_ret_date and current_person:
-                        date_str = match_ret_date.group(1).strip()
-                        current_person['ret_date'] = date_str if date_str else "Не вказано"
-
-                    match_id = re.search(r'\(ID:(\d+)(?:\.\d+)?\)', line)
-                    if match_id and current_person and current_person.get('is_return'):
-                        person_id = str(match_id.group(1))  # Беремо тільки цифри, відкидаємо .0
-                        current_person['id'] = person_id
-
-                        last_name = current_person['name'].split()[0].lower()
+                    for name in names_list:
+                        last_name = name.split()[0].lower()
                         if not any(last_name in excl_name.lower() for excl_name in exclude_names):
-                            unique_returns[person_id] = current_person
+                            # Ми не маємо ID з файлу (на відміну від логів), тому ID знайдемо в Excel
+                            returns_from_files.append({
+                                'name': name,
+                                'ret_date': target_date.strftime('%d.%m.%Y')  # Ставимо дату звіту як дату повернення
+                            })
 
-                        current_person = {}  # Очищуємо для наступного запису
-        else:
-            self.logger.error(f"Файл логів не знайдено за шляхом {log_path}")
-
-        returns_from_logs = list(unique_returns.values())
-
-        if not returns_from_logs:
+        if not returns_from_files:
             return []
 
         # ---------------------------------------------------------
-        # 2. ЗБАГАЧУЄМО ДАНИМИ З EXCEL (Звання, Підрозділ, Дата СЗЧ)
+        # 2. ЗБАГАЧУЄМО ДАНИМИ З EXCEL (Звання, Підрозділ, Дата СЗЧ, ID)
         # ---------------------------------------------------------
+        # Перемикаємось на аркуш СЗЧ (про всяк випадок)
+        self.excelProcessor.switch_to_sheet(DESERTER_TAB_NAME, silent=True)
+
+        name_idx = self.excelProcessor.header.get(COLUMN_NAME, 1) - 1
         id_idx = self.excelProcessor.header.get(COLUMN_ID_NUMBER, 1) - 1
         title_idx = self.excelProcessor.header.get(COLUMN_TITLE_2, 1) - 1
         subunit_idx = self.excelProcessor.header.get(COLUMN_SUBUNIT, 1) - 1
@@ -730,24 +732,54 @@ class ExcelReporter:
         last_row = self.excelProcessor.get_last_row()
         data = self.excelProcessor.sheet.range(f"A2:BB{last_row}").value
 
-        excel_dict = {}
+        # Створюємо словник Excel не за ID, а за прізвищем (першим словом ПІБ),
+        # оскільки з файлу ми гарантовано маємо тільки ПІБ
+        excel_dict_by_lastname = {}
         if data:
             for row in data:
-                if not row or len(row) <= id_idx: continue
+                if not row or len(row) <= name_idx: continue
 
-                row_id = str(row[id_idx]).replace('.0', '').strip()
-                if row_id:
-                    excel_dict[row_id] = row
+                full_name = str(row[name_idx]).strip()
+                if full_name and full_name != 'None':
+                    last_name = full_name.split()[0].lower()
+
+                    # Якщо є кілька людей з однаковим прізвищем, зберігаємо їх у список
+                    if last_name not in excel_dict_by_lastname:
+                        excel_dict_by_lastname[last_name] = []
+                    excel_dict_by_lastname[last_name].append(row)
 
         final_returns = []
-        for ret in returns_from_logs:
-            person_id = ret.get('id')
-            excel_row = excel_dict.get(person_id, [])
+        for ret in returns_from_files:
+            person_name = ret['name']
+            last_name = person_name.split()[0].lower()
 
-            title = excel_row[title_idx] if len(excel_row) > title_idx else 'Не вказано'
-            subunit = excel_row[subunit_idx] if len(excel_row) > subunit_idx else 'Не вказано'
+            # Шукаємо людину в Excel за прізвищем
+            matching_rows = excel_dict_by_lastname.get(last_name, [])
 
-            raw_des_date = excel_row[des_date_idx] if len(excel_row) > des_date_idx else None
+            # Якщо знайшли точний збіг по ПІБ (або беремо перший збіг по прізвищу)
+            best_match_row = None
+            if len(matching_rows) == 1:
+                best_match_row = matching_rows[0]
+            elif len(matching_rows) > 1:
+                for row in matching_rows:
+                    if str(row[name_idx]).strip().lower() == person_name.lower():
+                        best_match_row = row
+                        break
+                if not best_match_row:
+                    best_match_row = matching_rows[0]  # Fallback
+
+            if best_match_row:
+                person_id = str(best_match_row[id_idx]).replace('.0', '').strip() if len(best_match_row) > id_idx else 'Не вказано'
+                title = best_match_row[title_idx] if len(best_match_row) > title_idx else 'Не вказано'
+                subunit = best_match_row[subunit_idx] if len(best_match_row) > subunit_idx else 'Не вказано'
+
+                raw_des_date = best_match_row[des_date_idx] if len(best_match_row) > des_date_idx else None
+            else:
+                person_id = 'Не знайдено в Excel'
+                title = 'Не вказано'
+                subunit = 'Не вказано'
+                raw_des_date = None
+
             des_date_str = "Невідомо"
             if isinstance(raw_des_date, datetime):
                 des_date_str = raw_des_date.strftime('%d.%m.%Y')
@@ -755,7 +787,7 @@ class ExcelReporter:
                 des_date_str = raw_des_date.strip()
 
             final_returns.append({
-                'name': ret['name'],
+                'name': person_name,
                 'id_number': person_id,
                 'title': title,
                 'subunit': subunit,
