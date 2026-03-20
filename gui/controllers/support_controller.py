@@ -10,7 +10,7 @@ from gui.controllers.person_controller import PersonController
 from service.processing.MyWorkFlow import MyWorkFlow
 from service.processing.processors.DocTemplator import DocTemplator
 from utils.utils import get_person_key_from_str
-from dics.deserter_xls_dic import COLUMN_INCREMEMTAL, MIL_UNITS, COLUMN_MIL_UNIT
+from dics.deserter_xls_dic import COLUMN_INCREMENTAL, MIL_UNITS, COLUMN_MIL_UNIT
 from gui.services.auth_manager import AuthManager
 
 
@@ -106,7 +106,7 @@ class SupportController:
                 continue
 
             person_dict = found_person_data.get('data', {})
-            logical_id = person_dict.get(COLUMN_INCREMEMTAL)
+            logical_id = person_dict.get(COLUMN_INCREMENTAL)
 
             print(f'Знайдено логічний ID: {logical_id}')
             package_type = draft.get('package_type')

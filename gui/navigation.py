@@ -8,6 +8,7 @@ from gui.controllers.dbr_controller import DbrController
 from gui.controllers.notif_controller import NotifController
 from gui.controllers.task_controller import TaskController
 from gui.controllers.inbox_controller import InboxController
+from gui.controllers.config_controller import ConfigController
 
 from gui.views.person import search_view
 from gui.views.person import batch_search_view
@@ -24,6 +25,7 @@ from gui.views.task import task_list_view, task_edit_view
 from gui.views.calendar import calendar_view
 from gui.views.admin.admin_permissions_view import render_permissions_page
 from gui.views.admin.admin_users_view import render_users_page
+from gui.views.admin.admin_settings_view import render_settings_page
 from gui.views import in_progress_view
 from gui.auth_routes import create_login_page, require_access
 from gui.views.documentation.file_search_view import render_file_search_page
@@ -55,6 +57,7 @@ def init_nicegui(workflow_obj):
     dbr_ctrl = DbrController(workflow_obj, auth_manager)
     inbox_ctrl = InboxController(workflow_obj, auth_manager)
     notif_ctrl = NotifController(doc_templator, workflow_obj, auth_manager)
+    config_ctrl = ConfigController(workflow_obj)
 
     app_menu = AppMenu(auth_manager, task_ctrl, inbox_ctrl)
 
@@ -215,12 +218,12 @@ def init_nicegui(workflow_obj):
         app_menu.render(ctx)
         calendar_view.render_calendar_page(task_ctrl, ctx)
 
-    @ui.page('/settings')
+    @ui.page('/admin/settings')
     @require_access(auth_manager, 'admin_panel', 'write')
     def settings_doc():
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
-        in_progress_view.render_in_progress()
+        render_settings_page(config_ctrl, ctx)
 
     @ui.page('/logs')
     @require_access(auth_manager, 'admin_panel', 'read')

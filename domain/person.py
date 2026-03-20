@@ -9,7 +9,7 @@ class Person(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     # Числові та ідентифікатори
-    id: int = Field(None, alias=COLUMN_INCREMEMTAL)
+    id: int = Field(None, alias=COLUMN_INCREMENTAL)
     rnokpp: Optional[Any] = Field(None, alias=COLUMN_ID_NUMBER)
 
     # Дати (тепер використовуємо Union, щоб бути гнучкими)

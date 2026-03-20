@@ -1,6 +1,7 @@
 import os
 import multiprocessing
 import argparse
+from service.config.ConfigService import ConfigService
 
 os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
@@ -14,6 +15,12 @@ import json
 import sys
 import config
 from config import DESERTER_TAB_NAME
+
+cfg_service = ConfigService()
+cfg_service.sync_defaults()
+cfg_service.apply_to_runtime()
+
+
 from service.processing.MyWorkFlow import MyWorkFlow
 import threading
 from gui.navigation import init_nicegui

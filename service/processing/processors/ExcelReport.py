@@ -606,7 +606,7 @@ class ExcelReporter:
         if target_date is None:
             target_date = datetime.now().date()
 
-        id_idx = self.excelProcessor.header.get(COLUMN_INCREMEMTAL, 1) - 1
+        id_idx = self.excelProcessor.header.get(COLUMN_INCREMENTAL, 1) - 1
         name_idx = self.excelProcessor.header.get(COLUMN_NAME, 1) - 1
         ins_date_idx = self.excelProcessor.header.get(COLUMN_INSERT_DATE, 1) - 1
         des_date_idx = self.excelProcessor.header.get(COLUMN_DESERTION_DATE, 1) - 1

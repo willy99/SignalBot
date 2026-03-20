@@ -92,7 +92,7 @@ class NotifController:
                 continue
 
             person_dict = found_person_data.get('data', {})
-            logical_id = person_dict.get(COLUMN_INCREMEMTAL)
+            logical_id = person_dict.get(COLUMN_INCREMENTAL)
 
             print(f'Знайдено логічний ID: {logical_id}')
 

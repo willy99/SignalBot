@@ -96,3 +96,14 @@ CREATE TABLE IF NOT EXISTS notif_docs (
 );
 
 
+
+CREATE TABLE IF NOT EXISTS sys_config (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    key_name TEXT NOT NULL UNIQUE,
+    value TEXT,
+    value_type TEXT NOT NULL,
+    description TEXT,
+    validation_rule TEXT
+);
+

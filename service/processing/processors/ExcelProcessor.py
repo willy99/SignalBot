@@ -63,7 +63,7 @@ class ExcelProcessor:
             return False
 
     def _processRow(self, records_list):
-        id_col_idx = self.column_map.get(COLUMN_INCREMEMTAL.lower())
+        id_col_idx = self.column_map.get(COLUMN_INCREMENTAL.lower())
         if not id_col_idx:
             self.logger.error("❌ Помилка: Не знайдено колонку №")
             return
@@ -162,7 +162,7 @@ class ExcelProcessor:
         des_col = idx_map.get(COLUMN_DESERTION_DATE.lower())
         ret_col = idx_map.get(COLUMN_RETURN_DATE.lower())
         res_col = idx_map.get(COLUMN_RETURN_TO_RESERVE_DATE.lower())
-        id_col = idx_map.get(COLUMN_INCREMEMTAL.lower())
+        id_col = idx_map.get(COLUMN_INCREMENTAL.lower())
 
         if not all([pib_col, dob_col, rnokpp_col, des_col]):
             self.logger.error(f"--- ❌ Помилка: Не всі обов'язкові колонки знайдені")
@@ -506,8 +506,6 @@ class ExcelProcessor:
             last_row = self.get_last_row()
             data = self.sheet.range(f"A2:BB{last_row}").value
 
-            print('find, last row = ' + str(last_row))
-
             if data is None:
                 return None
 
@@ -527,7 +525,7 @@ class ExcelProcessor:
                 rnokpp_val = get_strint_fromfloat(row[rnokpp_idx], "").strip()
 
                 match_name = (target_name == pib_val) if target_name else True
-                match_rnokpp = (target_rnokpp == rnokpp_val) if target_rnokpp else True
+                match_rnokpp = (target_rnokpp == rnokpp_val) if (target_rnokpp and target_rnokpp != 'None') else True
 
                 match_bday = True
                 if target_des_date:

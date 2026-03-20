@@ -82,7 +82,7 @@ class PersonController:
                 grouped_persons = {}
                 for person_model in person_list:
                     # Якщо з якихось причин mil_unit немає, ставимо дефолтний
-                    m_unit = getattr(person_model, 'mil_unit', None) or 'А0224'
+                    m_unit = getattr(person_model, 'mil_unit', None) or MIL_UNITS[0]
 
                     if m_unit not in grouped_persons:
                         grouped_persons[m_unit] = []
@@ -97,7 +97,7 @@ class PersonController:
                     for person_model in persons:
                         updated_data = person_model.to_excel_dict(partial_update)
                         print(f'>>> updated_data [{mil_unit}]: {updated_data}')
-                        idx = updated_data[COLUMN_INCREMEMTAL]
+                        idx = updated_data[COLUMN_INCREMENTAL]
 
                         # Відправляємо на збереження у процесор (він вже стоїть на правильному аркуші)
                         if self.processor.update_row_by_id(idx, updated_data, paint_color):

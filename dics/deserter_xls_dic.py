@@ -2,14 +2,13 @@ from typing import Final, Dict, List, Tuple
 
 # EXCEL FILE COLUMNS FOR DESERTERS (А0224 СЗЧ.XLSX)
 NA : Final[str] = '' # порожня ячейка, інформація не додана або не змогли витягнути
-DEFAULT_MIL_UNIT: Final[str] = 'А0224'
 
 DEFAULT_REVIEW_STATUS: Final[str] = 'не призначено'
 DEFAULT_REVIEW_STATUS_FOR_EDU_CENTER: Final[str] = 'призначено'
 DEFAULT_SERVICE_TYPE: Final[str] = 'призивом'
 
 # Відповідність назв колонок в екселі
-COLUMN_INCREMEMTAL : Final[str] = '№'
+COLUMN_INCREMENTAL : Final[str] = '№'
 COLUMN_INSERT_DATE : Final[str] = 'Дата внесення'
 COLUMN_DESERTION_DATE : Final[str] = 'Дата СЗЧ'
 COLUMN_REPORT_DATE : Final[str] = 'Дата Рапорт'
@@ -404,6 +403,7 @@ SUSPENDED_KEYWORD:Final[str] = 'призупинено В/С'
 DESERTION_TYPE_WEAPON_KEYWORD: Final[str] = 'СЗЧ зброя'
 
 MIL_UNITS: Final[List[str]] = ['А0224', 'А7018']
+DEFAULT_MIL_UNIT: Final[str] = MIL_UNITS[0]
 
 EXPERIENCED_MORE_THAN_DAYS: Final[int] = 82
 
