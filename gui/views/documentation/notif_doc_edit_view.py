@@ -27,7 +27,8 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
         'filter_title': None,
         'filter_des_region': None,
         'search_results': [],
-        'selected_candidates': set()
+        'selected_candidates': set(),
+        'dragged_idx': None
     }
 
     async def on_save_draft_click():
@@ -243,7 +244,8 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                         title2=state['filter_title'],
                         review_statuses=REVIEW_STATUS_MAP[REPORT_REVIEW_STATUS_NON_ERDR],
                         empty_kpp=YES,
-                        desertion_region=des_region_val
+                        desertion_region=des_region_val,
+                        include_402=False
                     )
 
                     results = await run.io_bound(person_ctrl.search, ctx, filter_obj)
@@ -402,14 +404,48 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
 
                 buffer_container.clear()
 
+                def handle_dragstart(idx):
+                    state['dragged_idx'] = idx
+
+                def handle_drop(target_idx):
+                    dragged_idx = state.get('dragged_idx')
+                    # Якщо ми кидаємо елемент на інше місце
+                    if dragged_idx is not None and dragged_idx != target_idx:
+                        # Витягуємо елемент зі старого місця
+                        item = state['buffer'].pop(dragged_idx)
+                        # Вставляємо на нове місце
+                        state['buffer'].insert(target_idx, item)
+                        state['dragged_idx'] = None
+
+                        mark_dirty()
+                        refresh_buffer_ui()  # Перемальовуємо список (seq_num оновляться самі)
+
                 with buffer_container:
                     if not buffer_data:
                         ui.label('Чернетка порожня. Знайдіть та додайте осіб ліворуч.').classes('text-gray-400 italic text-center w-full mt-10')
                     else:
                         ui.label(f'Всього у чернетці: {len(buffer_data)}').classes('text-sm font-bold text-blue-600 mb-2')
                         for i, p in enumerate(buffer_data):
-                            with ui.row().classes('w-full justify-between items-center bg-white p-2 border rounded shadow-sm hover:bg-gray-100 transition-colors'):
-                                with ui.column().classes('gap-0 w-3/4'):
+                            is_completed = state['status'] == DOC_STATUS_COMPLETED
+                            # Налаштовуємо стилі рядка. Додаємо cursor-move, якщо можна тягати
+                            row_classes = 'w-full justify-between items-center bg-white p-2 border rounded shadow-sm hover:bg-gray-100 transition-colors'
+                            if not is_completed:
+                                row_classes += ' cursor-move'
+
+                            # Створюємо сам рядок
+                            item_row = ui.row().classes(row_classes)
+
+                            # 💡 ВАЖЛИВО: Вішаємо події перетягування
+                            if not is_completed:
+                                item_row.props('draggable="true"')
+                                item_row.on('dragstart', lambda e, idx=i: handle_dragstart(idx))
+                                # dragover.prevent - це команда браузеру "сюди МОЖНА кидати об'єкти"
+                                item_row.on('dragover.prevent', lambda e: None)
+                                item_row.on('drop', lambda e, idx=i: handle_drop(idx))
+
+                            with item_row:
+                                with ui.column().classes('gap-0 w-3/4 pointer-events-none'):
+                                    # pointer-events-none запобігає перехопленню drag-подій внутрішніми текстами
                                     ui.label(f"{p['seq_num']}. {p['name']}").classes('font-bold text-sm truncate w-full')
                                     info_str = f"РНОКПП: {p.get('rnokpp', '—')} | СЗЧ: {p.get('desertion_date', '—')}"
                                     ui.label(info_str).classes('text-xs text-gray-500')
@@ -423,7 +459,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                                 with ui.row().classes('gap-1'):
                                     delete_button = ui.button(icon='close', color='red', on_click=lambda idx=i: on_remove_click(idx)).props('flat dense size=sm')
 
-                                    if state['status'] == DOC_STATUS_COMPLETED:
+                                    if is_completed:
                                         delete_button.disable()
 
                 if len(buffer_data) > 0 and state['status'] != DOC_STATUS_COMPLETED:

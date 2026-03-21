@@ -782,7 +782,23 @@ def test_return_sign(processor_factory):
     processor = processor_factory("any.docx")
 
     text = "03.06.2022 року солдат БОЛВАН Іван Васильович не повернувся з лікування до району виконання завдання за призначенням."
+
     assert False == processor._check_return_sign(text)
+
+
+    import re
+
+    file_name = "21.03.2026 Повернення особистої зброї (Бамбуля С.І перебуває в СЗЧ) рв 3 дшб(2).doc"
+    is_return_doc = bool(re.search(PATTERN_RETURN_SIGN_IN_FILE, file_name))
+    assert False == is_return_doc
+
+    file_name = "20.03.2026 СЗЧ неповернення з лікування (Бамбуля ВО.) рбс 3 дшб.doc"
+    is_return_doc = bool(re.search(PATTERN_RETURN_SIGN_IN_FILE, file_name))
+    assert False == is_return_doc
+
+    file_name = "18.03.2026 повернення після СЗЧ Бамбуля Д. Є. 1 дшр 1 дшб.docx"
+    is_return_doc = bool(re.search(PATTERN_RETURN_SIGN_IN_FILE, file_name))
+    assert True == is_return_doc
 
 
 def test_error_sign(processor_factory):

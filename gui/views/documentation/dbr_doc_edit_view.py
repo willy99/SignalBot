@@ -2,7 +2,7 @@ from nicegui import ui, run
 
 from dics.deserter_xls_dic import COLUMN_ORDER_ASSIGNMENT_NUMBER, COLUMN_ORDER_ASSIGNMENT_DATE, \
     COLUMN_ORDER_RESULT_NUMBER, COLUMN_ORDER_RESULT_DATE, COLUMN_KPP_NUMBER, COLUMN_KPP_DATE, COLUMN_DBR_NUMBER, \
-    COLUMN_DBR_DATE, VALID_PATTERN_DOC_NUM
+    COLUMN_DBR_DATE, VALID_PATTERN_DOC_NUM, VALID_PATTERN_DOC_NUM_FULL
 from gui.controllers.dbr_controller import DbrController
 from gui.controllers.person_controller import PersonController
 from service.storage.FileCacher import FileCacheManager
@@ -252,12 +252,16 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
 
                 new_dbr_num = state['current_person'].get('dbr_num', '').strip()
                 if new_dbr_num:
-                    for i, doc in enumerate(buffer_data):
-                        if i != edit_idx and doc.get('dbr_num') == new_dbr_num:
-                            ui.notify(
-                                f'Увага! Номер виходу на ДБР "{new_dbr_num}" вже використовується для іншої особи у цьому списку!',
-                                type='negative')
-                            return
+                    if re.match(VALID_PATTERN_DOC_NUM_FULL, new_dbr_num):
+                        for i, doc in enumerate(buffer_data):
+                            if i != edit_idx and doc.get('dbr_num') == new_dbr_num:
+                                ui.notify(
+                                    f'Увага! Номер виходу на ДБР "{new_dbr_num}" вже використовується для іншої особи у цьому списку!',
+                                    type='negative')
+                                return
+                    elif not re.match(VALID_PATTERN_DOC_NUM, new_dbr_num):
+                        ui.notify(f'Увага! Номер невірний "{new_dbr_num}" !', type='negative')
+                        return
 
                 selected_person = state['current_search_results'].get(selected_id, {})
 

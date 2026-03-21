@@ -1,4 +1,5 @@
 from config import EXCEL_SUPPORT_COLOR
+from domain.document_filter import DocumentFilter
 from gui.services.request_context import RequestContext
 from domain.person_filter import PersonSearchFilter
 from domain.person import Person
@@ -49,7 +50,7 @@ class SupportController:
         print(str(log_text))
         return log_text
 
-    def save_support_doc(self, ctx: RequestContext, city: str, support_number: str, support_date: str, buffer_data: list,
+    def save_support_doc(self, ctx: RequestContext, city: str, out_number: str, out_date: str, buffer_data: list,
                          draft_id: Optional[int] = None, package_type:str=DOC_PACKAGE_STANDART) -> int:
         self.logger.debug('UI:' + ctx.user_name + ': Запис змін для пакету супроводів: ' + str(draft_id))
         dservice = DocSupportService(self.db, ctx)
@@ -58,28 +59,28 @@ class SupportController:
             id=draft_id,
             created_by=ctx.user_id,
             city=city,
-            support_number=support_number,
-            support_date=support_date,
+            out_number=out_number,
+            out_date=out_date,
             payload=buffer_data,
             package_type=package_type
         )
 
-        return dservice.save_support_doc(doc_model)
+        return dservice.save_doc(doc_model)
 
-    def get_all_drafts(self, ctx: RequestContext) -> List[Dict[str, Any]]:
+    def search_drafts(self, ctx: RequestContext, search_filter: DocumentFilter) -> List[Dict[str, Any]]:
         dservice = DocSupportService(self.db, ctx)
-        docs = dservice.get_all_support_docs()
+        docs = dservice.search_docs(search_filter)
         return [doc.model_dump() for doc in docs]
 
     def delete_draft(self, ctx: RequestContext, draft_id: int):
         self.logger.debug('UI:' + ctx.user_name + ': Видаляємо пакет супроводів: ' + str(draft_id))
         dservice = DocSupportService(self.db, ctx)
-        return dservice.delete_support_doc(draft_id)
+        return dservice.delete_doc(draft_id)
 
     def get_support_doc_by_id(self, ctx: RequestContext, draft_id: int) -> Optional[Dict[str, Any]]:
         self.logger.debug('UI:' + ctx.user_name + ': Дістаємо пакет супроводів: ' + str(draft_id))
         dservice = DocSupportService(self.db, ctx)
-        doc_model = dservice.get_support_doc_by_id(draft_id)
+        doc_model = dservice.get_doc_by_id(draft_id)
         if doc_model:
             return doc_model.model_dump()
         return None
@@ -91,8 +92,8 @@ class SupportController:
         if not draft:
             raise ValueError(f"Чернетку №{draft_id} не знайдено!")
 
-        support_number = draft.get('support_number')
-        support_date = draft.get('support_date')
+        out_number = draft.get('out_number')
+        out_date = draft.get('out_date')
         payload = draft.get('payload', [])
 
         persons_to_update = []
@@ -111,12 +112,12 @@ class SupportController:
             print(f'Знайдено логічний ID: {logical_id}')
             package_type = draft.get('package_type')
             if logical_id is not None:
-                individual_support_number = ('/' + str(row_seq_num) if row_seq_num else '') if package_type != DOC_PACKAGE_STANDART else ''
+                individual_out_number = ('/' + str(row_seq_num) if row_seq_num else '') if package_type != DOC_PACKAGE_STANDART else ''
                 mil_unit = doc.get('mil_unit') if doc.get('mil_unit') else MIL_UNITS[0]
                 p = Person(
                     id=logical_id,
-                    dbr_date=support_date,
-                    dbr_num=support_number + individual_support_number,
+                    dbr_date=out_date,
+                    dbr_num=out_number + individual_out_number,
                     mil_unit=mil_unit
                 )
                 persons_to_update.append(p)

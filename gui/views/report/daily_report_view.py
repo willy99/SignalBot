@@ -15,14 +15,14 @@ def get_rank_category(title: str) -> str:
     if not title:
         return 'Солдати'
     title = str(title).lower()
-    if any(x in title for x in ['лейтенант', 'капітан', 'майор', 'полковник']):
+    if any(x in title for x in ['лейтенант', 'капітан', 'майор', 'полковник', 'офіцер']):
         return 'Офіцери'
     if any(x in title for x in ['сержант', 'старшина']):
         return 'Сержанти'
     return 'Солдати'
 
 
-def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskController, person_ctrl:PersonController, ctx: RequestContext):
+def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskController, person_ctrl: PersonController, ctx: RequestContext):
     ui.label('Щоденний звіт').classes('w-full text-center text-3xl font-bold mb-6')
     raw_place_options = person_ctrl.get_column_options().get(COLUMN_DESERTION_PLACE, [])
     place_options = [opt for opt in raw_place_options if str(opt).strip()]
@@ -31,11 +31,37 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
 
     state = {'data': [], 'returns': [], 'archive': [], 'matrix1_rows': [], 'matrix1_cols': [], 'matrix2_rows': [], 'matrix2_cols': [], 'selected_places': place_options.copy()}
 
+    # 💡 ФУНКЦІЯ ГЕНЕРАЦІЇ WORD
+    async def generate_word_report():
+        # Фільтруємо дані тільки для А0224, оскільки шаблон створено для них
+        data_A0224 = [r for r in state.get('data', []) if r.get('sheet_name') == 'А0224']
+
+        if not data_A0224:
+            ui.notify('Немає нових записів по А0224 для звіту!', type='warning')
+            return
+
+        export_word_btn.props('loading')
+        try:
+            target_date_str = date_filter.value
+            file_bytes, file_name = await run.io_bound(
+                report_ctrl.generate_daily_report_word,
+                target_date_str,
+                data_A0224
+            )
+            ui.download(file_bytes, file_name)
+            ui.notify('✅ Звіт Word успішно згенеровано та збережено в архів!', type='positive')
+        except Exception as e:
+            ui.notify(f'❌ Помилка генерації Word: {e}', type='negative')
+            print(f"Помилка Word: {e}")
+        finally:
+            export_word_btn.props(remove='loading')
+
     with ui.row().classes('w-full items-center justify-between mb-4 px-4 max-w-7xl mx-auto bg-gray-50 p-4 rounded-lg border'):
+        # Ліва частина: Фільтри
         with ui.row().classes('items-center gap-4'):
             ui.label('Оберіть дату:').classes('font-bold text-gray-700')
 
-            date_filter = date_input('Дата формування', state, 'support_date', default_value=datetime.now().strftime('%d.%m.%Y'),
+            date_filter = date_input('Дата формування', state, 'out_date', default_value=datetime.now().strftime('%d.%m.%Y'),
                                      blur_handler=fix_date).classes('flex-1')
 
             with date_filter.add_slot('append'):
@@ -49,10 +75,18 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
 
             under_3_days_cb = ui.checkbox('СЗЧ < 3 діб', value=True).classes('font-bold text-gray-700 mt-1')
 
-        generate_btn = ui.button('Сформувати звіт', icon='analytics', on_click=lambda: load_data()).props('color="primary" elevated')
-        export_btn = ui.button('В задачу', icon='add_task', on_click=lambda: create_report_task()) \
-            .props('color="secondary" outline') \
-            .bind_visibility_from(state, 'data', backward=lambda d: len(d) > 0 or len(state['returns']) > 0 or len(state['archive']) > 0)
+        # Права частина: Кнопки дій
+        with ui.row().classes('items-center gap-2'):
+            generate_btn = ui.button('Сформувати звіт', icon='analytics', on_click=lambda: load_data()).props('color="primary" elevated')
+
+            export_btn = ui.button('В задачу', icon='add_task', on_click=lambda: create_report_task()) \
+                .props('color="secondary" outline') \
+                .bind_visibility_from(state, 'data', backward=lambda d: len(d) > 0 or len(state['returns']) > 0 or len(state['archive']) > 0)
+
+            # 💡 НОВА КНОПКА
+            export_word_btn = ui.button('У Word (А0224)', icon='description', on_click=generate_word_report) \
+                .props('color="blue" outline') \
+                .bind_visibility_from(state, 'data', backward=lambda d: any(r.get('sheet_name') == 'А0224' for r in d))
 
     table_container = ui.column().classes('w-full max-w-7xl mx-auto shadow-md rounded-lg overflow-hidden border bg-white')
 
@@ -290,30 +324,30 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
                                 ui.label('Бажаю здоровʼя, за добу станом на 18:00').classes('font-bold text-gray-900 mb-2')
                                 ui.table(columns=state['matrix2_cols'], rows=state['matrix2_rows']).classes('w-full analytics-table').props('dense flat bordered')
 
-                        with ui.row().classes('flex-1 mt-2'):
-                            ui.table(columns=state['exp_summary_cols'], rows=state['exp_summary_rows']).classes('w-72').props('dense flat bordered hide-header')
+                                ui.table(columns=state['exp_summary_cols'], rows=state['exp_summary_rows']).classes('w-72').props('dense flat bordered hide-header')
 
                     # ==============================
                     # РЕНДЕР ДЕТАЛЬНИХ СПИСКІВ
                     # ==============================
-                    columns = [
-                        {'name': 'ins_date', 'label': COLUMN_INSERT_DATE, 'field': 'ins_date', 'align': 'left'},
-                        {'name': 'name', 'label': COLUMN_NAME, 'field': 'name', 'align': 'left', 'classes': 'font-bold'},
-                        {'name': 'title', 'label': COLUMN_TITLE, 'field': 'title', 'align': 'left'},
-                        {'name': 'subunit', 'label': COLUMN_SUBUNIT, 'field': 'subunit', 'align': 'left'},
-                        {'name': 'desertion_place', 'label': 'Обставини', 'field': 'desertion_place', 'align': 'left'},
-                        {'name': 'des_date', 'label': COLUMN_DESERTION_DATE, 'field': 'des_date', 'align': 'left'},
+                    columns_gone = [
+                        {'name': 'ins_date', 'label': COLUMN_INSERT_DATE, 'field': 'ins_date', 'align': 'left', 'classes': 'w-2/12', 'headerClasses': 'w-2/12'},
+                        {'name': 'name', 'label': COLUMN_NAME, 'field': 'name', 'align': 'left', 'classes': 'w-3/12 font-bold', 'headerClasses': 'w-3/12 font-bold'},
+                        {'name': 'title', 'label': COLUMN_TITLE, 'field': 'title', 'align': 'left', 'classes': 'w-2/12', 'headerClasses': 'w-2/12'},
+                        {'name': 'subunit', 'label': COLUMN_SUBUNIT, 'field': 'subunit', 'align': 'left', 'classes': 'w-2/12', 'headerClasses': 'w-2/12'},
+                        {'name': 'desertion_place', 'label': 'Обставини', 'field': 'desertion_place', 'align': 'left', 'classes': 'w-3/12', 'headerClasses': 'w-3/12'},
+                        {'name': 'desertion_region', 'label': 'Регіон', 'field': 'desertion_region', 'classes': 'hidden', 'headerClasses': 'hidden'},
                     ]
 
                     if data_A0224:
                         with ui.row().classes('w-full bg-blue-50 p-3 border-b border-t items-center justify-between mt-4'):
                             ui.label(f'ВЧ А0224 | Додано записів: {len(data_A0224)}').classes('font-bold text-blue-800 text-lg')
-                        ui.table(columns=columns, rows=data_A0224, row_key='name').classes('w-full').props('flat bordered dense')
+                        # Додаємо клас table-fixed для строгого дотримання заданої ширини
+                        ui.table(columns=columns_gone, rows=data_A0224, row_key='name').classes('w-full table-fixed').props('flat bordered dense')
 
                     if data_A7018:
                         with ui.row().classes('w-full bg-green-50 p-3 border-b border-t items-center justify-between mt-4'):
                             ui.label(f'ВЧ А7018 | Додано записів: {len(data_A7018)}').classes('font-bold text-green-800 text-lg')
-                        ui.table(columns=columns, rows=data_A7018, row_key='name').classes('w-full').props('flat bordered dense')
+                        ui.table(columns=columns_gone, rows=data_A7018, row_key='name').classes('w-full table-fixed').props('flat bordered dense')
 
                     # ==============================
                     # ПОВЕРНЕННЯ
@@ -323,12 +357,16 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
 
                     if return_data:
                         columns_returns = [
-                            {'name': 'ret_date', 'label': 'Дата повернення', 'field': 'ret_date', 'align': 'left', 'classes': 'text-green-700 font-bold'},
+                            {'name': 'ins_date', 'label': 'Дата внесення', 'field': 'ins_date', 'align': 'left'},
                             {'name': 'name', 'label': 'ПІБ', 'field': 'name', 'align': 'left', 'classes': 'font-bold'},
                             {'name': 'title', 'label': 'Звання', 'field': 'title', 'align': 'left'},
                             {'name': 'subunit', 'label': 'Підрозділ', 'field': 'subunit', 'align': 'left'},
-                            {'name': 'des_date', 'label': 'Був в СЗЧ з', 'field': 'des_date', 'align': 'left'},
+                            {'name': 'des_date', 'label': 'Дата СЗЧ', 'field': 'des_date', 'align': 'left', 'classes': 'text-red-700'},
+                            {'name': 'ret_date', 'label': 'Дата повернення', 'field': 'ret_date', 'align': 'left', 'classes': 'text-green-700 font-bold'},
                         ]
+                        for ret_item in return_data:
+                            if 'ins_date' not in ret_item or not ret_item['ins_date']:
+                                ret_item['ins_date'] = date_filter.value
                         ui.table(columns=columns_returns, rows=return_data, row_key='id_number').classes('w-full').props('flat bordered dense')
                     else:
                         ui.label('Записів про повернення не знайдено.').classes('text-gray-500 italic p-4 text-center w-full')
@@ -355,7 +393,7 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
             generate_btn.props(remove='loading')
 
     # 💡 Захист від помилки відсутності слота (await замість ui.timer)
-    ui.timer(0.1, lambda: background_tasks.create(load_data()), once=True)
+    # ui.timer(0.1, lambda: background_tasks.create(load_data()), once=True)
 
     async def create_report_task():
         if not state.get('data') and not state.get('returns'):

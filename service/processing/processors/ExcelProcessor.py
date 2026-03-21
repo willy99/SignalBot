@@ -401,6 +401,7 @@ class ExcelProcessor:
             kpp_num_idx = self.header.get(COLUMN_KPP_NUMBER, 1) - 1
             review_status_idx = self.header.get(COLUMN_REVIEW_STATUS, 1) - 1
             des_region_idx = self.header.get(COLUMN_DESERTION_REGION, 1) - 1
+            article_idx = self.header.get(COLUMN_CC_ARTICLE, 1) - 1
 
 
             for i, row in enumerate(data):
@@ -478,13 +479,19 @@ class ExcelProcessor:
                     review_status = str(row[review_status_idx]).strip()
                     match_status = review_status in filter_obj.review_statuses
 
+                match_402_article = True
+                if filter_obj.include_402 is not None and filter_obj.include_402 == False:
+                    article = get_strint_fromfloat(row[article_idx])
+                    print('>>> compare ' + str(article))
+                    match_402_article = article != '402'
+
                 match_des_region = True
                 if filter_obj.desertion_region:
                     desertion_region = str(row[des_region_idx]).strip().lower() if row[des_region_idx] else ''
                     match_des_region = desertion_region == filter_obj.desertion_region.lower()
 
                 if (match_text and match_des_year and match_des_year_from and match_des_year_to and
-                        match_order and match_title2 and match_service and match_kpp and match_status and match_des_region):
+                        match_order and match_title2 and match_service and match_kpp and match_status and match_des_region and match_402_article):
                     serialized_row = []
                     for cell in row:
                         self._transform_cell(cell, serialized_row)
@@ -561,9 +568,10 @@ class ExcelProcessor:
                 cell = str(cell).strip()
             serialized_row.append(cell)
 
-    def delete_record(self, row_id: int) -> bool:
+    def delete_record(self, row_id: int, mil_unit: str) -> bool:
         try:
             with self.lock:
+                self.switch_to_sheet(mil_unit, silent=True)
                 ids = self.sheet.range('A2').expand('down').value
 
                 if not isinstance(ids, list):
@@ -587,6 +595,8 @@ class ExcelProcessor:
     def update_row_by_id(self, row_id: int, updated_data: dict, paint_with_color=None):
         try:
             with self.lock:
+                mil_unit = updated_data[COLUMN_MIL_UNIT] if updated_data[COLUMN_MIL_UNIT] else MIL_UNITS[0]
+                self.switch_to_sheet(mil_unit, silent=True)
 
                 headers = self.sheet.range('A1').expand('right').value
                 header_map = {name: idx for idx, name in enumerate(headers)}

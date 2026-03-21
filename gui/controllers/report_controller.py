@@ -1,15 +1,19 @@
 from typing import List
 
+from config import REPORT_DAILY_DESERTION
 from gui.services.request_context import RequestContext
 from domain.person_filter import PersonSearchFilter
 from datetime import date
 from gui.services.auth_manager import AuthManager
 from service.processing.DocumentProcessingService import DocumentProcessingService
 from service.processing.MyWorkFlow import MyWorkFlow
-
+from service.processing.processors.DocTemplator import DocTemplator
+from service.storage.StorageFactory import StorageFactory
+import io
 
 class ReportController:
-    def __init__(self, worklow: MyWorkFlow, auth_manager: AuthManager):
+    def __init__(self, doc_templator: DocTemplator, worklow: MyWorkFlow, auth_manager: AuthManager):
+        self.doc_templator = doc_templator
         self.reporter = worklow.reporter
         self.auth_manager = auth_manager
         self.log_manager = worklow.log_manager
@@ -52,3 +56,17 @@ class ReportController:
 
     def is_admin(self):
         return self.auth_manager.has_access('admin_panel', 'read')
+
+    def generate_daily_report_word(self, target_date: str, raw_documents: list) -> tuple[bytes, str]:
+        file_bytes, file_name = self.doc_templator.make_daily_report(target_date, raw_documents)
+
+        try:
+            client = StorageFactory.create_client(REPORT_DAILY_DESERTION, self.log_manager)
+            with client:
+                destination_path = f"{REPORT_DAILY_DESERTION}{client.separator}{file_name}"
+                buffer = io.BytesIO(file_bytes)
+                client.save_file_from_buffer(destination_path, buffer)
+                self.log_manager.get_logger().info(f"✅ Звіт СЗЧ успішно збережено в архів: {destination_path}")
+        except Exception as e:
+            self.log_manager.get_logger().error(f"❌ Не вдалося зберегти звіт в архівну папку: {e}")
+        return file_bytes, file_name

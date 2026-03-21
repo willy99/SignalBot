@@ -23,8 +23,8 @@ def render_document_page(controller: SupportController, person_controller: Perso
                          file_cache_manager: FileCacheManager, ctx: RequestContext, draft_id: int = None):
     state = {
         'status': DOC_STATUS_DRAFT,
-        'support_date': '',
-        'support_number': '',
+        'out_date': '',
+        'out_number': '',
         'edit_idx': None,
         'buffer': [],
         'current_search_results': {},
@@ -43,8 +43,8 @@ def render_document_page(controller: SupportController, person_controller: Perso
                 controller.save_support_doc,
                 ctx,
                 city.value,
-                state.get('support_number', ''),
-                state.get('support_date', ''),
+                state.get('out_number', ''),
+                state.get('out_date', ''),
                 state['buffer'],
                 state.get('current_support_doc_id'),
                 package_type=DOC_PACKAGE_DETAILED
@@ -59,8 +59,8 @@ def render_document_page(controller: SupportController, person_controller: Perso
 
     async def on_generate_docs_click():
         try:
-            supp_num = state.get('support_number', '').strip()
-            supp_date = state.get('support_date', '')
+            supp_num = state.get('out_number', '').strip()
+            supp_date = state.get('out_date', '')
 
             if not supp_num or not supp_date:
                 ui.notify('Непогано б заповнити дату та номер супроводу!', type='warning')
@@ -88,8 +88,8 @@ def render_document_page(controller: SupportController, person_controller: Perso
 
     async def on_generate_logs_click():
         try:
-            supp_num = state.get('support_number', '').strip()
-            supp_date = state.get('support_date', '')
+            supp_num = state.get('out_number', '').strip()
+            supp_date = state.get('out_date', '')
 
             generate_logs_btn.props('loading')
             log_text = await run.io_bound(
@@ -111,8 +111,8 @@ def render_document_page(controller: SupportController, person_controller: Perso
             generate_logs_btn.props(remove='loading')
 
     async def on_send_dbr_click():
-        supp_num = state.get('support_number', '').strip()
-        supp_date = state.get('support_date', '')
+        supp_num = state.get('out_number', '').strip()
+        supp_date = state.get('out_date', '')
 
         if not supp_num or not supp_date:
             ui.notify('Непогано б заповнити дату та номер супроводу!', type='warning')
@@ -185,9 +185,9 @@ def render_document_page(controller: SupportController, person_controller: Perso
 
                 supp_number_input = ui.input('Загальний номер супроводу', placeholder='Наприклад: 642/123', validation={
                     'Формат має бути 642/ХХХХ (до 4 цифр)': lambda v: bool(re.match(VALID_PATTERN_DOC_NUM, str(v).strip())) if v else True
-                }).bind_value(state, 'support_number').classes('flex-1').props('hide-bottom-space')
+                }).bind_value(state, 'out_number').classes('flex-1').props('hide-bottom-space')
 
-                supp_date_input = date_input('Дата формування', state, 'support_date', blur_handler=fix_date).classes('flex-1')
+                supp_date_input = date_input('Дата формування', state, 'out_date', blur_handler=fix_date).classes('flex-1')
 
             with ui.row().classes('w-full gap-2 items-center'):
                 search_input = ui.input('Пошук військовослужбовця. Введіть прізвище...').classes('flex-grow').props(
@@ -574,11 +574,11 @@ def render_document_page(controller: SupportController, person_controller: Perso
                     if draft.get('city') in city.options:
                         city.value = draft['city']
 
-                    state['support_date'] = draft.get('support_date', '')
-                    supp_date_input.set_value(state['support_date'])
+                    state['out_date'] = draft.get('out_date', '')
+                    supp_date_input.set_value(state['out_date'])
 
-                    state['support_number'] = draft.get('support_number', '')
-                    supp_number_input.set_value(state['support_number'])
+                    state['out_number'] = draft.get('out_number', '')
+                    supp_number_input.set_value(state['out_number'])
 
                     state['buffer'] = draft.get('payload', [])
                     state['status'] = draft.get('status', DOC_STATUS_DRAFT)

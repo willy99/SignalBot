@@ -263,3 +263,53 @@ class DocTemplator:
         zip_filename = f"Повідомлення_{safe_out_num}_{out_date}.zip"
 
         return zip_buffer.getvalue(), zip_filename
+
+    def make_daily_report(self, target_date: str, raw_documents: list) -> tuple[bytes, str]:
+        """
+        Генерує щоденне донесення про СЗЧ у форматі Word.
+        """
+        # 💡 Вкажіть правильний шлях до вашого шаблону звіту
+        # Можете додати 'daily-report' у __init__ вашого класу
+        template_path = os.path.join(self.templates_dir, 'daily-report', 'СЗЧ.docx')
+
+        if not os.path.exists(template_path):
+            raise FileNotFoundError(f"Шаблон щоденного звіту не знайдено: {template_path}")
+
+        doc = DocxTemplate(str(template_path))
+
+        formatted_docs = []
+        for idx, raw in enumerate(raw_documents, start=1):
+            title = raw.get('title', 'Не вказано')
+            name = self.format_name(raw.get('name', 'Невідомо'))
+            des_place = str(raw.get('desertion_place') or 'Не вказано').strip()
+
+            # Якщо у вас в даних є des_region - беремо його. Якщо ні - залишаємо порожнім або 'Не вказано'
+            des_region = str(raw.get('desertion_region') or '').strip()
+
+            formatted_docs.append({
+                'number': idx,
+                'title': title.lower(),
+                'name': name,
+                'des_place': des_place,
+                'des_region': des_region
+            })
+
+        # Формуємо контекст для Word
+        context = {
+            'date': target_date,
+            'documents': formatted_docs
+        }
+
+        # Рендеримо документ
+        doc.render(context)
+
+        # Зберігаємо в оперативну пам'ять
+        byte_io = io.BytesIO()
+        doc.save(byte_io)
+        byte_io.seek(0)
+
+        # Формуємо красиву назву файлу
+        safe_date = target_date.replace('.', '_')
+        file_name = f"СЗЧ 79 одшбр {safe_date}.docx"
+
+        return byte_io.getvalue(), file_name

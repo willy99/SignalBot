@@ -1,3 +1,4 @@
+from domain.document_filter import DocumentFilter
 from service.docworkflow.DbrService import DbrService, DbrDoc
 from gui.services.auth_manager import AuthManager
 from gui.services.request_context import RequestContext
@@ -14,10 +15,12 @@ class DbrController:
         self.log_manager = workflow.log_manager
         self.logger = self.log_manager.get_logger()
 
-    def get_all_drafts(self, ctx: RequestContext):
+    def search_drafts(self, ctx: RequestContext, doc_filter: DocumentFilter):
         dservice = DbrService(self.db, ctx)
-        docs = dservice.get_all_dbr_docs()
+        docs = dservice.search_docs(doc_filter)
         return [doc.model_dump() for doc in docs]
+
+
 
     def save_dbr_doc(self, ctx: RequestContext, out_number: str, out_date: str, payload: list,
                      dbr_doc_id: int = None) -> int:
@@ -30,16 +33,16 @@ class DbrController:
             payload=payload
         )
 
-        return service.save_dbr_doc(doc_model)
+        return service.save_doc(doc_model)
 
     def delete_dbr_doc(self, ctx: RequestContext, dbr_doc_id: int):
         self.logger.debug('UI:' + ctx.user_name + ': Видаляємо пакет супроводів: ' + str(dbr_doc_id))
         dservice = DbrService(self.db, ctx)
-        return dservice.delete_dbr_doc(dbr_doc_id)
+        return dservice.delete_doc(dbr_doc_id)
 
     def get_dbr_doc_by_id(self, ctx: RequestContext, dbr_doc_id: int) -> dict:
         service = DbrService(self.db, ctx)
-        doc_model = service.get_dbr_doc_by_id(dbr_doc_id)
+        doc_model = service.get_doc_by_id(dbr_doc_id)
         if doc_model:
             return doc_model.model_dump()
         return None

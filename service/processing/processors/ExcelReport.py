@@ -616,6 +616,7 @@ class ExcelReporter:
         call_idx = self.excelProcessor.header.get(COLUMN_ENLISTMENT_DATE, 1) - 1
         days_idx = self.excelProcessor.header.get(COLUMN_SERVICE_DAYS, 1) - 1
         des_place_idx = self.excelProcessor.header.get(COLUMN_DESERTION_PLACE, 1) - 1
+        des_region_idx = self.excelProcessor.header.get(COLUMN_DESERTION_REGION, 1) - 1
         exp_idx = self.excelProcessor.header.get(COLUMN_EXPERIENCE, 1) - 1
         des_type_idx = self.excelProcessor.header.get(COLUMN_DESERTION_TYPE, 1) - 1
 
@@ -654,8 +655,10 @@ class ExcelReporter:
                 call_date = parsed_call.date() if parsed_call else None
                 term_days = row[days_idx]
                 raw_place = row[des_place_idx] if len(row) > des_place_idx else None
+                raw_region = row[des_region_idx] if len(row) > des_region_idx else None
 
                 des_place_clean = str(raw_place).strip() if raw_place else 'Не вказано'
+                des_region_clean = str(raw_region).strip() if raw_region else ''
                 des_type_clean = str(raw_des_type).strip().lower() if raw_des_type else ''
 
                 # ==========================================
@@ -677,6 +680,7 @@ class ExcelReporter:
                         'call_date': call_date,
                         'term_days': get_strint_fromfloat(term_days),
                         'desertion_place': des_place_clean,
+                        'desertion_region': des_region_clean,
                         'experience': row[exp_idx] if (row[exp_idx]) else 'Невідомо',
                         'desertion_type': des_type_clean
                     })

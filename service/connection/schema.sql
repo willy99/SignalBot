@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS support_docs (
     status TEXT DEFAULT 'DRAFT',
     package_type TEXT DEFAULT 'Standart',
     city TEXT,
-    support_number TEXT,
+    out_number TEXT,
+    out_date TEXT,                      -- Дата відправки
     payload TEXT,
 
     -- Зовнішній ключ: якщо видалити юзера, його документи видаляться теж (або можна прибрати ON DELETE CASCADE)

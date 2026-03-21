@@ -52,7 +52,7 @@ def init_nicegui(workflow_obj):
 
     support_ctrl = SupportController(doc_templator, workflow_obj, auth_manager)
     person_ctrl = PersonController(workflow_obj, auth_manager)
-    report_ctrl = ReportController(workflow_obj, auth_manager)
+    report_ctrl = ReportController(doc_templator, workflow_obj, auth_manager)
     task_ctrl = TaskController(workflow_obj, auth_manager)
     dbr_ctrl = DbrController(workflow_obj, auth_manager)
     inbox_ctrl = InboxController(workflow_obj, auth_manager)

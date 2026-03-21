@@ -11,7 +11,7 @@ class SupportDoc(BaseModel):
     region: Optional[str] = None
     status: str = DOC_STATUS_DRAFT
     city: Optional[str] = ''
-    support_number: Optional[str] = ''
-    support_date: Optional[str] = ''
+    out_number: Optional[str] = ''
+    out_date: Optional[str] = ''
     payload: List[Any] = Field(default_factory=list)
     package_type: Optional[str] = ''

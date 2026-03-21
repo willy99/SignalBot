@@ -50,11 +50,12 @@ class PersonController:
         self.logger.debug('UI:' + ctx.user_name + ': Видаляємо персону ' + str(person_model))
         try:
             id = person_model.id
+            mil_unit = person_model.mil_unit if person_model.mil_unit else MIL_UNITS[0]
 
             if id is None:
                 print("Помилка: не знайдено ID рядка для оновлення")
                 return False
-            success = self.processor.delete_record(id)
+            success = self.processor.delete_record(id, mil_unit)
             if success:
                 self.processor.save()
                 return True

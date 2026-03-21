@@ -1,4 +1,3 @@
-# service/config_service.py
 import sqlite3
 import config
 from typing import List
@@ -6,7 +5,6 @@ from domain.sys_config import SysConfig
 
 
 class ConfigService:
-    # 💡 ДЖЕРЕЛО ПРАВДИ ДЛЯ НОВИХ ПАРАМЕТРІВ
     DEFAULT_SETTINGS = [
         # Основні
         SysConfig(key_name='PROCESS_DOC', category='Основні', value='True', value_type='bool', description='Копіювати документ з Signal у цільову папку'),
@@ -19,21 +17,44 @@ class ConfigService:
         SysConfig(key_name='DOC_DIR', category='Шляхи', value='exchange\\ДД', value_type='str', description='Головна папка для документів'),
         SysConfig(key_name='EXCEL_DIR', category='Шляхи', value='exchange\\projekt407', value_type='str', description='Папка зберігання Excel'),
         SysConfig(key_name='BACKUP_DIR', category='Шляхи', value='exchange\\projekt407\\backups', value_type='str', description='Папка для бекапів'),
-        SysConfig(key_name='DESERTER_TAB_NAME', category='Шляхи', value='А0224', value_type='str', description='Назва основного аркуша СЗЧ в Excel'),
-        SysConfig(key_name='DESERTER_RESERVE_TAB_NAME', category='Шляхи', value='А7018', value_type='str', description='Назва резервного аркуша СЗЧ в Excel'),
+        SysConfig(key_name='FOLDER_YEAR_FORMAT', category='Шляхи', value='%Y', value_type='str', description='Частина (рік) папки архівів'),
+        SysConfig(key_name='FOLDER_MONTH_FORMAT', category='Шляхи', value='%m', value_type='str', description='Частина (місяць) папки архівів'),
+        SysConfig(key_name='FOLDER_DAY_FORMAT', category='Шляхи', value='%d.%m.%Y', value_type='str', description='Формат назви папки архівів. Приклад - %d.%m.%Y'),
+        SysConfig(key_name='TMP_DIR', category='Шляхи', value='~/tmp/', value_type='str', description='Локальна папка для тимчасового сміття'),
 
         # Час та Логіка
-        SysConfig(key_name='DAY_ROLLOVER_HOUR', category='Час та Логіка', value='16', value_type='int', description='Година (0-23) переходу на наступний день',
+        SysConfig(key_name='DAY_ROLLOVER_HOUR', category='Час та Логіка', value='16', value_type='int', description='Година (0-23) переходу на наступний робочий день',
                   validation_rule='min:0|max:23'),
         SysConfig(key_name='BACKUP_KEEP_DAYS', category='Час та Логіка', value='30', value_type='int', description='Скільки днів зберігати старі бекапи',
                   validation_rule='min:1|max:365'),
-        SysConfig(key_name='CHECK_INBOX_EVERY_SEC', category='Час та Логіка', value='60.0', value_type='float', description='Інтервал перевірки інбоксу (сек)',
-                  validation_rule='min:10.0'),
+        # 💡 Змінено на int та додано max!
+        SysConfig(key_name='CHECK_INBOX_EVERY_SEC', category='Час та Логіка', value='60', value_type='int', description='Інтервал перевірки інбоксу (сек)',
+                  validation_rule='min:10|max:3600'),
 
         # Технічні
-        SysConfig(key_name='EXCEL_CHUNK_SIZE', category='Технічні', value='2000', value_type='int', description='Розмір блоку для читання Excel', validation_rule='min:100'),
         SysConfig(key_name='LOG_MONITORING_MAX_LINES', category='Технічні', value='1000', value_type='int', description='Максимальна кількість рядків у логах',
-                  validation_rule='min:100|max:5000')
+                  validation_rule='min:100|max:5000'),
+        SysConfig(key_name='SOCKET_PATH', category='Технічні', value='/tmp/signal-bot.sock', value_type='str', description='Шлях для сокету сігнала'),
+        SysConfig(key_name='TCP_HOST', category='Технічні', value='127.0.0.1', value_type='str', description='Хост для сокету сігнала'),
+        SysConfig(key_name='TCP_PORT', category='Технічні', value='1234', value_type='int', description='Порт для сокету сігнала', validation_rule='min:1|max:65535'),
+
+        # Excel
+        SysConfig(key_name='DESERTER_TAB_NAME', category='Excel', value='А0224', value_type='str', description='Назва основного аркуша СЗЧ в Excel'),
+        SysConfig(key_name='DESERTER_RESERVE_TAB_NAME', category='Excel', value='А7018', value_type='str', description='Назва аркуша БРЕЗівців в Excel'),
+        SysConfig(key_name='EXCEL_CHUNK_SIZE', category='Excel', value='2000', value_type='int', description='Розмір блоку для читання Excel', validation_rule='min:100|max:5000'),
+        SysConfig(key_name='EXCEL_DATE_FORMAT', category='Excel', value='%d.%m.%Y', value_type='str', description='Формат дат в Excel'),
+        # 💡 Додано регулярку на 6 символів HEX
+        SysConfig(key_name='EXCEL_LIGHT_GRAY_COLOR', category='Excel', value='EEEEEE', value_type='str', description='Колір (HEX) для повідомлень',
+                  validation_rule='regex:^[0-9A-Fa-f]{6}$'),
+        SysConfig(key_name='EXCEL_BLUE_COLOR', category='Excel', value='BDD7EE', value_type='str', description='Колір (HEX) для відправок на ДБР',
+                  validation_rule='regex:^[0-9A-Fa-f]{6}$'),
+        SysConfig(key_name='EXCEL_SUPPORT_COLOR', category='Excel', value='E8FFFE', value_type='str', description='Колір (HEX) для супроводів',
+                  validation_rule='regex:^[0-9A-Fa-f]{6}$'),
+
+        # UI
+        SysConfig(key_name='UI_DATE_FORMAT', category='UI', value='DD.MM.YYYY', value_type='str', description='Формат дат для репрезентації в UI'),
+        SysConfig(key_name='MAX_QUERY_RESULTS', category='UI', value='50', value_type='int', description='Обмеження кількості записів на сторінку',
+                  validation_rule='min:10|max:500'),
     ]
 
     def __init__(self, db_path: str = config.DB_NAME):

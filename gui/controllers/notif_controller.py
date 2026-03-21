@@ -1,3 +1,4 @@
+from domain.document_filter import DocumentFilter
 from service.docworkflow.NotifService import NotifService, NotifDoc
 from gui.services.auth_manager import AuthManager
 from gui.services.request_context import RequestContext
@@ -17,9 +18,9 @@ class NotifController:
         self.logger = self.log_manager.get_logger()
         self.doc_templator = doc_templator
 
-    def get_all_drafts(self, ctx: RequestContext):
+    def search_drafts(self, ctx: RequestContext, search_filter: DocumentFilter):
         dservice = NotifService(self.db, ctx)
-        docs = dservice.get_all_docs()
+        docs = dservice.search_docs(search_filter)
         return [doc.model_dump() for doc in docs]
 
     def save_doc(self, ctx: RequestContext, region: str, out_number: str, out_date: str, payload: list,
