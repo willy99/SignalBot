@@ -88,7 +88,6 @@ def render_calendar_page(task_ctrl, ctx):
             draw_calendar()
         except Exception as e:
             ui.notify(f'Помилка завантаження задач: {e}', type='negative')
-            print(e)
         finally:
             refresh_btn.props(remove='loading')
 

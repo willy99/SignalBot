@@ -14,7 +14,6 @@ from utils.utils import get_person_key_from_str
 from dics.deserter_xls_dic import COLUMN_INCREMENTAL, MIL_UNITS, COLUMN_MIL_UNIT
 from gui.services.auth_manager import AuthManager
 
-
 class SupportController:
     def __init__(self, doc_templator: DocTemplator, worklow: MyWorkFlow, auth_manager: AuthManager):
         self.doc_templator = doc_templator
@@ -129,3 +128,7 @@ class SupportController:
 
         dservice = DocSupportService(self.db, ctx)
         return dservice.mark_as_completed(draft_id)
+
+    def is_existing_num(self, ctx: RequestContext, out_number: str, exclude_id: Optional[int] = None) -> bool:
+        dservice = DocSupportService(self.db, ctx)
+        return dservice.is_existing_num(out_number, exclude_id)

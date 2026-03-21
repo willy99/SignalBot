@@ -3,7 +3,7 @@ from gui.controllers.support_controller import SupportController
 from gui.services.request_context import RequestContext
 from service.constants import DOC_STATUS_COMPLETED, DOC_STATUS_DRAFT, DOC_PACKAGE_STANDART
 from datetime import datetime
-from gui.tools.ui_components import date_input, fix_date
+from gui.tools.ui_components import date_input, fix_date, confirm_delete_dialog
 from domain.document_filter import DocumentFilter
 
 
@@ -162,17 +162,7 @@ def render_drafts_list_page(controller: SupportController, ctx: RequestContext):
 
         async def on_delete(e):
             draft_id = e.args
-
-            dialog = ui.dialog()
-            with dialog, ui.card().classes('p-6 min-w-[300px]'):
-                ui.label('Увага!').classes('text-xl font-bold text-red-600 mb-2')
-                ui.label(f'Ви дійсно хочете видалити пакет №{draft_id}?').classes('text-gray-600 mb-6')
-
-                with ui.row().classes('w-full justify-end gap-2'):
-                    ui.button('Скасувати', on_click=lambda: dialog.submit(False)).props('flat color="gray"')
-                    ui.button('Видалити', on_click=lambda: dialog.submit(True)).props('color="red"')
-
-            result = await dialog
+            result = await confirm_delete_dialog(f'Ви дійсно хочете видалити пакет №{draft_id}?')
             if result:
                 try:
                     await run.io_bound(controller.delete_draft, ctx, draft_id)

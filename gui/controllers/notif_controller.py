@@ -1,3 +1,5 @@
+from typing import Optional
+
 from domain.document_filter import DocumentFilter
 from service.docworkflow.NotifService import NotifService, NotifDoc
 from gui.services.auth_manager import AuthManager
@@ -113,3 +115,7 @@ class NotifController:
 
         dservice = NotifService(self.db, ctx)
         return dservice.mark_as_completed(doc_id, out_number, out_date)
+
+    def is_existing_num(self, ctx: RequestContext, out_number: str, exclude_id: Optional[int] = None) -> bool:
+        dservice = NotifService(self.db, ctx)
+        return dservice.is_existing_num(out_number, exclude_id)

@@ -27,7 +27,7 @@ class BaseDocumentService(Generic[T]):
         return self.model_class(**r_dict)
 
     def get_all_docs(self, created_by: Optional[int] = None) -> List[T]:
-        query = f"SELECT * FROM {self.table_name}"
+        query = f"SELECT * FROM {self.table_name} WHERE (deleted = 0 OR deleted IS NULL)"
         params = []
 
         if created_by:
@@ -40,7 +40,7 @@ class BaseDocumentService(Generic[T]):
         return [self._parse_row(r) for r in rows]
 
     def get_doc_by_id(self, doc_id: int) -> Optional[T]:
-        query = f"SELECT * FROM {self.table_name} WHERE id = ?"
+        query = f"SELECT * FROM {self.table_name} WHERE id = ? AND (deleted = 0 OR deleted IS NULL)"
         row = self.db.__execute_fetch__(query, (doc_id,))
         if not row:
             return None
@@ -49,6 +49,8 @@ class BaseDocumentService(Generic[T]):
     def save_doc(self, doc: T) -> int:
         doc_data = doc.model_dump(exclude={'id'})
         doc_data['payload'] = json.dumps(doc_data.get('payload', []), ensure_ascii=False)
+        if 'deleted' in doc_data and doc_data['deleted'] is None:
+            doc_data['deleted'] = 0
 
         if doc_data.get('created_date') and isinstance(doc_data['created_date'], datetime):
             doc_data['created_date'] = doc_data['created_date'].strftime(DB_DATETIME_FORMAT)
@@ -78,11 +80,13 @@ class BaseDocumentService(Generic[T]):
         return True
 
     def delete_doc(self, doc_id: int):
-        self.db.delete_record(self.table_name, doc_id)
+        data = {'deleted': 1}
+        self.db.update_record(self.table_name, doc_id, data)
+        # self.db.delete_record(self.table_name, doc_id)
 
     def search_docs(self, doc_filter: DocumentFilter, created_by: Optional[int] = None) -> List[T]:
         """Універсальний пошук для всіх типів пакетів"""
-        query = f"SELECT * FROM {self.table_name} WHERE 1=1"
+        query = f"SELECT * FROM {self.table_name} WHERE (deleted = 0 OR deleted IS NULL)"
         params = []
 
         if created_by:
@@ -124,3 +128,27 @@ class BaseDocumentService(Generic[T]):
     def _apply_extra_filters(self, query: str, params: list, doc_filter: DocumentFilter) -> tuple[str, list]:
         """Перевизначте цей метод у дочірньому класі, якщо треба фільтрувати по специфічних полях (напр. region)"""
         return query, params
+
+    def is_existing_num(self, out_number: str, exclude_id: Optional[int] = None) -> bool:
+        """
+        Перевіряє, чи вже існує такий вихідний номер у базі.
+        Ігнорує видалені документи (deleted = 1) та порожні номери.
+        """
+        if not out_number or not str(out_number).strip():
+            return False
+
+        clean_number = str(out_number).strip()
+
+        # Шукаємо тільки серед активних (не видалених) документів
+        query = f"SELECT 1 FROM {self.table_name} WHERE out_number = ? AND (deleted = 0 OR deleted IS NULL)"
+        params = [clean_number]
+
+        # Якщо ми редагуємо існуючий документ, ігноруємо його власний ID
+        if exclude_id is not None:
+            query += " AND id != ?"
+            params.append(exclude_id)
+
+        # Виконуємо запит (якщо знайде хоч один рядок - поверне True)
+        row = self.db.__execute_fetch__(query, tuple(params))
+
+        return bool(row)

@@ -57,7 +57,6 @@ def test_process_doc_maly_simple(processor_factory):
     processor = processor_factory(filename)
     result = processor.process()
 
-    print(result)
     assert isinstance(result, list)
     assert len(result) > 0
     fields = result[0]
@@ -266,7 +265,6 @@ def test_return_data_is_correct_2(processor_factory):
     assert isinstance(result, list)
     assert len(result) == 1
     person = result[0]
-    print(str(result))
 
     assert person[COLUMN_NAME] == 'БУЙКО Дмитро Володимирович'
     assert person[COLUMN_RETURN_DATE] == '27.02.2026'
@@ -278,7 +276,6 @@ def test_processing_imaged_pdf_ocr(processor_factory):
     filename = '13_09.01.2025 СЗЧ з А2900 зап рота МУРАХОВСЬКИЙ Володимир Олегович.PDF'
     processor = processor_factory(filename)
     result = processor.process()
-    print(str(result))
     assert isinstance(result, list)
     assert len(result) == 1
     person = result[0]

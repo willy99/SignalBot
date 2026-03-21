@@ -50,7 +50,11 @@ class ExcelProcessor:
         self._load_workbook(sheet_name)
         self.switch_to_sheet(sheet_name)
         try:
-            self._processRow(records_list)
+            next_empty_row = self._processRow(records_list)
+            if next_empty_row:
+                # 💡 Викликаємо нашу нову функцію!
+                self.update_total_formula(next_empty_row)
+
             if not self.batch_processing:
                 self.save()
             return True
@@ -144,6 +148,7 @@ class ExcelProcessor:
 
                 self.logger.debug(f'--- [+] Додано новий запис ID:{current_id} у рядок {target_insert_row}')
                 target_insert_row += 1
+        return target_insert_row
 
     def _find_existing_row(self, data_dict: Dict[str, Any]):
         """Шукає номер рядка за ПІБ, Датою народження та РНОКПП через xlwings (Mac-версія)."""
@@ -482,7 +487,6 @@ class ExcelProcessor:
                 match_402_article = True
                 if filter_obj.include_402 is not None and filter_obj.include_402 == False:
                     article = get_strint_fromfloat(row[article_idx])
-                    print('>>> compare ' + str(article))
                     match_402_article = article != '402'
 
                 match_des_region = True
@@ -679,6 +683,27 @@ class ExcelProcessor:
         results.sort(key=lambda x: x['found'])
 
         return results
+
+    def update_total_formula(self, target_row: int):
+        """
+        Вставляє формулу =SUBTOTAL(...) у колонку 'I' під останнім записом.
+        target_row - рядок, куди треба вставити формулу.
+        """
+        last_data_row = target_row - 1
+        formula_str = f"=SUBTOTAL(103, $I$2:$I${last_data_row})"
+
+        try:
+            cell = self.sheet.range(f'I{target_row}')
+            cell.formula = formula_str
+            try:
+                if sys.platform == "win32":
+                    cell.api.Font.Bold = True
+                else:
+                    cell.api.font_object.bold = True
+            except:
+                pass
+        except Exception as e:
+            self.logger.error(f"❌ Помилка при оновленні формули SUBTOTAL: {e}")
 
     def get_last_row(self):
         last_row = self.sheet.used_range.last_cell.row

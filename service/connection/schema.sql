@@ -26,20 +26,6 @@ CREATE TABLE IF NOT EXISTS role_permissions (
 );
 
 -- Таблиця супровідних документів
-CREATE TABLE IF NOT EXISTS support_docs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_by INTEGER NOT NULL,
-    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    status TEXT DEFAULT 'DRAFT',
-    package_type TEXT DEFAULT 'Standart',
-    city TEXT,
-    out_number TEXT,
-    out_date TEXT,                      -- Дата відправки
-    payload TEXT,
-
-    -- Зовнішній ключ: якщо видалити юзера, його документи видаляться теж (або можна прибрати ON DELETE CASCADE)
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
-);
 
 -- Таблиця задач (Канбан)
 CREATE TABLE IF NOT EXISTS task (
@@ -69,6 +55,21 @@ CREATE TABLE IF NOT EXISTS subtask (
 );
 
 
+CREATE TABLE IF NOT EXISTS support_docs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_by INTEGER NOT NULL,
+    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status TEXT DEFAULT 'DRAFT',
+    package_type TEXT DEFAULT 'Standart',
+    city TEXT,
+    out_number TEXT,
+    out_date TEXT,                      -- Дата відправки
+    payload TEXT,
+    deleted INTEGER DEFAULT 0,
+
+    -- Зовнішній ключ: якщо видалити юзера, його документи видаляться теж (або можна прибрати ON DELETE CASCADE)
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+);
 
 
 CREATE TABLE IF NOT EXISTS dbr_docs (
@@ -79,6 +80,7 @@ CREATE TABLE IF NOT EXISTS dbr_docs (
     out_number TEXT,                    -- Вихідний номер
     out_date TEXT,                      -- Дата відправки
     payload TEXT,                       -- JSON масив з обраними особами
+    deleted INTEGER DEFAULT 0,
 
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -92,6 +94,7 @@ CREATE TABLE IF NOT EXISTS notif_docs (
     out_number TEXT,                    -- Вихідний номер
     out_date TEXT,                      -- Дата відправки
     payload TEXT,                       -- JSON масив з обраними особами
+    deleted INTEGER DEFAULT 0,
 
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
 );

@@ -96,8 +96,6 @@ class TaskService:
                 params.append(now_str)
 
         query += " ORDER BY updated_date DESC"
-        print(query)
-        print(str(params))
         rows = self.db.__execute_fetchall__(query, tuple(params))
         return [Task(**dict(r)) for r in rows]
 

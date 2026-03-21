@@ -30,3 +30,17 @@ CREATE INDEX IF NOT EXISTS idx_dbr_docs_status ON dbr_docs(status);
 
 CREATE INDEX IF NOT EXISTS idx_notif_docs_created_by ON notif_docs(created_by);
 CREATE INDEX IF NOT EXISTS idx_notif_docs_status ON notif_docs(status);
+
+
+CREATE UNIQUE INDEX IF NOT EXISTS udx_support_out_number
+ON support_docs(out_number)
+WHERE out_number IS NOT NULL AND out_number != '' AND deleted = 0;
+
+CREATE UNIQUE INDEX IF NOT EXISTS udx_dbr_out_number
+ON dbr_docs(out_number)
+WHERE out_number IS NOT NULL AND out_number != '' AND deleted = 0;
+
+CREATE UNIQUE INDEX IF NOT EXISTS udx_notif_out_number
+ON notif_docs(out_number)
+WHERE out_number IS NOT NULL AND out_number != '' AND deleted = 0;
+

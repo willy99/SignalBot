@@ -15,3 +15,4 @@ class SupportDoc(BaseModel):
     out_date: Optional[str] = ''
     payload: List[Any] = Field(default_factory=list)
     package_type: Optional[str] = ''
+    deleted: Optional[int] = None

@@ -7,7 +7,7 @@ from gui.controllers.person_controller import PersonController
 from gui.services.auth_manager import AuthManager
 from gui.services.request_context import RequestContext
 import re
-from gui.tools.ui_components import date_input, fix_date
+from gui.tools.ui_components import date_input, fix_date, confirm_delete_dialog
 from security_config import MODULE_PERSON, PERM_READ, PERM_DELETE, PERM_EDIT
 from datetime import datetime, timedelta
 
@@ -254,7 +254,9 @@ def edit_erdr(person: Person, person_ctrl, ctx: RequestContext, on_close=None):
 
 
 async def handle_delete(person, person_ctrl:PersonController, ctx:RequestContext, dialog, on_close=None):
-    with ui.notification(message='Зберігаю дані...', spinner=True, timeout=0) as n:
+    result = await confirm_delete_dialog('Ви дійсно бажаєте видалити цей запис?')
+    if not result: return
+    with ui.notification(message='Видаляю дані...', spinner=True, timeout=0) as n:
         await asyncio.sleep(0.1)  # Даємо UI відмалювати спінер
 
         success = await run.io_bound(person_ctrl.delete_record, ctx, person)

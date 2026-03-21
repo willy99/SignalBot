@@ -5,6 +5,7 @@ from gui.controllers.task_controller import TaskController
 from gui.services.auth_manager import AuthManager
 from gui.services.request_context import RequestContext
 import config
+from gui.tools.ui_components import confirm_delete_dialog
 from service.processing.parsers.ParserFactory import ParserFactory
 from domain.person import Person
 from gui.controllers.person_controller import PersonController
@@ -386,14 +387,8 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
 
 
     async def confirm_and_queue_delete(folder: str, filename: str, is_personal: bool):
-        dialog = ui.dialog()
-        with dialog, ui.card().classes('p-4 min-w-[300px]'):
-            ui.label(f'Видалити "{filename}"?').classes('font-bold')
-            with ui.row().classes('w-full justify-end mt-4 gap-2'):
-                ui.button('Ні', on_click=lambda: dialog.submit(False)).props('flat color="gray"')
-                ui.button('Так', on_click=lambda: dialog.submit(True)).props('color="red"')
-
-        if await dialog:
+        result = await confirm_delete_dialog(f'Видалити "{filename}"?')
+        if result:
             add_to_queue('delete', folder, filename, is_personal=is_personal)
 
     ui.timer(0.1, load_data, once=True)

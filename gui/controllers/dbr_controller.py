@@ -1,3 +1,5 @@
+from typing import Optional
+
 from domain.document_filter import DocumentFilter
 from service.docworkflow.DbrService import DbrService, DbrDoc
 from gui.services.auth_manager import AuthManager
@@ -19,8 +21,6 @@ class DbrController:
         dservice = DbrService(self.db, ctx)
         docs = dservice.search_docs(doc_filter)
         return [doc.model_dump() for doc in docs]
-
-
 
     def save_dbr_doc(self, ctx: RequestContext, out_number: str, out_date: str, payload: list,
                      dbr_doc_id: int = None) -> int:
@@ -105,3 +105,7 @@ class DbrController:
 
         dservice = DbrService(self.db, ctx)
         return dservice.mark_as_completed(dbr_doc_id, out_number, out_date)
+
+    def is_existing_num(self, ctx: RequestContext, out_number: str, exclude_id: Optional[int] = None) -> bool:
+        dservice = DbrService(self.db, ctx)
+        return dservice.is_existing_num(out_number, exclude_id)

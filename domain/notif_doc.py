@@ -13,3 +13,4 @@ class NotifDoc(BaseModel):
     out_date: Optional[str] = ''
     region: Optional[str] = ''
     payload: List[Any] = Field(default_factory=list)
+    deleted: Optional[int] = None

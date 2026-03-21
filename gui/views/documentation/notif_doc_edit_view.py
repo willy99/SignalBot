@@ -9,7 +9,7 @@ from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED, DB_DATE_FO
 from utils.utils import format_to_excel_date
 from gui.tools.validation import is_valid_doc_number
 import re
-from gui.tools.ui_components import date_input, fix_date, mark_clean, mark_dirty
+from gui.tools.ui_components import date_input, fix_date, mark_clean, mark_dirty, confirm_delete_dialog
 
 
 def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController,
@@ -32,6 +32,11 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
     }
 
     async def on_save_draft_click():
+        has_error = await validate_out_number()
+        if has_error:
+            ui.notify('Виправте помилки перед збереженням!', type='negative')
+            return
+
         save_draft_btn.disable()
         mark_clean()
         current_out_num = state.get('out_number', '').strip()
@@ -66,7 +71,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
             ui.notify('Заповніть дату та номер на КПП!', type='warning')
             return
         if not is_valid_doc_number(out_num):
-            ui.notify('❌ Формат номера має бути 642/ХХХХ', type='negative')
+            ui.notify('❌ Формат номера має бути 642/ХХХХX', type='negative')
             return
 
         await on_save_draft_click()
@@ -177,9 +182,26 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                     ui.label('Статус:').classes('text-gray-500 font-medium')
                     status_badge = ui.badge(status_text, color=badge_color).classes('text-sm px-2 py-1')
 
-                out_number_input = ui.input('Вихідний номер на КПП', placeholder='Наприклад: 642/123', validation={
-                    'Формат має бути 642/ХХХХ': lambda v: bool(re.match(VALID_PATTERN_DOC_NUM, v.strip())) if v else True
-                }).bind_value(state, 'out_number').classes('flex-1').props('hide-bottom-space')
+                out_number_input = ui.input('Вихідний номер на КПП', placeholder='Наприклад: 642/123').bind_value(state, 'out_number').classes('flex-1').props('hide-bottom-space')
+
+                async def validate_out_number(e=None):
+                    num = state.get('out_number', '').strip()
+                    out_number_input.props(remove='error error-message')
+                    if not num:
+                        return False
+
+                    if not re.match(VALID_PATTERN_DOC_NUM, num):
+                        out_number_input.props('error error-message="Формат має бути 642/ХХХХX (до 5 цифр)"')
+                        return True
+                    is_dup = await run.io_bound(notif_ctrl.is_existing_num, ctx, num, state.get('notif_doc_id'))
+
+                    if is_dup:
+                        out_number_input.props('error error-message="Цей номер вже існує в базі!"')
+                        ui.notify(f'Увага! Номер {num} вже зайнятий.', type='warning')
+                        return True
+                    return False
+
+                out_number_input.on('blur', validate_out_number)
 
                 out_date_input = date_input(
                     'Дата відправки', state, 'out_date', blur_handler=fix_date
@@ -377,15 +399,8 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
 
             async def on_remove_click(idx):
                 with right_panel:
-                    dialog = ui.dialog()
-                    with dialog, ui.card().classes('p-6 min-w-[300px]'):
-                        ui.label('Підтвердження').classes('text-xl font-bold text-red-600 mb-2')
-                        ui.label('Видалити особу зі списку чернетки?').classes('text-gray-600 mb-6')
-                        with ui.row().classes('w-full justify-end gap-2'):
-                            ui.button('Скасувати', on_click=lambda: dialog.submit(False)).props('flat color="gray"')
-                            ui.button('Видалити', on_click=lambda: dialog.submit(True)).props('color="red"')
-
-                if await dialog:
+                    result = await confirm_delete_dialog('Видалити особу зі списку чернетки?')
+                if result:
                     if 0 <= idx < len(state['buffer']):
                         state['buffer'].pop(idx)
                     await perform_search()

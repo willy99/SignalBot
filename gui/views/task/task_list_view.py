@@ -3,6 +3,8 @@ from gui.services.request_context import RequestContext
 from domain.task import *
 from gui.controllers.task_controller import TaskController
 from datetime import timedelta
+
+from gui.tools.ui_components import confirm_delete_dialog
 from service.constants import TASK_STATUS_COMPLETED, TASK_STATUS_NEW, TASK_STATUS_IN_PROGRESS
 from dics.deserter_xls_dic import TASK_TYPES
 
@@ -31,18 +33,7 @@ def get_card_colors(task, current_user_id: int) -> str:
 
 async def delete_task_with_confirm(task_id: int, controller: TaskController, ctx: RequestContext, refresh_callback):
     """Викликає вікно підтвердження і видаляє задачу, якщо користувач згоден"""
-    dialog = ui.dialog()
-    with dialog, ui.card().classes('p-6 min-w-[300px]'):
-        ui.label('Видалення задачі').classes('text-xl font-bold text-red-600 mb-2')
-        ui.label('Ви дійсно хочете назавжди видалити цю задачу?').classes('text-gray-600 mb-6')
-
-        with ui.row().classes('w-full justify-end gap-2'):
-            ui.button('Скасувати', on_click=lambda: dialog.submit(False)).props('flat color="gray"')
-            ui.button('Видалити', on_click=lambda: dialog.submit(True)).props('color="red"')
-
-    # Чекаємо, поки користувач натисне одну з кнопок
-    result = await dialog
-
+    result = await confirm_delete_dialog('Ви дійсно хочете назавжди видалити цю задачу?')
     if result:  # Якщо натиснув "Видалити" (повернулося True)
         try:
             controller.delete_task(ctx, task_id)

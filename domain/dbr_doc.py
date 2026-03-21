@@ -12,3 +12,4 @@ class DbrDoc(BaseModel):
     out_number: Optional[str] = ''
     out_date: Optional[str] = ''
     payload: List[Any] = Field(default_factory=list)
+    deleted: Optional[int] = None

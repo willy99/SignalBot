@@ -11,7 +11,7 @@ from domain.person_filter import PersonSearchFilter
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
 from gui.tools.validation import is_number, is_valid_doc_number
 from utils.utils import format_to_excel_date
-from gui.tools.ui_components import date_input, fix_date
+from gui.tools.ui_components import date_input, fix_date, confirm_delete_dialog
 import re
 
 
@@ -50,9 +50,7 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                     ui.label('Статус:').classes('text-gray-500 font-medium')
                     status_badge = ui.badge(status_text, color=badge_color).classes('text-sm px-2 py-1')
 
-                out_number_input = ui.input('Загальний вих. номер (СЕДО)', placeholder='Наприклад: 642/123', validation={
-                    'Формат має бути 642/ХХХХ (до 4 цифр)': lambda v: bool(re.match(VALID_PATTERN_DOC_NUM, v.strip())) if v else True
-                }) \
+                out_number_input = ui.input('Загальний вих. номер (СЕДО)', placeholder='Наприклад: 642/123') \
                     .bind_value(state, 'out_number') \
                     .on_value_change(lambda e: state['current_person'].update({'dbr_num': e.value + '/'})) \
                     .classes('flex-1').props('hide-bottom-space')
@@ -62,6 +60,25 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                     blur_handler=fix_date,
                 ).classes('flex-1').on_value_change(lambda e: state['current_person'].update({'dbr_date': e.value})) \
                     .classes('flex-1')
+
+            async def validate_out_number(e=None):
+                num = state.get('out_number', '').strip()
+                out_number_input.props(remove='error error-message')
+                if not num:
+                    return False
+
+                if not re.match(VALID_PATTERN_DOC_NUM, num):
+                    out_number_input.props('error error-message="Формат має бути 642/ХХХХX (до 5 цифр)"')
+                    return True
+                is_dup = await run.io_bound(dbr_ctrl.is_existing_num, ctx, num, state.get('dbr_doc_id'))
+
+                if is_dup:
+                    out_number_input.props('error error-message="Цей номер вже існує в базі!"')
+                    ui.notify(f'Увага! Номер {num} вже зайнятий.', type='warning')
+                    return True
+                return False
+
+            out_number_input.on('blur', validate_out_number)
 
             ui.label('Додавання військовослужбовців').classes('text-lg font-bold text-gray-700 mb-2')
 
@@ -307,16 +324,7 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
 
             async def on_remove_click(idx):
                 with right_panel:
-                    dialog = ui.dialog()
-                    with dialog, ui.card().classes('p-6 min-w-[300px]'):
-                        ui.label('Підтвердження').classes('text-xl font-bold text-red-600 mb-2')
-                        ui.label('Ви дійсно хочете видалити цю особу зі списку?').classes('text-gray-600 mb-6')
-
-                        with ui.row().classes('w-full justify-end gap-2'):
-                            ui.button('Скасувати', on_click=lambda: dialog.submit(False)).props('flat color="gray"')
-                            ui.button('Видалити', on_click=lambda: dialog.submit(True)).props('color="red"')
-
-                result = await dialog
+                    result = await confirm_delete_dialog('Ви дійсно хочете видалити цю особу зі списку?')
 
                 if result:
                     if 0 <= idx < len(state['buffer']):
@@ -395,6 +403,11 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                 complete_btn.set_visibility(len(buffer_data) > 0)
 
             async def on_save_draft_click():
+                has_error = await validate_out_number()
+                if has_error:
+                    ui.notify('Виправте помилки перед збереженням!', type='negative')
+                    return
+
                 save_draft_btn.disable()
                 try:
                     dbr_doc_id = await run.io_bound(
@@ -415,7 +428,7 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
             async def on_send_dbr_click():
                 out_num = state.get('out_number', '').strip()
                 if not is_valid_doc_number(out_num):
-                    ui.notify('❌ Увага! Невірний формат вихідного номера. Має бути 642/ХХХХ', type='negative')
+                    ui.notify('❌ Увага! Невірний формат вихідного номера. Має бути 642/ХХХХX', type='negative')
                     return
                 await on_save_draft_click()
 

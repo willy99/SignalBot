@@ -34,6 +34,10 @@ def render_support_standard_page(controller: SupportController, person_controlle
         if not state['buffer']:
             ui.notify('Неможливо зберегти: пакет порожній!', type='warning')
             return
+        has_error = await validate_out_number()
+        if has_error:
+            ui.notify('Виправте помилки перед збереженням!', type='negative')
+            return
 
         save_draft_btn.disable()
         try:
@@ -67,7 +71,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                 return
 
             if not is_valid_doc_number(supp_num):
-                ui.notify('❌ Увага! Невірний формат номера супроводу. Має бути 642/ХХХХ', type='negative')
+                ui.notify('❌ Увага! Невірний формат номера супроводу. Має бути 642/ХХХХX', type='negative')
                 return
 
             await on_save_draft_click()
@@ -116,7 +120,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
             return
 
         if not is_valid_doc_number(supp_num):
-            ui.notify('❌ Увага! Невірний формат номера супроводу. Має бути 642/ХХХХ', type='negative')
+            ui.notify('❌ Увага! Невірний формат номера супроводу. Має бути 642/ХХХХX', type='negative')
             return
 
         await on_save_draft_click()
@@ -187,9 +191,26 @@ def render_support_standard_page(controller: SupportController, person_controlle
                     status_badge = ui.badge(status_text, color=badge_color).classes('text-sm px-2 py-1')
                 city = ui.radio(['Миколаїв', 'Дніпро', 'Донецьк'], value='Миколаїв').props('inline')
 
-                supp_number_input = ui.input('Загальний номер супроводу', placeholder='Наприклад: 642/123', validation={
-                    'Формат має бути 642/ХХХХ (до 4 цифр)': lambda v: bool(re.match(VALID_PATTERN_DOC_NUM, str(v).strip())) if v else True
-                }).bind_value(state, 'out_number').classes('flex-1').props('hide-bottom-space')
+                supp_number_input = ui.input('Загальний номер супроводу', placeholder='Наприклад: 642/123').bind_value(state, 'out_number').classes('flex-1').props('hide-bottom-space')
+
+                async def validate_out_number(e=None):
+                    num = state.get('out_number', '').strip()
+                    supp_number_input.props(remove='error error-message')
+                    if not num:
+                        return False
+
+                    if not re.match(VALID_PATTERN_DOC_NUM, num):
+                        supp_number_input.props('error error-message="Формат має бути 642/ХХХХX (до 5 цифр)"')
+                        return True
+                    is_dup = await run.io_bound(controller.is_existing_num, ctx, num, state.get('current_support_doc_id'))
+
+                    if is_dup:
+                        supp_number_input.props('error error-message="Цей номер вже існує в базі!"')
+                        ui.notify(f'Увага! Номер {num} вже зайнятий.', type='warning')
+                        return True
+                    return False
+
+                supp_number_input.on('blur', validate_out_number)
 
                 supp_date_input = date_input('Дата формування', state, 'out_date', blur_handler=fix_date).classes('flex-1')
 
