@@ -10,4 +10,4 @@ __pycache__/
 /service/ml/output_model/
 /.nicegui/
 
-/tests_tmp
+/tests/tests_tmp

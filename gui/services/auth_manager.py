@@ -1,7 +1,7 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 from nicegui import app
 from gui.services.request_context import RequestContext
-from security_config import PERM_READ, PERM_EDIT, PERM_DELETE
+from dics.security_config import PERM_READ, PERM_EDIT, PERM_DELETE
 
 
 class AuthManager:

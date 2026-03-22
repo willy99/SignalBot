@@ -7,7 +7,7 @@ from nicegui import run
 from domain.person_filter import PersonSearchFilter
 from gui.services.request_context import RequestContext
 from config import MAX_QUERY_RESULTS
-from security_config import MODULE_PERSON, PERM_EDIT
+from dics.security_config import MODULE_PERSON, PERM_EDIT
 
 ui.add_css('''
     .my-sticky-header-table thead tr th {

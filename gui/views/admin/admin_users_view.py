@@ -1,7 +1,7 @@
 from nicegui import ui
 
 from gui.services.auth_manager import AuthManager
-from security_config import *
+from dics.security_config import *
 
 def render_users_page(auth_manager: AuthManager):
     ui.label('Керування користувачами').classes('w-full text-center text-3xl font-bold mb-8')

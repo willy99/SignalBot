@@ -1,5 +1,5 @@
 from nicegui import ui
-from security_config import *
+from dics.security_config import *
 
 def render_permissions_page(auth_manager):
     ui.label('Керування правами доступу').classes('w-full text-center text-3xl font-bold mb-8')

@@ -1,11 +1,11 @@
-from nicegui import ui, app
+from nicegui import app
 import urllib.parse
 
 from gui.controllers.inbox_controller import InboxController
 from gui.controllers.task_controller import TaskController
 from config import CHECK_INBOX_EVERY_SEC
 from gui.services.auth_manager import AuthManager
-from security_config import MODULE_DOC_SUPPORT, MODULE_DOC_DBR, MODULE_DOC_NOTIF, MODULE_PERSON, MODULE_REPORT_UNITS, MODULE_REPORT_GENERAL, MODULE_ADMIN
+from dics.security_config import MODULE_DOC_SUPPORT, MODULE_DOC_DBR, MODULE_DOC_NOTIF, MODULE_PERSON, MODULE_REPORT_UNITS, MODULE_REPORT_GENERAL, MODULE_ADMIN
 
 if not hasattr(app, 'alarmed_tasks'):
     app.alarmed_tasks = set()

@@ -8,7 +8,7 @@ from gui.services.auth_manager import AuthManager
 from gui.services.request_context import RequestContext
 import re
 from gui.tools.ui_components import date_input, fix_date, confirm_delete_dialog
-from security_config import MODULE_PERSON, PERM_READ, PERM_DELETE, PERM_EDIT
+from dics.security_config import MODULE_PERSON, PERM_DELETE, PERM_EDIT
 from datetime import datetime, timedelta
 
 def search_select(options: list, label: str, person: Person, field: str):
