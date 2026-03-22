@@ -145,7 +145,7 @@ class DocProcessor:
 
     def validate_record(self, record):
         if not check_birthday_id_number(record[COLUMN_BIRTHDAY], record[COLUMN_ID_NUMBER]):
-            self.logger.warning('------ ⚠️ Невідповідність дати народження та ІПН! ' + str(record[COLUMN_BIRTHDAY] + '/' + str(record[COLUMN_ID_NUMBER])))
+            self.logger.warning('------ ⚠️ Невідповідність дати народження та ІПН! ' + str(record[COLUMN_BIRTHDAY] + '/' + str(record[COLUMN_ID_NUMBER])) + '::' + str(record[COLUMN_NAME]))
             return False
 
         # might be exceptions here later, if critical errors

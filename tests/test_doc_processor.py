@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import pytest
 from pathlib import Path
 from service.processing.processors.DocProcessor import DocProcessor
@@ -6,19 +8,39 @@ from service.processing.parsers.MLParser import MLParser
 import config
 from service.storage.LoggerManager import LoggerManager
 
+
 @pytest.fixture
-def processor_factory():
+def mock_logger():
+    logger_manager = MagicMock(spec=LoggerManager)
+    logger = MagicMock()
+
+    # Функція, яка буде імітувати запис у консоль
+    def print_to_console(msg, *args, **kwargs):
+        # Додаємо колір або префікс, щоб бачити, що це саме з логера
+        print(f"\n[LOG-DEBUG] {msg}")
+
+    # Прив'язуємо функцію до методу debug (можна і до info/error)
+    logger.debug.side_effect = print_to_console
+    logger.info.side_effect = print_to_console
+    logger.error.side_effect = print_to_console
+
+    logger_manager.get_logger.return_value = logger
+    return logger_manager
+
+
+@pytest.fixture
+def processor_factory(mock_logger):
     """Фабрика для створення процесора з різними файлами"""
 
     def _create_processor(file_name):
         # Шлях до тестових файлів у папці tests/data
         base_path = Path(__file__).parent / "data" / file_name
-        return DocProcessor(LoggerManager(), str(base_path), file_name)
+        return DocProcessor(mock_logger, str(base_path), file_name)
 
     return _create_processor
 
 
-def test_process_doc_fedorov_simple(processor_factory):
+def test_process_doc_fedorov_simple(processor_factory, mock_logger):
     # Тестуємо реальний кейс Федорова (СЗЧ)
     filename = "01_25.01.2026 СЗЧ з РБпНС ББпС Федоров _доповідь.doc"
     processor = processor_factory(filename)
@@ -51,7 +73,7 @@ def test_process_doc_fedorov_simple(processor_factory):
     assert fields[COLUMN_EXECUTOR] == "МОГУТОВ Ігор Миколайович"
 
 
-def test_process_doc_maly_simple(processor_factory):
+def test_process_doc_maly_simple(processor_factory, mock_logger):
     # Тестуємо реальний кейс (СЗЧ)
     filename = "02_01.01.2026 СЗЧ з РВБЗ 2 сабатр САДН  МАЛИЙ Д.В.doc"
     processor = processor_factory(filename)
@@ -85,7 +107,7 @@ def test_process_doc_maly_simple(processor_factory):
     assert fields[COLUMN_DESERTION_TYPE] == 'СЗЧ'
 
 # tests error - missing one of the part in the document
-def test_process_doc_maly_error_missing_4(processor_factory):
+def test_process_doc_maly_error_missing_4(processor_factory, mock_logger):
     # Тестуємо реальний кейс, де заздалегідь знаємо, що PIECE_4 буде None
     filename = "03_01.01.2026 СЗЧ з РВБЗ 2 сабатр САДН  МАЛИЙ Д.В _ error.doc"
     processor = processor_factory(filename)
@@ -143,7 +165,7 @@ def test_process_doc_two_persons(processor_factory):
         assert "НЕГОЛЮК" in field[COLUMN_DESERT_CONDITIONS]
         assert field[COLUMN_EXECUTOR] == 'БЕЗКРОВНИЙ Володимир Володимирович'
 
-def test_process_doc_tzk_is_full(processor_factory):
+def test_process_doc_tzk_is_full(processor_factory, mock_logger):
     # перевірка, що тцк розпарсився правильно та повно. матьйїхйоп
     filename = "05_05.02.2026 СЗЧ з РВБЗ (Гавнов В.М.) рбс 3 дшб_tzk.doc"
     processor = processor_factory(filename)
@@ -156,7 +178,7 @@ def test_process_doc_tzk_is_full(processor_factory):
     assert person[COLUMN_TZK] == 'Крижопільським РТЦК та СП м. Крижопіль'
     assert person[COLUMN_TZK_REGION] == "Вінницька область"
 
-def test_process_docx_simple(processor_factory):
+def test_process_docx_simple(processor_factory, mock_logger):
     # тестування парсінгу docx
     filename = "06_02.01.2026 СЗЧ відсутність на військовій службі без поважних причин (Гавнов В.Є.) 9 дшр 3 дшб.docx"
     processor = processor_factory(filename)
@@ -187,7 +209,7 @@ def test_process_docx_simple(processor_factory):
     assert person[COLUMN_EXECUTOR] == 'САМУЛІК Роман Богданович'
     assert person[COLUMN_RETURN_DATE] == '30.12.2025'
 
-def test_return_date(processor_factory):
+def test_return_date(processor_factory, mock_logger):
     filename = "07_09.02.2026 повернення після СЗЧ 5 дшр 2 дшб ДУБ Є.М..doc"
     processor = processor_factory(filename)
     result = processor.process()
@@ -198,7 +220,7 @@ def test_return_date(processor_factory):
     assert person[COLUMN_DESERTION_DATE] == ''
     assert person[COLUMN_DESERTION_PLACE] == ''
 
-def test_not_a_desertion_case(processor_factory):
+def test_not_a_desertion_case(processor_factory, mock_logger):
     filename = "08_12.02.2026 Травмування  (КАША О.М.) МР.docx"
     processor = processor_factory(filename)
     result = processor.process()
@@ -206,7 +228,7 @@ def test_not_a_desertion_case(processor_factory):
     assert len(result) == 0
 
 
-def test_desertion_date_is_correct(processor_factory):
+def test_desertion_date_is_correct(processor_factory, mock_logger):
     filename = "09_15.02.2026 СЗЧ з лікування БУЙНОВ С.В. 3дшр 1дшб.doc"
     processor = processor_factory(filename)
     result = processor.process()
@@ -218,7 +240,7 @@ def test_desertion_date_is_correct(processor_factory):
     assert person[COLUMN_DESERTION_DATE] == '13.02.2026'  # винно бути не 15.02.2026!
 
 
-def test_402_refusal(processor_factory):
+def test_402_refusal(processor_factory, mock_logger):
     filename = "10_02.03.2026  відмова ДУМБЄКОВ С.А. 8 дшр 2 дшб.doc"
     processor = processor_factory(filename)
     result = processor.process()
@@ -245,7 +267,7 @@ def test_402_refusal(processor_factory):
     assert person[COLUMN_CC_ARTICLE] == '402'
 
 
-def test_return_data_is_correct(processor_factory):
+def test_return_data_is_correct(processor_factory, mock_logger):
     filename = "11_03.03.2026  повернення БУЙКО Д.В Танкова рота.docx"
     processor = processor_factory(filename)
     result = processor.process()
@@ -258,7 +280,7 @@ def test_return_data_is_correct(processor_factory):
     assert person[COLUMN_DESERTION_PLACE] == NA
     assert person[COLUMN_DESERTION_REGION] == NA
 
-def test_return_data_is_correct_2(processor_factory):
+def test_return_data_is_correct_2(processor_factory, mock_logger):
     filename = "12_27.02.2026  повернення БУЙКО Д.В. 8 дшр 2 дшб.doc"
     processor = processor_factory(filename)
     result = processor.process()
@@ -272,7 +294,7 @@ def test_return_data_is_correct_2(processor_factory):
     assert person[COLUMN_DESERTION_PLACE] == NA
     assert person[COLUMN_DESERTION_REGION] == NA
 
-def test_processing_imaged_pdf_ocr(processor_factory):
+def test_processing_imaged_pdf_ocr(processor_factory, mock_logger):
     filename = '13_09.01.2025 СЗЧ з А2900 зап рота МУРАХОВСЬКИЙ Володимир Олегович.PDF'
     processor = processor_factory(filename)
     result = processor.process()
@@ -294,7 +316,7 @@ def test_processing_imaged_pdf_ocr(processor_factory):
 
 #################### загальне модульне тестування регекспів ##############################
 
-def test_military_unit(processor_factory):
+def test_military_unit(processor_factory, mock_logger):
     processor = processor_factory("any.docx")
     text = "ДОПОВІДЬ про факт не прибуття до місця несення служби військовослужбовця військової частини А0224 (Командування ДШВ) Десантно-штурмових військ Збройних Сил України"
     res = processor._extract_mil_unit(text)
@@ -309,7 +331,7 @@ def test_military_unit(processor_factory):
     assert res == 'А7018'
 
 
-def test_name_extraction(processor_factory):
+def test_name_extraction(processor_factory, mock_logger):
     processor = processor_factory("any.docx")
     text = "ГАВНОВЄЗЕРСЬКИЙ Олег Вікторович, старший солдат, військовослужбовець військової служби за призивом, "
     res = processor._extract_name(text)
@@ -347,7 +369,7 @@ def test_name_extraction(processor_factory):
     res = processor._extract_name(text)
     assert "ДУМБА Михайло В’ячиславович" in res
 
-def test_title_extraction(processor_factory):
+def test_title_extraction(processor_factory, mock_logger):
     processor = processor_factory("any.docx")
     text = "ПУНДІК Олег Вікторович, старший солдат, військовослужбовець військової служби за призовом, "
     res = processor._extract_title(text)
@@ -377,7 +399,7 @@ def test_title_extraction(processor_factory):
     res = processor._extract_title_2(res)
     assert "офіцер" in res
 
-def test_rtzk_extraction(processor_factory):
+def test_rtzk_extraction(processor_factory, mock_logger):
     processor = processor_factory("any.docx")
     text = "Призваний Слов'янським ТЦК 10.09.2025. РНОКПП 1234567890"
     res = processor._extract_rtzk(text)
@@ -462,7 +484,7 @@ def test_rtzk_extraction(processor_factory):
     assert res == "Горішньоплавнінським ОМВК Полтавської області"
 
 
-def test_rtzk_region_extraction(processor_factory):
+def test_rtzk_region_extraction(processor_factory, mock_logger):
     processor = processor_factory("any.docx")
 
     text = "Призваний Центральним РТЦК та СП м. Київ 06.12.2024 року. "
@@ -520,7 +542,7 @@ def test_rtzk_region_extraction(processor_factory):
 
 
 
-def test_desertion_region_extraction(processor_factory):
+def test_desertion_region_extraction(processor_factory, mock_logger):
     processor = processor_factory("any.docx")
 
     text = "26.02.2026 року близько 08:00 години, під час перевірки наявності особового складу був відсутній солдат БУЙКО Олександр Васильович, який самовільно залишив район тимчасового місця розосередження підрозділу військової частини А0224 під час повітряної тривоги. Пошук військовослужбовця в районі зосередження підрозділу поблизу міста Миколаєва, Миколаївської області позитивного результату не приніс. Місцезнаходження військовослужбовця невідоме. Решта обставин з'ясовується. "
@@ -556,7 +578,7 @@ def test_desertion_region_extraction(processor_factory):
     assert "Запорізька область" in res
 
 
-def test_conscription_date(processor_factory):
+def test_conscription_date(processor_factory, mock_logger):
     processor = processor_factory("any.docx")
 
     text = "БУЙНОВ Олег Леонідович, Одружений. неодружений. Призваний Салтівським ВТТЦК та СП м. Харків. РНОКПП відомості не надано"
@@ -583,7 +605,7 @@ def test_conscription_date(processor_factory):
 
 
 
-def test_address_extraction(processor_factory):
+def test_address_extraction(processor_factory, mock_logger):
     processor = processor_factory("any.docx")
     text = "телефону +38(096)-896-7925. Близькі родичі: Батьки померли. Адреса реєстрації військовослужбовця: Запорізька обл, м. Василівка, вул. Кірова буд. 25."
     res = processor._extract_address(text)
@@ -597,7 +619,7 @@ def test_address_extraction(processor_factory):
     res = processor._extract_address(text)
     assert res == 'Кіровоградська обл., м. Олександрія, вул. Перспективна, буд. 16 кв. 52'
 
-def test_phone_extraction(processor_factory):
+def test_phone_extraction(processor_factory, mock_logger):
     processor = processor_factory("any.docx")
     text = "номер мобільного телефону (095) 64 73225. Адреса "
     res = processor._extract_phone(text)
@@ -607,7 +629,7 @@ def test_phone_extraction(processor_factory):
     res = processor._extract_phone(text)
     assert res == '0505184441'
 
-def test_where_desertion_extraction(processor_factory):
+def test_where_desertion_extraction(processor_factory, mock_logger):
     processor = processor_factory("any.docx")
     text = "30.01.2026 від тимчасово виконуючого обов’язки командира 4 аеромобільної роти аеромобільного батальйону надійшла доповідь про факт неповернення з лікування до району виконання завдання за призначенням військовослужбовця військової частини А0224 (без зброї)."
     file_name = '30.01.2026 СЗЧ з лікування ГАВНОВ Р.О. 4 аемр аемб.docx'
@@ -669,7 +691,7 @@ def test_where_desertion_extraction(processor_factory):
     res = processor._extract_desertion_place(text, file_name)
     assert res == 'НЦ'
 
-def test_milsubunit_extraction(processor_factory):
+def test_milsubunit_extraction(processor_factory, mock_logger):
     processor = processor_factory("any.docx")
 
     text = "ГАВНОВ Віталій Сергійович, солдат, військовослужбовець військової служби за призовом, розвідник-санітар 2 розвідувального відділення розвідувального взводу 1 десантно-штурмового батальйону військової частини А0224, 30.07.1986 року народження, українець, освіта середня . Призваний"
@@ -748,7 +770,7 @@ def test_milsubunit_extraction(processor_factory):
     res = processor.extract_military_subunit(text, file_name)
     assert res == 'Зап рота'
 
-def test_desertion_type_extraction(processor_factory):
+def test_desertion_type_extraction(processor_factory, mock_logger):
     processor = processor_factory("any.docx")
 
     text = "16.02.2026 близько 14:00 солдат БУЙНОВ Антон Олександрович, солдат БАРАНЧУК Максим Володимирович та солдат СКАЧКУК Сергій Іванович здійснили самовільне залишення району виконання бойового завдання підрозділом поблизу населеного пункту Шевченко Добропільської міської громади Покровського району Донецької області. Військовослужбовець: солдат БУЙНОВ Антон Олександрович з особистою зброєю (5,45 x 39 мм автомат АК-74, номер зброї 6811118, набої 5,45 x 39 в кількості 400 шт., граната DM52 – 2 шт.) солдат БАРАНЧУК Максим Володимирович з особистою зброєю (5,45 x 39 мм автомат АК-74, номер зброї 6811119, набої 5,45 x 45 в кількості 400 шт., граната DM52 – 2 шт.) солдат СКАЧКУК Сергій Іванович з особистою зброєю (5,45 x 39 мм автомат АК-74, номер зброї 6722224, набої 5,45 x 39 в кількості 400 шт"
@@ -775,7 +797,7 @@ def test_desertion_type_extraction(processor_factory):
     cc = processor._extract_cc_article(res)
     assert cc == '407'
 
-def test_return_sign(processor_factory):
+def test_return_sign(processor_factory, mock_logger):
     processor = processor_factory("any.docx")
 
     text = "03.06.2022 року солдат БОЛВАН Іван Васильович не повернувся з лікування до району виконання завдання за призначенням."
@@ -798,7 +820,7 @@ def test_return_sign(processor_factory):
     assert True == is_return_doc
 
 
-def test_error_sign(processor_factory):
+def test_error_sign(processor_factory, mock_logger):
     processor = processor_factory("any.docx")
 
     text = "ДОПОВІДЬ про факт помилково поданих даних щодо  неповернення після проходження військово-лікарської комісії військовослужбовця військової частини А0224 (Командування ДШВ) Десантно-штурмових військ Збройних Сил України"
@@ -810,7 +832,7 @@ def test_error_sign(processor_factory):
     text = "ДОПОВІДЬ про факт помилкового повідомлення про  неповенення з лікування до району виконання завдання за призначенням військовослужбовця військової частини А0224 (7 КШР) Десантно-штурмових військ Збройних Сил України "
     assert True == processor._check_error_sign(text)
 
-def test_desertion_sign(processor_factory):
+def test_desertion_sign(processor_factory, mock_logger):
     processor = processor_factory("any.docx")
     text = "16.02.2026 від командира аеромобільного батальйону надійшла доповідь про факт необережного поводження зі зброєю військовослужбовців військової частини А0224. Попередньо встановлено, що особовий склад підрозділів військової частини А0224 відповідно до бойового наказу командира військової частини А0224 №3/3т/БН від 15.02.2026 веде наступальні (штурмові) дій батальйонів I ешелону на глибину виконання найближчого та подальшого завдання при проведенні наступальних (штурмових) дій при виконанні заходів з національної безпеки та оборони, відсічі та стримуванні збройної агресії. Встановлено, що під час виконання бойового завдання, в районі виконання завдань за призначенням, у визначеній смузі відповідальності військової частини А0224, внаслідок необережного поводження зі зброєю отримав поранення військовослужбовець військової частини А0224: Солдат за призовом БУЙНОВ Олександр Олексійович, номер обслуги мінометного відділення взводу вогневої підтримки 1 аеромобільної роти аеромобільного батальйону військової частини А0224, діагноз: “Вогнепальне кульове(15.02.2026) сліпе поранення медіальної поверхні нижньої третини лівої гомілки, проникаюче? в гомілково-стопний суглоб”. Військовослужбовця евакуйовано до ПХГ Петропавлівка. Військовослужбовець перебував у засобах індивідуального захисту та з особистою зброєю. Ознак алкогольного та наркотичного сп’яніння не виявлено. Решта обставин з'ясовується."
     record = {
@@ -820,12 +842,10 @@ def test_desertion_sign(processor_factory):
 
     assert False == processor.is_desertion_case(record)
 
-def test_ml(processor_factory):
+def test_ml(processor_factory, mock_logger):
     text = "НЕГОЛЮК Володимир Васильович, старший солдат, військовослужбовець військової служби за призовом, стрілець-помічник гранатометника 2  десантно-штурмового відділення 3 десантно-штурмового взводу 7 десантно-штурмової роти 2 десантно-штурмового батальйону військової частини А0224, 29.10.1981 року народження, українець, освіта вища, Національний транспортний університет м. Київ у 2010 році. Одружений. неодружений. Призваний Салтівським ВТТЦК та СП м. Харків, 25.10.2025 року. РНОКПП відомості не надано"
-    log_manager = LoggerManager()
 
-
-    parser = MLParser(model_path=config.ML_MODEL_PATH, log_manager=log_manager)
+    parser = MLParser(model_path=config.ML_MODEL_PATH, log_manager=mock_logger)
     extracted = parser.parse_text(text)
     assert extracted[COLUMN_TZK] == 'Салтівським ВТТЦК та СП м. Харків'
     assert extracted[COLUMN_TITLE] == 'старший солдат'
