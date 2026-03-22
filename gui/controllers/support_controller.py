@@ -71,6 +71,10 @@ class SupportController:
         docs = dservice.search_docs(search_filter)
         return [doc.model_dump() for doc in docs]
 
+    def count_search_docs(self, ctx: RequestContext, search_filter: DocumentFilter):
+        dservice = DocSupportService(self.db, ctx)
+        return dservice.count_search_docs(search_filter, None)
+
     def delete_draft(self, ctx: RequestContext, draft_id: int):
         self.logger.debug('UI:' + ctx.user_name + ': Видаляємо пакет супроводів: ' + str(draft_id))
         dservice = DocSupportService(self.db, ctx)

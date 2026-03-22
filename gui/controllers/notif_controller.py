@@ -25,6 +25,10 @@ class NotifController:
         docs = dservice.search_docs(search_filter)
         return [doc.model_dump() for doc in docs]
 
+    def count_search_docs(self, ctx: RequestContext, search_filter: DocumentFilter):
+        dservice = NotifService(self.db, ctx)
+        return dservice.count_search_docs(search_filter, None)
+
     def save_doc(self, ctx: RequestContext, region: str, out_number: str, out_date: str, payload: list,
                  doc_id: int = None) -> int:
         service = NotifService(self.db, ctx)

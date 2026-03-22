@@ -689,6 +689,7 @@ class ExcelProcessor:
         Вставляє формулу =SUBTOTAL(...) у колонку 'I' під останнім записом.
         target_row - рядок, куди треба вставити формулу.
         """
+        return
         last_data_row = target_row - 1
         formula_str = f"=SUBTOTAL(103, $I$2:$I${last_data_row})"
 

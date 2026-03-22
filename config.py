@@ -83,6 +83,7 @@ TCP_PORT : Final = 1234
 # Налаштування бази даних
 DB_NAME = os.path.join(os.path.expanduser("~/work/signalBot/signal-data"), "bot_data.db")
 MAX_QUERY_RESULTS = 50
+RECORDS_PER_PAGE = 10
 
 # ML
 ML_MODEL_JSON = os.path.join(os.path.expanduser("~/work/signalBot/signal-data"), "training_data.jsonl")

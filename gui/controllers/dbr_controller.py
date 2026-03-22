@@ -22,6 +22,10 @@ class DbrController:
         docs = dservice.search_docs(doc_filter)
         return [doc.model_dump() for doc in docs]
 
+    def count_search_docs(self, ctx: RequestContext, search_filter: DocumentFilter):
+        dservice = DbrService(self.db, ctx)
+        return dservice.count_search_docs(search_filter, None)
+
     def save_dbr_doc(self, ctx: RequestContext, out_number: str, out_date: str, payload: list,
                      dbr_doc_id: int = None) -> int:
         service = DbrService(self.db, ctx)

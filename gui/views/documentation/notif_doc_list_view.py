@@ -1,9 +1,11 @@
 from nicegui import ui, run
+
+from config import RECORDS_PER_PAGE
 from gui.controllers.notif_controller import NotifController
 from gui.services.request_context import RequestContext
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
 from datetime import datetime
-from gui.tools.ui_components import date_input, fix_date, confirm_delete_dialog
+from gui.tools.ui_components import date_input, fix_date, confirm_delete_dialog, ServerPagination
 from domain.document_filter import DocumentFilter
 
 
@@ -24,7 +26,8 @@ def render_notif_drafts_list_page(notif_ctrl: NotifController, ctx: RequestConte
         {'name': 'out_number', 'label': 'Вихідний номер', 'field': 'out_number', 'align': 'left', 'sortable': True},
         {'name': 'out_date', 'label': 'Дата відправки', 'field': 'out_date', 'align': 'left', 'sortable': True},
         {'name': 'people_count', 'label': 'Осіб у пакеті', 'field': 'people_count', 'align': 'center', 'sortable': True},
-        {'name': 'created_date', 'label': 'Створено', 'field': 'created_date', 'align': 'left', 'sortable': True},
+        {'name': 'created_date', 'label': 'Дата створення', 'field': 'created_date', 'align': 'left', 'sortable': True},
+        {'name': 'created_by', 'label': 'Ким створено', 'field': 'created_by', 'align': 'left', 'sortable': True},
         {'name': 'status', 'label': 'Статус', 'field': 'status', 'align': 'center', 'sortable': True},
         {'name': 'actions', 'label': 'Дії', 'field': 'actions', 'align': 'center'},
     ]
@@ -46,16 +49,24 @@ def render_notif_drafts_list_page(notif_ctrl: NotifController, ctx: RequestConte
                 status_options = {'Всі': 'Всі', DOC_STATUS_DRAFT: 'Чернетка', DOC_STATUS_COMPLETED: 'Відправлено'}
                 ui.select(status_options, label='Статус').bind_value(filter_state, 'status').classes('w-36').props('dense outlined')
 
-                async def apply_filters():
+                async def apply_filters(reset_page=True):
                     search_btn.props('loading')
+                    if reset_page:
+                        pager.reset()
+
                     try:
                         # 1. Пакуємо дані з UI у наш Dataclass
                         doc_filter = DocumentFilter(
                             date_from=filter_state['date_from'] or None,
                             date_to=filter_state['date_to'] or None,
                             out_number=filter_state['out_number'].strip() if filter_state['out_number'] else None,
-                            status=filter_state['status'] if filter_state['status'] != 'Всі' else None
+                            status=filter_state['status'] if filter_state['status'] != 'Всі' else None,
+                            limit=pager.limit,
+                            offset=pager.offset
                         )
+
+                        total_count = await run.io_bound(notif_ctrl.count_search_docs, ctx, doc_filter)
+                        pager.update_total(total_count)
 
                         # 2. Викликаємо контролер
                         drafts = await run.io_bound(notif_ctrl.search_drafts, ctx, doc_filter)
@@ -63,9 +74,10 @@ def render_notif_drafts_list_page(notif_ctrl: NotifController, ctx: RequestConte
                         # 3. Форматуємо отримані об'єкти NotifDoc для таблиці
                         formatted_rows = []
                         for d in drafts:
-                            # Якщо d - це Pydantic модель, беремо атрибути. Якщо словник (на всяк випадок) - get
+
                             payload = getattr(d, 'payload', []) if not isinstance(d, dict) else d.get('payload', [])
                             c_date = getattr(d, 'created_date', None) if not isinstance(d, dict) else d.get('created_date')
+                            c_created = getattr(d, 'created_by', None) if not isinstance(d, dict) else d.get('created_by')
 
                             if isinstance(c_date, datetime):
                                 created_str = c_date.strftime('%Y-%m-%d %H:%M')
@@ -81,6 +93,7 @@ def render_notif_drafts_list_page(notif_ctrl: NotifController, ctx: RequestConte
                                 'out_date': getattr(d, 'out_date', d.get('out_date') if isinstance(d, dict) else None) or '—',
                                 'people_count': len(payload),
                                 'created_date': created_str,
+                                'created_by': c_created,
                                 'status': getattr(d, 'status', d.get('status') if isinstance(d, dict) else DOC_STATUS_DRAFT),
                             })
 
@@ -108,8 +121,12 @@ def render_notif_drafts_list_page(notif_ctrl: NotifController, ctx: RequestConte
                       ).props('color="primary"').classes('shrink-0 h-10')
 
         # Створюємо порожню таблицю
-        table = ui.table(columns=columns, rows=[], row_key='id').classes('w-full max-w-6xl shadow-md')
+        table = ui.table(columns=columns, rows=[], row_key='id').classes('w-full max-w-8xl shadow-md')
         table.props('flat bordered separator=horizontal row-key="id"')
+        pager = ServerPagination(
+            records_per_page=RECORDS_PER_PAGE,
+            on_change=lambda: ui.timer(0.1, lambda: apply_filters(reset_page=False), once=True)
+        )
 
         # Кастомні слоти
         table.add_slot('body-cell-status', '''

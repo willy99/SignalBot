@@ -1,10 +1,11 @@
 from nicegui import ui, run
 
+from config import RECORDS_PER_PAGE
 from gui.controllers.dbr_controller import DbrController
 from gui.services.request_context import RequestContext
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
 from datetime import datetime
-from gui.tools.ui_components import date_input, fix_date, confirm_delete_dialog
+from gui.tools.ui_components import date_input, fix_date, confirm_delete_dialog, ServerPagination
 from domain.document_filter import DocumentFilter  # 💡 Імпортуємо наш новий фільтр
 
 
@@ -24,7 +25,8 @@ def render_dbr_drafts_list_page(dbr_ctrl: DbrController, ctx: RequestContext):
         {'name': 'out_number', 'label': 'Вихідний номер', 'field': 'out_number', 'align': 'left', 'sortable': True},
         {'name': 'out_date', 'label': 'Дата відправки', 'field': 'out_date', 'align': 'left', 'sortable': True},
         {'name': 'people_count', 'label': 'Осіб у пакеті', 'field': 'people_count', 'align': 'center', 'sortable': True},
-        {'name': 'created_date', 'label': 'Створено', 'field': 'created_date', 'align': 'left', 'sortable': True},
+        {'name': 'created_date', 'label': 'Дата створення', 'field': 'created_date', 'align': 'left', 'sortable': True},
+        {'name': 'created_by', 'label': 'Ким створено', 'field': 'created_by', 'align': 'left', 'sortable': True},
         {'name': 'status', 'label': 'Статус', 'field': 'status', 'align': 'center', 'sortable': True},
         {'name': 'actions', 'label': 'Дії', 'field': 'actions', 'align': 'center'},
     ]
@@ -47,16 +49,23 @@ def render_dbr_drafts_list_page(dbr_ctrl: DbrController, ctx: RequestContext):
                 ui.select(status_options, label='Статус').bind_value(filter_state, 'status').classes('w-36').props('dense outlined')
 
                 # 💡 Асинхронна функція, яка смикає БД
-                async def apply_filters():
+                async def apply_filters(reset_page=True):
                     search_btn.props('loading')
+                    if reset_page:
+                        pager.reset()
                     try:
                         # 1. Пакуємо дані з UI у наш Dataclass
                         doc_filter = DocumentFilter(
                             date_from=filter_state['date_from'] or None,
                             date_to=filter_state['date_to'] or None,
                             out_number=filter_state['out_number'].strip() if filter_state['out_number'] else None,
-                            status=filter_state['status'] if filter_state['status'] != 'Всі' else None
+                            status=filter_state['status'] if filter_state['status'] != 'Всі' else None,
+                            limit=pager.limit,
+                            offset=pager.offset
                         )
+
+                        total_count = await run.io_bound(dbr_ctrl.count_search_docs, ctx, doc_filter)
+                        pager.update_total(total_count)
 
                         # 2. Викликаємо контролер (виконується в окремому потоці, щоб не блокувати UI)
                         drafts = await run.io_bound(dbr_ctrl.search_drafts, ctx, doc_filter)
@@ -80,6 +89,7 @@ def render_dbr_drafts_list_page(dbr_ctrl: DbrController, ctx: RequestContext):
                                 'out_date': d.get('out_date') or '—',
                                 'people_count': len(payload),
                                 'created_date': created_str,
+                                'created_by': d.get('created_by'),
                                 'status': d.get('status', DOC_STATUS_DRAFT),
                             })
 
@@ -107,8 +117,12 @@ def render_dbr_drafts_list_page(dbr_ctrl: DbrController, ctx: RequestContext):
                       ).props('color="primary"').classes('shrink-0 h-10')
 
         # Створюємо порожню таблицю (вона заповниться при першому виклику apply_filters)
-        table = ui.table(columns=columns, rows=[], row_key='id').classes('w-full max-w-6xl shadow-md')
+        table = ui.table(columns=columns, rows=[], row_key='id').classes('w-full max-w-8xl shadow-md')
         table.props('flat bordered separator=horizontal row-key="id"')
+        pager = ServerPagination(
+            records_per_page=RECORDS_PER_PAGE,
+            on_change=lambda: ui.timer(0.1, lambda: apply_filters(reset_page=False), once=True)
+        )
 
         # Кастомні слоти
         table.add_slot('body-cell-status', '''

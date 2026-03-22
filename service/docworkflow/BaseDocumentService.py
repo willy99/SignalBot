@@ -23,21 +23,10 @@ class BaseDocumentService(Generic[T]):
             r_dict['payload'] = json.loads(r_dict['payload'])
         else:
             r_dict['payload'] = []
-        # Ініціалізуємо конкретну модель (NotifDoc, DbrDoc тощо)
+        username = r_dict.pop('username', None)
+        if username:
+            r_dict['created_by'] = username
         return self.model_class(**r_dict)
-
-    def get_all_docs(self, created_by: Optional[int] = None) -> List[T]:
-        query = f"SELECT * FROM {self.table_name} WHERE (deleted = 0 OR deleted IS NULL)"
-        params = []
-
-        if created_by:
-            query += " WHERE created_by = ?"
-            params.append(created_by)
-
-        query += " ORDER BY created_date DESC"
-        rows = self.db.__execute_fetchall__(query, tuple(params))
-
-        return [self._parse_row(r) for r in rows]
 
     def get_doc_by_id(self, doc_id: int) -> Optional[T]:
         query = f"SELECT * FROM {self.table_name} WHERE id = ? AND (deleted = 0 OR deleted IS NULL)"
@@ -84,11 +73,30 @@ class BaseDocumentService(Generic[T]):
         self.db.update_record(self.table_name, doc_id, data)
         # self.db.delete_record(self.table_name, doc_id)
 
+    def count_search_docs(self, doc_filter: DocumentFilter, created_by: Optional[int] = None) -> int:
+        """Повертає загальну кількість записів за фільтром (без лімітів)"""
+        query = f"SELECT COUNT(*) as cnt FROM {self.table_name} s WHERE (s.deleted = 0 OR s.deleted IS NULL)"
+        params = []
+        query, params = self._apply_extra_filters(doc_filter, query, params, created_by)
+
+        row = self.db.__execute_fetch__(query, tuple(params))
+        return row['cnt'] if row else 0
+
     def search_docs(self, doc_filter: DocumentFilter, created_by: Optional[int] = None) -> List[T]:
         """Універсальний пошук для всіх типів пакетів"""
-        query = f"SELECT * FROM {self.table_name} WHERE (deleted = 0 OR deleted IS NULL)"
+        query = f"SELECT s.*, u.username FROM {self.table_name} s LEFT JOIN users u ON u.id = s.created_by WHERE (deleted = 0 OR deleted IS NULL)"
         params = []
 
+        query, params = self._apply_extra_filters(doc_filter, query, params, created_by)
+
+        query += " ORDER BY created_date DESC"
+        query += f" LIMIT {doc_filter.limit} OFFSET {doc_filter.offset}"
+
+        rows = self.db.__execute_fetchall__(query, tuple(params))
+
+        return [self._parse_row(r) for r in rows]
+
+    def _apply_extra_filters(self, doc_filter: DocumentFilter, query: str, params: list, created_by: Optional[int] = None) -> tuple[str, list]:
         if created_by:
             query += " AND created_by = ?"
             params.append(created_by)
@@ -116,17 +124,6 @@ class BaseDocumentService(Generic[T]):
                 params.append(iso_to)
             except ValueError:
                 pass
-
-        # 💡 Точка розширення: дозволяє дочірнім класам додавати свої специфічні фільтри
-        query, params = self._apply_extra_filters(query, params, doc_filter)
-
-        query += " ORDER BY created_date DESC"
-        rows = self.db.__execute_fetchall__(query, tuple(params))
-
-        return [self._parse_row(r) for r in rows]
-
-    def _apply_extra_filters(self, query: str, params: list, doc_filter: DocumentFilter) -> tuple[str, list]:
-        """Перевизначте цей метод у дочірньому класі, якщо треба фільтрувати по специфічних полях (напр. region)"""
         return query, params
 
     def is_existing_num(self, out_number: str, exclude_id: Optional[int] = None) -> bool:

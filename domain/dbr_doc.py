@@ -1,12 +1,12 @@
 from pydantic import BaseModel, Field
 from datetime import datetime, date
-from typing import Optional, Any
+from typing import Optional, Any, Union
 from dics.deserter_xls_dic import *
 from service.constants import DOC_STATUS_DRAFT
 
 class DbrDoc(BaseModel):
     id: Optional[int] = None
-    created_by: Optional[int] = None
+    created_by: Union[int, str, None] = None
     created_date: Optional[datetime] = None
     status: str = DOC_STATUS_DRAFT
     out_number: Optional[str] = ''

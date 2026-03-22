@@ -1,9 +1,11 @@
 from nicegui import ui, run
+
+from config import RECORDS_PER_PAGE
 from gui.controllers.support_controller import SupportController
 from gui.services.request_context import RequestContext
 from service.constants import DOC_STATUS_COMPLETED, DOC_STATUS_DRAFT, DOC_PACKAGE_STANDART
 from datetime import datetime
-from gui.tools.ui_components import date_input, fix_date, confirm_delete_dialog
+from gui.tools.ui_components import date_input, fix_date, confirm_delete_dialog, ServerPagination
 from domain.document_filter import DocumentFilter
 
 
@@ -49,16 +51,23 @@ def render_drafts_list_page(controller: SupportController, ctx: RequestContext):
                 status_options = {'Всі': 'Всі', DOC_STATUS_DRAFT: 'Чернетка', DOC_STATUS_COMPLETED: 'Відправлено'}
                 ui.select(status_options, label='Статус').bind_value(filter_state, 'status').classes('w-36').props('dense outlined')
 
-                async def apply_filters():
+                async def apply_filters(reset_page=True):
                     search_btn.props('loading')
+                    if reset_page:
+                        pager.reset()
+
                     try:
                         # Пакуємо дані з UI у Dataclass
                         doc_filter = DocumentFilter(
                             date_from=filter_state['date_from'] or None,
                             date_to=filter_state['date_to'] or None,
                             out_number=filter_state['out_number'].strip() if filter_state['out_number'] else None,
-                            status=filter_state['status'] if filter_state['status'] != 'Всі' else None
+                            status=filter_state['status'] if filter_state['status'] != 'Всі' else None,
+                            limit=pager.limit,
+                            offset=pager.offset
                         )
+                        total_count = await run.io_bound(controller.count_search_docs, ctx, doc_filter)
+                        pager.update_total(total_count)
 
                         # Викликаємо контролер
                         drafts = await run.io_bound(controller.search_drafts, ctx, doc_filter)
@@ -120,6 +129,10 @@ def render_drafts_list_page(controller: SupportController, ctx: RequestContext):
         # Створюємо порожню таблицю
         table = ui.table(columns=columns, rows=[], row_key='id').classes('w-full max-w-8xl general-table')
         table.props('flat bordered separator=cell')
+        pager = ServerPagination(
+            records_per_page=RECORDS_PER_PAGE,
+            on_change=lambda: ui.timer(0.1, lambda: apply_filters(reset_page=False), once=True)
+        )
 
         # Кастомні слоти
         table.add_slot('body-cell-actions', '''
@@ -135,8 +148,8 @@ def render_drafts_list_page(controller: SupportController, ctx: RequestContext):
 
         table.add_slot('body-cell-status', '''
             <q-td :props="props">
-                <q-badge :color="props.row.status === \'''' + DOC_STATUS_COMPLETED + '''\' ? 'green' : 'grey'" class="text-bold q-pa-sm">
-                    {{ props.row.status }}
+                <q-badge :color="props.row.status === \'''' + DOC_STATUS_COMPLETED + '''\' ? 'green' : 'orange'" class="text-bold q-pa-sm">
+                    {{ props.row.status === \'''' + DOC_STATUS_COMPLETED + '''\' ? 'Відправлено' : 'Чернетка' }}
                 </q-badge>
             </q-td>
         ''')
