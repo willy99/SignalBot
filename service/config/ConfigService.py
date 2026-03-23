@@ -53,8 +53,11 @@ class ConfigService:
 
         # UI
         SysConfig(key_name='UI_DATE_FORMAT', category='UI', value='DD.MM.YYYY', value_type='str', description='Формат дат для репрезентації в UI'),
-        SysConfig(key_name='MAX_QUERY_RESULTS', category='UI', value='50', value_type='int', description='Обмеження кількості записів на сторінку',
-                  validation_rule='min:10|max:500'),
+        SysConfig(key_name='MAX_QUERY_RESULTS', category='UI', value='50', value_type='int', description='Обмеження кількості записів на сторінку без пейджеру',
+                  validation_rule='min:5|max:500'),
+        SysConfig(key_name='RECORDS_PER_PAGE', category='UI', value='10', value_type='int', description='Обмеження кількості записів на сторінку',
+                  validation_rule='min:5|max:500'),
+
     ]
 
     def __init__(self, db_path: str = config.DB_NAME):
@@ -108,3 +111,4 @@ class ConfigService:
         configs = self.get_all()
         for conf in configs:
             setattr(config, conf.key_name, conf.get_typed_value())
+

@@ -2,7 +2,6 @@ from nicegui import ui, run
 from dics.deserter_xls_dic import *
 from domain.person import Person
 import asyncio
-from config import EXCEL_BLUE_COLOR
 from gui.controllers.person_controller import PersonController
 from gui.services.auth_manager import AuthManager
 from gui.services.request_context import RequestContext

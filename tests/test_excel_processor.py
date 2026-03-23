@@ -1,7 +1,7 @@
 import pytest
 from service.processing.processors.ExcelProcessor import ExcelProcessor
 from dics.deserter_xls_dic import COLUMN_NAME, COLUMN_ID_NUMBER, COLUMN_BIRTHDAY, COLUMN_DESERTION_DATE, COLUMN_INCREMENTAL, COLUMN_MIL_UNIT, COLUMN_TZK_REGION
-from config import DESERTER_TAB_NAME
+import config
 
 
 def test_upsert_inserts_new_record(temp_excel_file, mock_logger):
@@ -13,7 +13,7 @@ def test_upsert_inserts_new_record(temp_excel_file, mock_logger):
         COLUMN_ID_NUMBER: "1234567890",
         COLUMN_BIRTHDAY: "01.01.1909",
         COLUMN_DESERTION_DATE: "01.10.2023",
-        COLUMN_MIL_UNIT: DESERTER_TAB_NAME
+        COLUMN_MIL_UNIT: config.DESERTER_TAB_NAME
     }
 
     try:
@@ -45,7 +45,7 @@ def test_upsert_updates_existing_record(temp_excel_file, mock_logger):
         COLUMN_ID_NUMBER: "29110912091",
         COLUMN_BIRTHDAY: "09.03.1999",
         COLUMN_DESERTION_DATE: "15.05.2023",
-        COLUMN_MIL_UNIT: DESERTER_TAB_NAME
+        COLUMN_MIL_UNIT: config.DESERTER_TAB_NAME
     }
 
     try:
@@ -80,7 +80,7 @@ def test_upsert_updates_withoutrnokpp_existing_record(temp_excel_file, mock_logg
         COLUMN_ID_NUMBER: None,
         COLUMN_BIRTHDAY: "09.03.1999",
         COLUMN_DESERTION_DATE: "15.05.2023",
-        COLUMN_MIL_UNIT: DESERTER_TAB_NAME
+        COLUMN_MIL_UNIT: config.DESERTER_TAB_NAME
     }
 
     try:

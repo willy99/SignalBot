@@ -3,7 +3,6 @@ import urllib.parse
 
 from gui.controllers.inbox_controller import InboxController
 from gui.controllers.task_controller import TaskController
-from config import CHECK_INBOX_EVERY_SEC
 from gui.services.auth_manager import AuthManager
 from dics.security_config import MODULE_DOC_SUPPORT, MODULE_DOC_DBR, MODULE_DOC_NOTIF, MODULE_PERSON, MODULE_REPORT_UNITS, MODULE_REPORT_GENERAL, MODULE_ADMIN
 
@@ -172,7 +171,7 @@ class AppMenu:
                             print(f"Помилка оновлення задач для юзера {ctx.user_login}: {e}")
 
                     # Запускаємо таймер тільки для цієї сесії (наприклад, раз на 15 секунд)
-                    ui.timer(CHECK_INBOX_EVERY_SEC, update_my_tasks)
+                    ui.timer(config.CHECK_INBOX_EVERY_SEC, update_my_tasks)
 
                     # Викликаємо функцію відразу при завантаженні сторінки, щоб не чекати 15 сек
                     ui.timer(0.1, update_my_tasks, once=True)

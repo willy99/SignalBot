@@ -6,7 +6,7 @@ from gui.views.person.person_view import edit_person
 from nicegui import run
 from domain.person_filter import PersonSearchFilter
 from gui.services.request_context import RequestContext
-from config import MAX_QUERY_RESULTS
+import config
 from dics.security_config import MODULE_PERSON, PERM_EDIT
 
 ui.add_css('''
@@ -167,13 +167,13 @@ def search_page(person_ctrl, ctx: RequestContext, auth_manager: AuthManager):
             refresh_cb = lambda: ui.timer(0, lambda: do_search(auto_open=False, force_refresh=True), once=True)
             if len(data) == 1 and auto_open:
                 edit_person(data[0], person_ctrl, ctx=ctx, auth_manager=auth_manager, on_close=refresh_cb)
-            if len(data) > MAX_QUERY_RESULTS:
+            if len(data) > config.MAX_QUERY_RESULTS:
                 ui.notify(
-                    f'⚠️ Знайдено занадто багато результатів ({len(data)}). Показано перші {MAX_QUERY_RESULTS}. Будь ласка, уточніть параметри пошуку',
+                    f'⚠️ Знайдено занадто багато результатів ({len(data)}). Показано перші {config.MAX_QUERY_RESULTS}. Будь ласка, уточніть параметри пошуку',
                     type='warning',
                     timeout=8000
                 )
-                data = data[:MAX_QUERY_RESULTS]  # Відсікаємо все зайве
+                data = data[:config.MAX_QUERY_RESULTS]  # Відсікаємо все зайве
             with results_container:
                 results_ui(data, person_ctrl, ctx, auth_manager=auth_manager, refresh_callback=refresh_cb)
 

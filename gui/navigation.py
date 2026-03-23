@@ -31,7 +31,6 @@ from gui.auth_routes import create_login_page, require_access
 from gui.views.documentation.file_search_view import render_file_search_page
 from pathlib import Path
 from service.processing.processors.DocTemplator import DocTemplator
-from config import LOGGER_FILE_NAME
 from gui.services.auth_manager import AuthManager
 import os
 import config
@@ -231,7 +230,7 @@ def init_nicegui(workflow_obj):
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
         log_dir = "logs"
-        log_file = os.path.join(log_dir, LOGGER_FILE_NAME)
+        log_file = os.path.join(log_dir, config.LOGGER_FILE_NAME)
         render_logs_page(log_file)
 
 

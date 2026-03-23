@@ -4,11 +4,8 @@ import traceback
 import config
 from dics.deserter_xls_dic import *
 from collections import defaultdict
-
-from service.constants import DB_DATE_FORMAT
 from service.processing.DocumentProcessingService import DocumentProcessingService
 from service.storage.LoggerManager import LoggerManager
-from config import DESERTER_TAB_NAME, EXCEL_DATE_FORMAT
 from utils.utils import get_strint_fromfloat, get_year_safe
 from domain.person_filter import PersonSearchFilter
 import re
@@ -44,7 +41,7 @@ class ExcelReporter:
 
     def get_subunit_desertion_stats(self, search_filter: PersonSearchFilter):
         """Збирає повну статистику по підрозділах, званнях та термінах СЗЧ."""
-        self.excelProcessor.switch_to_sheet(DESERTER_TAB_NAME)
+        self.excelProcessor.switch_to_sheet(config.DESERTER_TAB_NAME)
         try:
             def get_stats_template():
                 return {
@@ -366,7 +363,7 @@ class ExcelReporter:
 
     def get_yearly_desertion_stats(self):
         """Збирає статистику виключно по роках (по року СЗЧ), без жодних фільтрів."""
-        self.excelProcessor.switch_to_sheet(DESERTER_TAB_NAME)
+        self.excelProcessor.switch_to_sheet(config.DESERTER_TAB_NAME)
         try:
             def get_stats_template():
                 return {
@@ -721,7 +718,7 @@ class ExcelReporter:
         if not returns_from_files:
             return []
 
-        self.excelProcessor.switch_to_sheet(DESERTER_TAB_NAME, silent=True)
+        self.excelProcessor.switch_to_sheet(config.DESERTER_TAB_NAME, silent=True)
 
         name_idx = self.excelProcessor.header.get(COLUMN_NAME, 1) - 1
         id_idx = self.excelProcessor.header.get(COLUMN_ID_NUMBER, 1) - 1
@@ -934,7 +931,7 @@ class ExcelReporter:
 
             if isinstance(des_date_val, (datetime, date)):
                 des_date_year = str(des_date_val.year)
-                des_date_str = des_date_val.strftime(EXCEL_DATE_FORMAT)
+                des_date_str = des_date_val.strftime(config.EXCEL_DATE_FORMAT)
             elif des_date_val:
                 des_date_str = str(des_date_val).strip()
                 if len(des_date_str) >= 4:
@@ -942,7 +939,7 @@ class ExcelReporter:
 
             if isinstance(dbr_date_val, (datetime, date)):
                 dbr_date_year = str(dbr_date_val.year)
-                dbr_date_str = dbr_date_val.strftime(EXCEL_DATE_FORMAT)
+                dbr_date_str = dbr_date_val.strftime(config.EXCEL_DATE_FORMAT)
             elif dbr_date_val:
                 dbr_date_str = str(dbr_date_val).strip()
                 if len(dbr_date_str) >= 4:
@@ -950,7 +947,7 @@ class ExcelReporter:
 
             if erdr_date_val is not None and isinstance(erdr_date_val, (datetime, date)):
                 erdr_date_year = str(erdr_date_val.year)
-                erdr_date_str = erdr_date_val.strftime(EXCEL_DATE_FORMAT)
+                erdr_date_str = erdr_date_val.strftime(config.EXCEL_DATE_FORMAT)
             elif erdr_date_val:
                 erdr_date_str = str(erdr_date_val).strip()
                 if len(erdr_date_str) >= 4:
@@ -998,7 +995,7 @@ class ExcelReporter:
                 continue
 
             dob_val = row[dob_idx]
-            dob_str = dob_val.strftime(EXCEL_DATE_FORMAT) if isinstance(dob_val, (datetime, date)) else str(dob_val or '')
+            dob_str = dob_val.strftime(config.EXCEL_DATE_FORMAT) if isinstance(dob_val, (datetime, date)) else str(dob_val or '')
 
             # Безпечне отримання РНОКПП (обходимо проблему .0 у Excel)
             rnokpp_raw = row[rnokpp_idx]

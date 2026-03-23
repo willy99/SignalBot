@@ -1,6 +1,6 @@
 from nicegui import ui, run
 
-from config import RECORDS_PER_PAGE
+import config
 from gui.controllers.support_controller import SupportController
 from gui.services.request_context import RequestContext
 from service.constants import DOC_STATUS_COMPLETED, DOC_STATUS_DRAFT, DOC_PACKAGE_STANDART
@@ -130,7 +130,7 @@ def render_drafts_list_page(controller: SupportController, ctx: RequestContext):
         table = ui.table(columns=columns, rows=[], row_key='id').classes('w-full max-w-8xl general-table')
         table.props('flat bordered separator=cell')
         pager = ServerPagination(
-            records_per_page=RECORDS_PER_PAGE,
+            records_per_page=config.RECORDS_PER_PAGE,
             on_change=lambda: ui.timer(0.1, lambda: apply_filters(reset_page=False), once=True)
         )
 

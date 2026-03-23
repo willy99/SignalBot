@@ -9,7 +9,7 @@ from service.processing.processors.DocTemplator import DocTemplator
 from utils.utils import get_person_key_from_str
 from domain.person import Person
 from dics.deserter_xls_dic import *
-from config import EXCEL_LIGHT_GRAY_COLOR
+import config
 
 
 class NotifController:
@@ -113,7 +113,7 @@ class NotifController:
                 persons_to_update.append(p)
 
         if persons_to_update:
-            success = person_controller.save_persons(ctx, persons_to_update, paint_color=EXCEL_LIGHT_GRAY_COLOR, partial_update=True)
+            success = person_controller.save_persons(ctx, persons_to_update, paint_color=config.EXCEL_LIGHT_GRAY_COLOR, partial_update=True)
             if not success:
                 raise Exception("Не вдалося оновити дані в Excel. Статус чернетки НЕ змінено.")
 

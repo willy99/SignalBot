@@ -1,6 +1,6 @@
 from typing import List
 
-from config import REPORT_DAILY_DESERTION
+import config
 from gui.services.request_context import RequestContext
 from domain.person_filter import PersonSearchFilter
 from gui.services.auth_manager import AuthManager
@@ -61,9 +61,9 @@ class ReportController:
         file_bytes, file_name = self.doc_templator.make_daily_report(target_date, raw_documents)
 
         try:
-            client = StorageFactory.create_client(REPORT_DAILY_DESERTION, self.log_manager)
+            client = StorageFactory.create_client(config.REPORT_DAILY_DESERTION, self.log_manager)
             with client:
-                destination_path = f"{REPORT_DAILY_DESERTION}{client.separator}{file_name}"
+                destination_path = f"{config.REPORT_DAILY_DESERTION}{client.separator}{file_name}"
                 buffer = io.BytesIO(file_bytes)
                 client.save_file_from_buffer(destination_path, buffer)
                 self.log_manager.get_logger().info(f"✅ Звіт СЗЧ успішно збережено в архів: {destination_path}")

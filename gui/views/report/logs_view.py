@@ -1,7 +1,7 @@
 import os
 import re
 from nicegui import ui
-from config import LOG_MONITORING_MAX_LINES
+import config
 
 # Регулярний вираз для парсингу логу: Дата/Час - РІВЕНЬ - Повідомлення
 LOG_PATTERN = re.compile(r"^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2},\d{3})\s-\s([A-Z]+)\s-\s(.*)$")
@@ -79,8 +79,8 @@ def render_logs_page(log_file_path: str):
                     state['lines'].append(formatted)
 
             # Обрізаємо старі рядки, щоб браузер не гальмував
-            if len(state['lines']) > LOG_MONITORING_MAX_LINES:
-                state['lines'] = state['lines'][-LOG_MONITORING_MAX_LINES:]
+            if len(state['lines']) > config.LOG_MONITORING_MAX_LINES:
+                state['lines'] = state['lines'][-config.LOG_MONITORING_MAX_LINES:]
 
             # Оновлюємо вміст на сторінці
             log_container.content = "".join(state['lines'])

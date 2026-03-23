@@ -1,7 +1,6 @@
-from config import EXCEL_SUPPORT_COLOR
+import config
 from domain.document_filter import DocumentFilter
 from gui.services.request_context import RequestContext
-from domain.person_filter import PersonSearchFilter
 from domain.person import Person
 from typing import List, Optional, Dict, Any
 
@@ -126,7 +125,7 @@ class SupportController:
                 persons_to_update.append(p)
 
         if persons_to_update:
-            success = person_ctrl.save_persons(ctx, persons_to_update, paint_color=EXCEL_SUPPORT_COLOR, partial_update=True)
+            success = person_ctrl.save_persons(ctx, persons_to_update, paint_color=config.EXCEL_SUPPORT_COLOR, partial_update=True)
             if not success:
                 raise Exception("Не вдалося оновити дані в Excel. Статус чернетки НЕ змінено.")
 

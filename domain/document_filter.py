@@ -1,8 +1,7 @@
 # domain/document_filter.py
 from dataclasses import dataclass
 from typing import Optional
-
-from config import RECORDS_PER_PAGE
+import config
 
 
 @dataclass
@@ -13,5 +12,5 @@ class DocumentFilter:
     status: Optional[str] = None
 
     # 💡 Пагінація
-    limit: int = RECORDS_PER_PAGE
+    limit: int = config.RECORDS_PER_PAGE
     offset: int = 0

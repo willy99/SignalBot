@@ -1,6 +1,6 @@
 from nicegui import ui, run
 
-from config import RECORDS_PER_PAGE
+import config
 from gui.controllers.notif_controller import NotifController
 from gui.services.request_context import RequestContext
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
@@ -124,7 +124,7 @@ def render_notif_drafts_list_page(notif_ctrl: NotifController, ctx: RequestConte
         table = ui.table(columns=columns, rows=[], row_key='id').classes('w-full max-w-8xl shadow-md')
         table.props('flat bordered separator=horizontal row-key="id"')
         pager = ServerPagination(
-            records_per_page=RECORDS_PER_PAGE,
+            records_per_page=config.RECORDS_PER_PAGE,
             on_change=lambda: ui.timer(0.1, lambda: apply_filters(reset_page=False), once=True)
         )
 

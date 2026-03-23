@@ -1,7 +1,7 @@
 import io
 import os
 import smbclient
-from config import NET_SERVER_IP, NET_USERNAME, NET_PASSWORD
+import config
 from service.storage.FileStorageClient import FileStorageClient
 from service.storage.LoggerManager import LoggerManager
 import json
@@ -16,9 +16,9 @@ class SMBFileClient(FileStorageClient):
     _shared_smb_semaphore = threading.BoundedSemaphore(5)
 
     def __init__(self, path, log_manager: LoggerManager):
-        self.server_ip = NET_SERVER_IP
-        self.username = NET_USERNAME
-        self.password = NET_PASSWORD
+        self.server_ip = config.NET_SERVER_IP
+        self.username = config.NET_USERNAME
+        self.password = config.NET_PASSWORD
         self.is_connected = False
         self.logger = log_manager.get_logger()
         self.separator = "\\" if path.startswith("\\\\") else os.sep

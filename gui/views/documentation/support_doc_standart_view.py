@@ -5,7 +5,7 @@ from domain.person_filter import PersonSearchFilter
 from gui.services.request_context import RequestContext
 from utils.utils import to_genitive_case, to_genitive_title
 from gui.tools.validation import is_valid_doc_number
-from config import OUTBOX_DIR_PATH
+import config
 from gui.tools.ui_components import fix_date, date_input, mark_clean, mark_dirty
 from service.storage.FileCacher import FileCacheManager
 import io
@@ -98,7 +98,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                 ctx, city.value, supp_number_input.value, supp_date_input.value, state['buffer']
             )
             file_name = f"Пакет_Супроводів_{supp_number_input.value}_{supp_date_input.value}.txt"
-            destination_path = f'{OUTBOX_DIR_PATH}{file_cache_manager.get_file_separator()}{ctx.user_login}{file_cache_manager.get_file_separator()}{file_name.replace("/","_")}'
+            destination_path = f'{config.OUTBOX_DIR_PATH}{file_cache_manager.get_file_separator()}{ctx.user_login}{file_cache_manager.get_file_separator()}{file_name.replace("/","_")}'
             log_buffer = io.BytesIO(log_text.encode('utf-8'))
 
             client = file_cache_manager.client

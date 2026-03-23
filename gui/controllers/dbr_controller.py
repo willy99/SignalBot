@@ -8,7 +8,7 @@ from service.processing.MyWorkFlow import MyWorkFlow
 from utils.utils import get_person_key_from_str
 from domain.person import Person
 from dics.deserter_xls_dic import *
-from config import EXCEL_BLUE_COLOR
+import config
 
 
 class DbrController:
@@ -103,7 +103,7 @@ class DbrController:
                 persons_to_update.append(p)
 
         if persons_to_update:
-            success = person_controller.save_persons(ctx, persons_to_update, paint_color=EXCEL_BLUE_COLOR, partial_update=True)
+            success = person_controller.save_persons(ctx, persons_to_update, paint_color=config.EXCEL_BLUE_COLOR, partial_update=True)
             if not success:
                 raise Exception("Не вдалося оновити дані в Excel. Статус чернетки НЕ змінено.")
 

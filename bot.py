@@ -14,7 +14,6 @@ except RuntimeError:
 import json
 import sys
 import config
-from config import DESERTER_TAB_NAME
 
 cfg_service = ConfigService()
 cfg_service.sync_defaults()
@@ -58,7 +57,7 @@ def main():
     try:
         # Ініціалізація Excel
         workflow.initExcelProcessor(config.DESERTER_XLSX_FILE_PATH)
-        workflow.excelProcessor.switch_to_sheet(DESERTER_TAB_NAME)
+        workflow.excelProcessor.switch_to_sheet(config.DESERTER_TAB_NAME)
 
         # 1. Хоткеї у фоні
         # threading.Thread(target=listen_hotkeys, daemon=True).start()

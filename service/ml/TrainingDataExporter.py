@@ -1,11 +1,11 @@
 import pandas as pd
 import json
 from typing import Any
-from config import ML_LOCAL_DESERTER_XLSX, ML_MODEL_JSON
+import config
 from dics.deserter_xls_dic import *
 
 class TrainingDataExporter:
-    def __init__(self, file_path: str = ML_LOCAL_DESERTER_XLSX):
+    def __init__(self, file_path: str = config.ML_LOCAL_DESERTER_XLSX):
         self.file_path = file_path
         # Визначаємо зв'язки: де шукати (джерело) та що шукати (ціль)
         self.mapping = {
@@ -50,7 +50,7 @@ class TrainingDataExporter:
         end = start + len(val_str)
         return [start, end, label]
 
-    def export_to_jsonl(self, output_file: str = ML_MODEL_JSON):
+    def export_to_jsonl(self, output_file: str = config.ML_MODEL_JSON):
         """Метод для експорту даних у формат JSONL для навчання ML."""
         print(f"📖 Завантаження Excel: {self.file_path}")
 

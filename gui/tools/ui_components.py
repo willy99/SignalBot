@@ -1,6 +1,6 @@
 import re
 from nicegui import ui
-from config import UI_DATE_FORMAT
+import config
 from dics.deserter_xls_dic import VALID_PATTERN_DATE
 from typing import Any, Callable
 from datetime import datetime
@@ -20,7 +20,7 @@ def date_input(label: str, bind_obj: Any, field: str, blur_handler=None, default
     with inp.add_slot('append'):
         ui.icon('edit_calendar').classes('cursor-pointer')
         with ui.menu():
-            ui.date().bind_value(bind_obj, field).props(f'mask="{UI_DATE_FORMAT}"')
+            ui.date().bind_value(bind_obj, field).props(f'mask="{config.UI_DATE_FORMAT}"')
 
     return inp
 

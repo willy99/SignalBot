@@ -4,7 +4,7 @@ import sys
 
 import warnings
 from domain.person_filter import YES
-from config import DESERTER_TAB_NAME, EXCEL_CHUNK_SIZE, EXCEL_DATE_FORMAT, DESERTER_RESERVE_TAB_NAME, EXCEL_LAST_COL_NUMBER
+import config
 from dics.deserter_xls_dic import *
 from dics.deserter_xls_dic import NA
 from typing import List, Dict, Any
@@ -30,17 +30,17 @@ class ExcelProcessor:
         warnings.filterwarnings("ignore", category=UserWarning)
         self.abs_path = os.path.abspath(file_path)
         self.app = xw.App(visible=False, add_book=False)
-        self._load_workbook(DESERTER_TAB_NAME) #default tab name
+        self._load_workbook(config.DESERTER_TAB_NAME) #default tab name
         self.lock = threading.RLock()
 
         self.column_values: Dict[str, List[str]] = {} # для комбіков
 
     def get_correct_sheet_name(self, mil_unit):
-        sheet_name = DESERTER_TAB_NAME
+        sheet_name = config.DESERTER_TAB_NAME
         if mil_unit is None:
             return sheet_name
         if mil_unit.find("701") > -1:
-            return DESERTER_RESERVE_TAB_NAME
+            return config.DESERTER_RESERVE_TAB_NAME
         return sheet_name
 
     def upsert_record(self, records_list: List[Dict[str, Any]]) -> bool:
@@ -92,7 +92,7 @@ class ExcelProcessor:
 
         self.logger.debug(f'--- Визначено останній ID: {current_id} (з рядка {last_row_with_data})')
 
-        last_col_idx = EXCEL_LAST_COL_NUMBER
+        last_col_idx = config.EXCEL_LAST_COL_NUMBER
 
         # 3. Перебір кожного словника в масиві
         for data_dict in records_list:
@@ -233,7 +233,7 @@ class ExcelProcessor:
 
     def _fetch_records_by_chunks(self, last_row: int, num_cols: int) -> List[List[Any]]:
         """Зчитує дані з Excel частинами. Кидає помилку, якщо дані не зачитані."""
-        chunk_size = EXCEL_CHUNK_SIZE
+        chunk_size = config.EXCEL_CHUNK_SIZE
         all_data = []
 
         for start_row in range(1, last_row + 1, chunk_size):
@@ -383,7 +383,7 @@ class ExcelProcessor:
 
     def search_people(self, filter_obj: PersonSearchFilter) -> list:
         with self.lock:
-            self.switch_to_sheet(filter_obj.mil_unit if filter_obj.mil_unit else DESERTER_TAB_NAME , silent=True)
+            self.switch_to_sheet(filter_obj.mil_unit if filter_obj.mil_unit else config.DESERTER_TAB_NAME , silent=True)
 
             results = []
             last_row = self.get_last_row()
@@ -516,7 +516,7 @@ class ExcelProcessor:
             if key.mil_unit:
                 self.switch_to_sheet(key.mil_unit, silent=True)
             else:
-                self.switch_to_sheet(DESERTER_TAB_NAME, silent=True)
+                self.switch_to_sheet(config.DESERTER_TAB_NAME, silent=True)
 
             last_row = self.get_last_row()
             data = self.sheet.range(f"A2:BB{last_row}").value
@@ -644,7 +644,7 @@ class ExcelProcessor:
         Повертає відсортований список словників: спочатку ті, кого НЕ знайдено (False), потім ті, хто Є (True).
         """
         # Переконуємось, що ми на правильному листі
-        self.switch_to_sheet(DESERTER_TAB_NAME, silent=True)
+        self.switch_to_sheet(config.DESERTER_TAB_NAME, silent=True)
 
         # 1. Знаходимо колонку з ПІБ
         pib_col_idx = self.column_map.get(COLUMN_NAME.lower()) or self.header.get(COLUMN_NAME)

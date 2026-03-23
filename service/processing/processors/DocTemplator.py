@@ -5,7 +5,7 @@ from docxtpl import DocxTemplate
 import os
 import zipfile
 
-from config import EXCEL_DATE_FORMAT
+import config
 from utils.utils import get_typed_value
 
 
@@ -300,7 +300,7 @@ class DocTemplator:
             })
 
         # Формуємо контекст для Word
-        context_date = (get_typed_value(target_date) + timedelta(days=1)).strftime(EXCEL_DATE_FORMAT)
+        context_date = (get_typed_value(target_date) + timedelta(days=1)).strftime(config.EXCEL_DATE_FORMAT)
         context = {
             'date': context_date,
             'documents': formatted_docs
