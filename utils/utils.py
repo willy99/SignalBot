@@ -114,6 +114,22 @@ def format_ukr_date(date_val):
     # 3. Якщо жоден формат не підійшов — повертаємо як було (щоб не втратити дані)
     return date_str
 
+def calculate_days_between(date_from_str, date_to_str):
+        if date_from_str == NA or date_to_str == NA:
+            return 0
+        try:
+            def parse_date(d_str):
+                return datetime.strptime(d_str, config.EXCEL_DATE_FORMAT)
+
+            dt_start = parse_date(date_from_str)
+            dt_end = parse_date(date_to_str)
+
+            delta = dt_end - dt_start
+            days = delta.days
+            return days
+        except Exception as e:
+            return 0
+
 def get_typed_value(value):
         if isinstance(value, str):
             try:
@@ -135,7 +151,7 @@ def check_birthday_id_number(birthday: datetime, idn: str)-> bool:
     birthday_calculated = format_ukr_date(birthday_calculated_dt).strip()
     birthday_table = format_ukr_date(birthday).strip() if birthday else None
     if birthday_table != birthday_calculated:
-        print('------ ⚠️ В таблиці:' + str(birthday_table) + ' А шо винно бути:' + str(birthday_calculated))
+        print('------ ⚠️ Актуальний день народження:' + str(birthday_table) + ' По він коду має бути:' + str(birthday_calculated))
         return False
     return True
 
@@ -147,7 +163,7 @@ def get_strint_fromfloat(value, default = None) -> str:
         value = str(value).strip() if value else default
     return value
 
-# 029384902_ІМЯ Прізвище по-батькові_24.02.1979
+# 029384902_ІМЯ Прізвище по-батькові_24.02.1979_А0224
 def get_person_key_from_str(glued_key: str) -> PersonKey:
     key = PersonKey(rnokpp=None, name=None, des_date=None, mil_unit=None)
     if not glued_key: return key

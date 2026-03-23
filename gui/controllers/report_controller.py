@@ -3,13 +3,13 @@ from typing import List
 from config import REPORT_DAILY_DESERTION
 from gui.services.request_context import RequestContext
 from domain.person_filter import PersonSearchFilter
-from datetime import date
 from gui.services.auth_manager import AuthManager
 from service.processing.DocumentProcessingService import DocumentProcessingService
 from service.processing.MyWorkFlow import MyWorkFlow
 from service.processing.processors.DocTemplator import DocTemplator
 from service.storage.StorageFactory import StorageFactory
 import io
+from datetime import date
 
 class ReportController:
     def __init__(self, doc_templator: DocTemplator, worklow: MyWorkFlow, auth_manager: AuthManager):

@@ -2,7 +2,7 @@ from pathlib import Path
 from service.processing.parsers.ParserFactory import ParserFactory
 import config
 from service.storage.LoggerManager import LoggerManager
-from utils.utils import format_to_excel_date, get_file_name, clean_text, check_birthday_id_number
+from utils.utils import format_to_excel_date, get_file_name, clean_text, check_birthday_id_number, calculate_days_between
 import dics.deserter_xls_dic as col
 from dics.deserter_xls_dic import *
 from datetime import datetime
@@ -399,27 +399,11 @@ class DocProcessor:
         return NA
 
     def _calculate_service_days(self, conscription_date_str, desertion_date_str):
-        if conscription_date_str == NA or desertion_date_str == NA:
+        days = calculate_days_between(conscription_date_str, desertion_date_str)
+        if days < 0 or days > 4000:
+            self.logger.error(f"--- ⚠️ Нелогічна кількість днів служби: {days}. Перевірте дати.")
             return 0
-        try:
-            def parse_date(d_str):
-                return datetime.strptime(d_str, config.EXCEL_DATE_FORMAT)
-
-            dt_start = parse_date(conscription_date_str)
-            dt_end = parse_date(desertion_date_str)
-
-            delta = dt_end - dt_start
-            days = delta.days
-
-            if days < 0 or days > 4000:
-                self.logger.error(f"--- ⚠️ Нелогічна кількість днів служби: {days}. Перевірте дати.")
-                return 0
-
-            return days
-
-        except Exception as e:
-            self.logger.warning(f"--- ⚠️ Помилка розрахунку днів: {e}")
-            return 0
+        return days
 
     def extract_military_subunit(self, text, file_name=None, mapping=PATTERN_SUBUNIT_MAPPING):
         short_values = set()

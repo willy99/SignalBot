@@ -42,10 +42,10 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
 
         export_word_btn.props('loading')
         try:
-            target_date_str = date_filter.value
+            target_date = date_filter
             file_bytes, file_name = await run.io_bound(
                 report_ctrl.generate_daily_report_word,
-                target_date_str,
+                target_date.value,
                 data_A0224
             )
             ui.download(file_bytes, file_name)

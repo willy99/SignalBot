@@ -83,6 +83,12 @@ def render_calendar_page(task_ctrl, ctx):
 
             # Забираємо задачі через ваш контролер
             tasks = task_ctrl.get_all_tasks(ctx, search_filter)
+
+            print('>>> tasks')
+            for task in tasks:
+                print(str(task.id) + '/ ' + str(task.task_subject))
+
+
             state['tasks'] = tasks or []
 
             draw_calendar()
@@ -112,7 +118,7 @@ def render_calendar_page(task_ctrl, ctx):
             with ui.grid(columns=7).classes('w-full bg-gray-200 gap-[1px]'):
 
                 # ШАПКА: Дні тижня
-                days_of_week = ['Пн', 'Вв', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
+                days_of_week = ['Понеділок', 'Вівторок', 'Середа', 'Четвер', 'Пʼятниця', 'Субота', 'Надуля']
                 for day_name in days_of_week:
                     ui.label(day_name).classes('bg-blue-50 text-center font-bold p-2 text-blue-900')
 

@@ -17,7 +17,6 @@ import re
 
 def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file_cache_manager: FileCacheManager,
                     ctx: RequestContext, dbr_doc_id: int = None):
-    ui.label('Масова відправка справ на ДБР').classes('w-full text-center text-3xl font-bold mb-6')
 
     state = {
         'status': DOC_STATUS_DRAFT,
@@ -37,6 +36,74 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
             'mil_unit': ''
         }
     }
+
+    async def on_save_draft_click():
+        has_error = await validate_out_number()
+        if has_error:
+            ui.notify('Виправте помилки перед збереженням!', type='negative')
+            return
+
+        save_draft_btn.disable()
+        try:
+            dbr_doc_id = await run.io_bound(
+                dbr_ctrl.save_dbr_doc,
+                ctx,
+                state.get('out_number', ''),
+                state.get('out_date', ''),
+                state['buffer'],
+                state['dbr_doc_id']
+            )
+            state['dbr_doc_id'] = dbr_doc_id
+            ui.notify(f'Чернетку збережено!', type='positive', icon='cloud_done')
+        except Exception as e:
+            ui.notify(f'Помилка БД: {e}', type='negative')
+        finally:
+            save_draft_btn.enable()
+
+    async def on_send_dbr_click():
+        out_num = state.get('out_number', '').strip()
+        if not is_valid_doc_number(out_num):
+            ui.notify('❌ Увага! Невірний формат вихідного номера. Має бути 642/ХХХХX', type='negative')
+            return
+        await on_save_draft_click()
+
+        complete_btn.disable()
+        complete_btn.props('loading')
+        ui.notify('⏳ Оновлюємо дані в Excel, зачекайте...', type='info')
+
+        try:
+            success = await run.io_bound(
+                dbr_ctrl.mark_as_completed,
+                ctx,
+                state['dbr_doc_id'],
+                state['buffer'],
+                state.get('out_number', ''),
+                state.get('out_date', ''),
+                person_ctrl
+            )
+
+            if success:
+                state['status'] = DOC_STATUS_COMPLETED
+                refresh_status_ui()
+                ui.notify(f'Справи успішно відправлені на ДБР!', type='positive')
+            else:
+                ui.notify(f'Виникла помилка під час відправки', type='negative')
+        except Exception as e:
+            ui.notify(f'❌ Помилка під час відправки: {e}', type='negative')
+        finally:
+            complete_btn.props(remove='loading')
+            if state.get('status') != DOC_STATUS_COMPLETED:
+                complete_btn.enable()
+
+    with ui.row().classes('w-full px-4 items-center justify-between mb-6'):
+        ui.label('Масова відправка справ на ДБР').classes('text-3xl font-bold')
+
+        with ui.row().classes('items-center gap-2'):
+            save_draft_btn = ui.button('ЗБЕРЕГТИ ЧЕРНЕТКУ', on_click=on_save_draft_click, icon='save').classes('h-10').props('outline color="primary"')
+            save_draft_btn.disable()
+            complete_btn = ui.button('ПІДТВЕРДИТИ ВІДПРАВКУ', on_click=on_send_dbr_click, icon='send').classes('h-10').props('color="green"')
+            complete_btn.disable()
+
 
     with ui.grid(columns=12).classes('w-full gap-6 items-start max-w-7xl mx-auto'):
 
@@ -402,68 +469,6 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                 save_draft_btn.set_visibility(len(buffer_data) > 0)
                 complete_btn.set_visibility(len(buffer_data) > 0)
 
-            async def on_save_draft_click():
-                has_error = await validate_out_number()
-                if has_error:
-                    ui.notify('Виправте помилки перед збереженням!', type='negative')
-                    return
-
-                save_draft_btn.disable()
-                try:
-                    dbr_doc_id = await run.io_bound(
-                        dbr_ctrl.save_dbr_doc,
-                        ctx,
-                        state.get('out_number', ''),
-                        state.get('out_date', ''),
-                        state['buffer'],
-                        state['dbr_doc_id']
-                    )
-                    state['dbr_doc_id'] = dbr_doc_id
-                    ui.notify(f'Чернетку збережено!', type='positive', icon='cloud_done')
-                except Exception as e:
-                    ui.notify(f'Помилка БД: {e}', type='negative')
-                finally:
-                    save_draft_btn.enable()
-
-            async def on_send_dbr_click():
-                out_num = state.get('out_number', '').strip()
-                if not is_valid_doc_number(out_num):
-                    ui.notify('❌ Увага! Невірний формат вихідного номера. Має бути 642/ХХХХX', type='negative')
-                    return
-                await on_save_draft_click()
-
-                complete_btn.disable()
-                complete_btn.props('loading')
-                ui.notify('⏳ Оновлюємо дані в Excel, зачекайте...', type='info')
-
-                try:
-                    success = await run.io_bound(
-                        dbr_ctrl.mark_as_completed,
-                        ctx,
-                        state['dbr_doc_id'],
-                        state['buffer'],
-                        state.get('out_number', ''),
-                        state.get('out_date', ''),
-                        person_ctrl
-                    )
-
-                    if success:
-                        state['status'] = DOC_STATUS_COMPLETED
-                        refresh_status_ui()
-                        ui.notify(f'Справи успішно відправлені на ДБР!', type='positive')
-                    else:
-                        ui.notify(f'Виникла помилка під час відправки', type='negative')
-                except Exception as e:
-                    ui.notify(f'❌ Помилка під час відправки: {e}', type='negative')
-                finally:
-                    complete_btn.props(remove='loading')
-                    if state.get('status') != DOC_STATUS_COMPLETED:
-                        complete_btn.enable()
-
-            save_draft_btn = ui.button('ЗБЕРЕГТИ ЧЕРНЕТКУ', on_click=on_save_draft_click, icon='save').classes(
-                'w-full mt-4 h-12').props('outline color="primary"')
-            complete_btn = ui.button('ПІДТВЕРДИТИ ВІДПРАВКУ', on_click=on_send_dbr_click, icon='send').classes(
-                'w-full mt-2 h-12').props('color="green"')
 
             def refresh_status_ui():
                 current_status = state.get('status', DOC_STATUS_DRAFT)

@@ -1,8 +1,13 @@
 import io
+from datetime import timedelta
 from pathlib import Path
 from docxtpl import DocxTemplate
 import os
 import zipfile
+
+from config import EXCEL_DATE_FORMAT
+from utils.utils import get_typed_value
+
 
 class DocTemplator:
     def __init__(self, templates_dir: Path):
@@ -295,8 +300,9 @@ class DocTemplator:
             })
 
         # Формуємо контекст для Word
+        context_date = (get_typed_value(target_date) + timedelta(days=1)).strftime(EXCEL_DATE_FORMAT)
         context = {
-            'date': target_date,
+            'date': context_date,
             'documents': formatted_docs
         }
 

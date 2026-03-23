@@ -11,6 +11,9 @@ from gui.tools.ui_components import date_input, fix_date, confirm_delete_dialog
 from dics.security_config import MODULE_PERSON, PERM_DELETE, PERM_EDIT
 from datetime import datetime, timedelta
 
+from utils.utils import calculate_days_between, check_birthday_id_number
+
+
 def search_select(options: list, label: str, person: Person, field: str):
     """Створює випадаючий список із можливістю пошуку"""
     sel = ui.select(options=options, label=label, with_input=False)
@@ -20,8 +23,6 @@ def search_select(options: list, label: str, person: Person, field: str):
 
 def is_delete_allowed(person: Person) -> bool:
     """Перевіряє, чи запис було додано сьогодні або вчора."""
-    # Припускаємо, що поле називається insert_date або ins_date.
-    # Змініть 'insert_date' на вашу реальну назву поля у моделі Person, якщо вона інша.
     ins_date_val = getattr(person, 'insert_date', getattr(person, 'ins_date', None))
 
     if not ins_date_val:
@@ -42,6 +43,7 @@ def is_delete_allowed(person: Person) -> bool:
     except Exception:
         return False
 
+
 # ==========================================
 # 🪟 ВІКНА ДІАЛОГІВ
 # ==========================================
@@ -51,9 +53,112 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, auth_manager: 
     can_edit = auth_manager.has_access(MODULE_PERSON, PERM_EDIT)
     can_delete = auth_manager.has_access(MODULE_PERSON, PERM_DELETE)
 
+    def recalculate_days():
+        """Оновлює кількість днів та валідує результат"""
+        days = calculate_days_between(person.enlistment_date, person.desertion_date)
+        person.service_days = days
+
+        # Оновлюємо UI (якщо потрібно примусово, хоча bind_value має підхопити)
+        service_days_input.update()
+
+    def validate_date_sequence(person: Person) -> bool:
+        """Перевіряє, чи дата СЗЧ не раніше дати призову"""
+        if not person.enlistment_date or not person.desertion_date:
+            return True  # Якщо однієї з дат немає, валідація проходить
+
+        try:
+            # Парсимо дати (використовуємо вашу логіку парсингу)
+            start = datetime.strptime(person.enlistment_date, '%d.%m.%Y')
+            end = datetime.strptime(person.desertion_date, '%d.%m.%Y')
+            return end >= start
+        except (ValueError, TypeError):
+            return True
+
+    def validate_id_vs_birthday(person: Person) -> bool:
+        if not person.rnokpp or not person.birthday or len(str(person.rnokpp)) < 5:
+            return True
+
+        try:
+            if isinstance(person.birthday, str):
+                bday_dt = datetime.strptime(person.birthday, '%d.%m.%Y')
+            else:
+                bday_dt = person.birthday
+
+            return check_birthday_id_number(bday_dt, str(person.rnokpp))
+        except Exception:
+            return True
+
+    def refresh_validation():
+        recalculate_days()  # Ваша попередня функція розрахунку днів
+        enlist_inp.validate()
+        desert_inp.validate()
+        rnokpp_inp.validate()
+        birthday_inp.validate()
+
+
+    date_logic_error = '⚠️ Дата СЗЧ не може бути раніше дати призову'
+    date_rules = {date_logic_error: lambda _: validate_date_sequence(person)}
+    id_mismatch_err = '⚠️ РНОКПП не збігається з датою народження!'
+
+    async def handle_save(person, person_ctrl: PersonController, ctx: RequestContext, dialog, on_close=None, paint_color=None):
+        if not enlist_inp.validate() or not desert_inp.validate() or not rnokpp_inp.validate() or not birthday_inp.validate():
+            ui.notify('Виправте помилки в датах перед збереженням!', type='negative')
+            return
+
+        with ui.notification(message='Зберігаю дані...', spinner=True, timeout=0) as n:
+            await asyncio.sleep(0.1)  # Даємо UI відмалювати спінер
+
+            success = await run.io_bound(person_ctrl.save_person, ctx, person, paint_color)
+
+            if success:
+                n.message = 'Успішно збережено!'
+                n.type = 'positive'
+                n.spinner = False
+                n.timeout = 2
+
+                # Закриваємо діалог миттєво після успіху
+                dialog.close()
+
+                if on_close:
+                    if asyncio.iscoroutinefunction(on_close):
+                        await on_close()
+                    else:
+                        on_close()
+
+            else:
+                n.message = 'Помилка запису!'
+                n.type = 'negative'
+                n.spinner = False
+
+    async def handle_delete(person, person_ctrl: PersonController, ctx: RequestContext, dialog, on_close=None):
+        result = await confirm_delete_dialog('Ви дійсно бажаєте видалити цей запис?')
+        if not result: return
+        with ui.notification(message='Видаляю дані...', spinner=True, timeout=0) as n:
+            await asyncio.sleep(0.1)  # Даємо UI відмалювати спінер
+
+            success = await run.io_bound(person_ctrl.delete_record, ctx, person)
+
+            if success:
+                n.message = 'Успішно видалено!'
+                n.type = 'positive'
+                n.spinner = False
+                n.timeout = 2
+
+                dialog.close()
+
+                if on_close:
+                    if asyncio.iscoroutinefunction(on_close):
+                        await on_close()
+                    else:
+                        on_close()
+
+            else:
+                n.message = 'Помилка видалення!'
+                n.type = 'negative'
+                n.spinner = False
+
     with ui.dialog().props('maximized') as dialog, ui.card().classes(
             'w-full h-full max-w-none p-0 gap-0 flex flex-col bg-gray-50'):
-        # ШАПКА (Фіксована)
         with ui.row().classes(
                 'w-full justify-between items-center bg-blue-700 text-white p-4 m-0 shrink-0 shadow-md z-10'):
             with ui.row().classes('items-center gap-3'):
@@ -61,7 +166,6 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, auth_manager: 
                 ui.label(f"Картка: {person.name}").classes('text-2xl font-bold')
             ui.button(icon='close', on_click=dialog.close).props('flat round text-white')
 
-        # ТІЛО З ТАБАМИ (Скролиться)
         with ui.column().classes('w-full flex-grow overflow-hidden p-0 gap-0'):
             with ui.tabs().classes('w-full text-black bg-white border-b border-gray-200 shrink-0') as tabs:
                 main_tab = ui.tab('Основна інформація', icon='contact_mail')
@@ -70,7 +174,6 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, auth_manager: 
                 bio_tab = ui.tab('Біографія', icon='history_edu')
                 erdr_tab = ui.tab('Стан розслідування', icon='gavel')
 
-            # Вміст табів (flex-grow та overflow-y-auto дозволяють скролити лише контент)
             with ui.tab_panels(tabs, value=main_tab).classes('w-full flex-grow overflow-y-auto p-6 bg-transparent'):
                 # ПАНЕЛЬ 1: Основна інформація
                 with ui.tab_panel(main_tab):
@@ -78,9 +181,12 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, auth_manager: 
                         with ui.row().classes('w-full gap-6'):
                             search_select(MIL_UNITS, COLUMN_MIL_UNIT, person, 'mil_unit').classes('w-32')
                             ui.input(COLUMN_NAME).bind_value(person, 'name').classes('flex-grow')
-                            ui.input(COLUMN_ID_NUMBER, placeholder='xxxxxxxxxx', validation={
-                                'Формат має бути xxxxxxxxxx': lambda v: bool(re.match(VALID_PATTERN_ID_NUMBER, str(v))) if v else True
+                            rnokpp_inp = ui.input(COLUMN_ID_NUMBER, placeholder='xxxxxxxxxx', validation={
+                                'Формат має бути 10 цифр': lambda v: len(str(v)) == 10 if v else True,
+                                id_mismatch_err: lambda _: validate_id_vs_birthday(person)
                             }).bind_value(person, 'rnokpp').classes('w-48')
+
+                            rnokpp_inp.on('blur', refresh_validation)
 
                         with ui.row().classes('w-full gap-6 mt-4'):
                             search_select(ui_options.get(COLUMN_TITLE, []), COLUMN_TITLE, person, 'title').classes('flex-grow')
@@ -94,15 +200,31 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, auth_manager: 
                                 'Формат має бути 0xxxxxxxxx': lambda v: bool(re.match(VALID_PATTERN_PHONE, v.strip())) if v else True
                             }).bind_value(person, 'phone').classes('w-48')
 
-                        with ui.row().classes('w-full mt-4'):date_input(COLUMN_BIRTHDAY, person, 'birthday', blur_handler=fix_date).classes('w-1/3')
+                        with ui.row().classes('w-full mt-4'):
+                            birthday_inp = date_input(
+                                COLUMN_BIRTHDAY,
+                                person,
+                                'birthday',
+                                # Тут обов'язково fix_date(e) та оновлення валідації
+                                blur_handler=lambda e: [fix_date(e), refresh_validation()]
+                            ).classes('w-1/3')
+                            birthday_inp.validation.update({
+                                id_mismatch_err: lambda _: validate_id_vs_birthday(person)
+                            })
 
                 # ПАНЕЛЬ 2: ТЦК
                 with ui.tab_panel(tzk_tab):
                     with ui.card().classes('w-full max-w-5xl mx-auto p-6 shadow-sm border border-gray-200'):
                         with ui.row().classes('w-full gap-6'):
                             ui.input(COLUMN_TZK).bind_value(person, 'tzk').classes('flex-grow')
-                            date_input(COLUMN_ENLISTMENT_DATE, person, 'enlistment_date',blur_handler=fix_date).classes('w-1/3')
-                            ui.input(COLUMN_SERVICE_DAYS).bind_value(person, 'service_days').classes('flex-grow')
+                            enlist_inp = date_input(COLUMN_ENLISTMENT_DATE, person, 'enlistment_date', blur_handler=lambda e: [fix_date(e), refresh_validation()]).classes('w-1/3')
+                            enlist_inp.props(f'validation-rules="{date_rules}"')
+                            enlist_inp.validation = date_rules
+
+                            service_days_input = ui.input(COLUMN_SERVICE_DAYS, validation={
+                                '⚠️ Нелогічна кількість днів служби. Перевірте дати.':
+                                    lambda v: 0 <= (int(v) if str(v).isdigit() else 0) <= 4000
+                            }).bind_value(person, 'service_days').classes('flex-grow')
 
                         with ui.row().classes('w-full gap-6 mt-4'):
                             search_select(ui_options.get(COLUMN_TZK_REGION, []), COLUMN_TZK_REGION, person,'tzk_region').classes('w-1/3')
@@ -116,7 +238,8 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, auth_manager: 
                             search_select(ui_options.get(COLUMN_DESERTION_REGION, []), COLUMN_DESERTION_REGION, person,'desertion_region').classes('flex-grow')
 
                         with ui.row().classes('w-full gap-6 mt-4'):
-                            date_input(COLUMN_DESERTION_DATE, person, 'desertion_date', blur_handler=fix_date).classes('w-1/3')
+                            desert_inp = date_input(COLUMN_DESERTION_DATE, person, 'desertion_date', blur_handler=lambda e: [fix_date(e), refresh_validation()]).classes('w-1/3')
+                            desert_inp.validation = date_rules
                             ui.input(COLUMN_DESERTION_TERM).bind_value(person, 'desertion_term').classes('flex-grow')
 
                         with ui.row().classes('w-full mt-4'):
@@ -197,111 +320,3 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, auth_manager: 
     return dialog
 
 
-def edit_erdr(person: Person, person_ctrl, ctx: RequestContext, on_close=None):
-    ui_options = person_ctrl.get_column_options()
-
-    with ui.dialog() as dialog, ui.card().classes('w-[1000px] max-w-none'):
-        with ui.row().classes('w-full justify-between items-center'):
-            ui.label(f"Картка Військовослужбовця: {person.name}").classes('text-xl font-bold')
-            ui.button(icon='close', on_click=dialog.close).props('flat round')
-
-        # ТАБИ
-        with ui.tabs().classes('w-full') as tabs:
-            main_tab = ui.tab('💼 ДБР')
-            bio_tab = ui.tab('📝 БІО')
-
-        with ui.tab_panels(tabs, value=main_tab).classes('w-full'):
-            if not person.review_status:
-                person.review_status = REVIEW_STATUS_WAITING
-
-            with ui.tab_panel(main_tab):
-                with ui.row().classes('w-full gap-4'):
-                    ui.input(COLUMN_NAME).bind_value(person, 'name').classes('flex-grow').props('readonly')
-                    ui.input(COLUMN_ID_NUMBER).bind_value(person, 'rnokpp').classes('w-40').props('readonly')
-
-                with ui.row().classes('w-full gap-4 mt-2'):
-                    search_select(ui_options.get(COLUMN_REVIEW_STATUS, []), COLUMN_REVIEW_STATUS, person,
-                                  'review_status').classes('flex-grow')
-                    ui.input(COLUMN_CC_ARTICLE).bind_value(person, 'cc_article').classes('w-40')
-
-                with ui.row().classes('w-full gap-4 mt-2'):
-                    ui.input(COLUMN_ORDER_ASSIGNMENT_NUMBER).bind_value(person, 'o_ass_num').classes('w-40')
-                    date_input(COLUMN_ORDER_ASSIGNMENT_DATE, person, 'o_ass_date', blur_handler=fix_date).classes('w-1/3')
-
-                with ui.row().classes('w-full gap-4 mt-2'):
-                    ui.input(COLUMN_ORDER_RESULT_NUMBER).bind_value(person, 'o_res_num').classes('w-40')
-                    date_input(COLUMN_ORDER_RESULT_DATE, person, 'o_res_date', blur_handler=fix_date).classes('w-1/3')
-
-                with ui.row().classes('w-full gap-4 mt-2'):
-                    ui.input(COLUMN_KPP_NUMBER).bind_value(person, 'kpp_num').classes('w-40')
-                    date_input(COLUMN_KPP_DATE, person, 'kpp_date', blur_handler=fix_date).classes('w-1/3')
-
-                with ui.row().classes('w-full gap-4 mt-2'):
-                    ui.input(COLUMN_DBR_NUMBER).bind_value(person, 'dbr_num').classes('w-40')
-                    date_input(COLUMN_DBR_DATE, person, 'dbr_date', blur_handler=fix_date).classes('w-1/3')
-
-            with ui.tab_panel(bio_tab):
-                ui.textarea(COLUMN_BIO).bind_value(person, 'bio').classes('w-full')
-
-        # КНОПКИ ДІЇ
-        with ui.row().classes('w-full justify-end mt-4 gap-2'):
-            ui.button('Скасувати', on_click=dialog.close).props('outline')
-            if person_ctrl.auth_manager.has_access('person', 'write'):
-                ui.button('💾 ЗБЕРЕГТИ', on_click=lambda: handle_save(person, person_ctrl, ctx, dialog, on_close=on_close, paint_color=EXCEL_BLUE_COLOR)) \
-                    .classes('bg-green-600 text-white')
-
-    dialog.open()
-
-
-async def handle_delete(person, person_ctrl:PersonController, ctx:RequestContext, dialog, on_close=None):
-    result = await confirm_delete_dialog('Ви дійсно бажаєте видалити цей запис?')
-    if not result: return
-    with ui.notification(message='Видаляю дані...', spinner=True, timeout=0) as n:
-        await asyncio.sleep(0.1)  # Даємо UI відмалювати спінер
-
-        success = await run.io_bound(person_ctrl.delete_record, ctx, person)
-
-        if success:
-            n.message = 'Успішно видалено!'
-            n.type = 'positive'
-            n.spinner = False
-            n.timeout = 2
-
-            dialog.close()
-
-            if on_close:
-                if asyncio.iscoroutinefunction(on_close):
-                    await on_close()
-                else:
-                    on_close()
-
-        else:
-            n.message = 'Помилка видалення!'
-            n.type = 'negative'
-            n.spinner = False
-
-async def handle_save(person, person_ctrl:PersonController, ctx:RequestContext, dialog, on_close=None, paint_color=None):
-    with ui.notification(message='Зберігаю дані...', spinner=True, timeout=0) as n:
-        await asyncio.sleep(0.1)  # Даємо UI відмалювати спінер
-
-        success = await run.io_bound(person_ctrl.save_person, ctx, person, paint_color)
-
-        if success:
-            n.message = 'Успішно збережено!'
-            n.type = 'positive'
-            n.spinner = False
-            n.timeout = 2
-
-            # Закриваємо діалог миттєво після успіху
-            dialog.close()
-
-            if on_close:
-                if asyncio.iscoroutinefunction(on_close):
-                    await on_close()
-                else:
-                    on_close()
-
-        else:
-            n.message = 'Помилка запису!'
-            n.type = 'negative'
-            n.spinner = False

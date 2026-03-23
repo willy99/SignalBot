@@ -1,9 +1,13 @@
 from nicegui import ui
 from datetime import datetime
+
+from nicegui.dependencies import register_esm
+
 from gui.services.request_context import RequestContext
 from domain.task import Task, Subtask
 from gui.controllers.task_controller import TaskController
-from service.constants import TASK_STATUS_NEW, TASK_STATUS_COMPLETED
+from gui.tools.ui_components import confirm_delete_dialog
+from service.constants import TASK_STATUS_NEW, TASK_STATUS_COMPLETED, TASK_STATUS_IN_PROGRESS, TASK_STATUS_CANCELED
 from dics.deserter_xls_dic import TASK_TYPES
 
 
@@ -19,7 +23,7 @@ def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_
         'task_type': 'Документація',
         'assignee': ctx.user_id,
         'task_deadline': '',
-        'task_status': TASK_STATUS_NEW,  # За замовчуванням
+        'task_status': TASK_STATUS_NEW,
         'subtasks': []
     }
 
@@ -92,15 +96,62 @@ def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_
         except Exception as e:
             ui.notify(f'Помилка збереження: {e}', type='negative')
 
+    async def on_delete():
+        result = await confirm_delete_dialog(f'Видалити задачу №{task_id}?')
+
+        if result:
+            try:
+                controller.delete_task(ctx, task_id)
+                ui.notify('Задачу видалено', type='positive')
+                ui.navigate.to('/tasks')
+            except Exception as e:
+                ui.notify(f'Помилка видалення: {e}', type='negative')
+
+    def change_status(new_status: str):
+        state['task_status'] = new_status
+        on_save()
+        header_buttons.refresh()
+        status_badge.refresh()
+        ui.notify(f'Статус змінено на: {new_status}')
+
     # ==========================================
     # ШАПКА ФОРМИ (Заголовок + Кнопки)
     # ==========================================
+
+    @ui.refreshable
+    def header_buttons():
+        with ui.row().classes('items-center gap-3'):
+            if not is_new:
+                ui.button('ВИДАЛИТИ', icon='delete', on_click=on_delete).props('color="red"').classes('h-10')
+
+            ui.button('СКАСУВАТИ', icon='close', on_click=lambda: ui.navigate.to('/tasks')).props('color="gray" text-color="black"').classes('h-10')
+
+            # Кнопка перемикання статусів
+            if state['task_status'] == TASK_STATUS_NEW:
+                ui.button('РОЗПОЧАТИ', icon='play_arrow', on_click=lambda: change_status(TASK_STATUS_IN_PROGRESS)) \
+                    .props('color="orange"').classes('h-10')
+            elif state['task_status'] == TASK_STATUS_IN_PROGRESS:
+                ui.button('ЗАВЕРШИТИ', icon='check_circle', on_click=lambda: change_status(TASK_STATUS_COMPLETED)) \
+                    .props('color="green"').classes('h-10')
+
+            ui.button('ЗБЕРЕГТИ', icon='save', on_click=on_save).props('color="primary"').classes('h-10 px-8 shadow-md')
+
+    @ui.refreshable
+    def status_badge():
+        colors = {
+            TASK_STATUS_NEW: 'blue',
+            TASK_STATUS_IN_PROGRESS: 'orange',
+            TASK_STATUS_COMPLETED: 'green',
+            TASK_STATUS_CANCELED: 'red'
+        }
+        color = colors.get(state['task_status'], 'gray')
+        with ui.row().classes('items-center justify-between w-full border-b border-gray-100 pb-3 mb-2'):
+            ui.label('Статус:').classes('text-gray-600 font-bold')
+            ui.badge(state['task_status'], color=color).classes('text-sm px-2 py-1')
+
     with ui.row().classes('w-full max-w-6xl mx-auto items-center justify-between mb-6'):
         ui.label(page_title).classes('text-3xl font-bold')
-
-        with ui.row().classes('items-center gap-4'):
-            ui.button('СКАСУВАТИ', icon='close', on_click=lambda: ui.navigate.to('/tasks')).props('flat color="gray"').classes('h-10')
-            ui.button('ЗБЕРЕГТИ', icon='save', on_click=on_save).props('color="primary"').classes('h-10 px-8')
+        header_buttons()
 
     # ==========================================
     # ТІЛО ФОРМИ (Дві колонки)
@@ -162,10 +213,7 @@ def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_
         # --- ПРАВА ПАНЕЛЬ: Параметри ---
         with ui.column().classes('col-span-12 md:col-span-4 w-full gap-4'):
             with ui.card().classes('w-full p-6 shadow-md gap-4'):
-                badge_color = 'green' if state['task_status'] == TASK_STATUS_COMPLETED else 'blue'
-                with ui.row().classes('items-center justify-between w-full border-b border-gray-100 pb-3 mb-2'):
-                    ui.label('Статус:').classes('text-gray-600 font-bold')
-                    ui.badge(state['task_status'], color=badge_color).classes('text-sm px-2 py-1')
+                status_badge()
 
                 ui.select(users_options, label='Виконавець (Кому)').bind_value(state, 'assignee').classes('w-full')
                 ui.select(type_options, label='Тип задачі').bind_value(state, 'task_type').classes('w-full')

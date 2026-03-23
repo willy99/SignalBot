@@ -27,6 +27,8 @@ class TaskService:
             task_id = self.db.insert_record(DB_TABLE_TASK, task_data)
         else:
             task_id = task.id
+            task_data.pop('created_by', None)
+            task_data.pop('created_date', None)
             self.db.update_record(DB_TABLE_TASK, task_id, task_data)
             self.db.delete_children(DB_TABLE_SUBTASK, 'task_id', task_id)
 
@@ -96,6 +98,7 @@ class TaskService:
                 params.append(now_str)
 
         query += " ORDER BY updated_date DESC"
+        print('>>> query = ' + query)
         rows = self.db.__execute_fetchall__(query, tuple(params))
         return [Task(**dict(r)) for r in rows]
 

@@ -15,3 +15,5 @@ python-dotenv~=1.2.2
 pynput
 xlwings
 docxtpl
+dotenv
+werkzeug~=3.1.3

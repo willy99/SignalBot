@@ -70,6 +70,41 @@ def test_upsert_updates_existing_record(temp_excel_file, mock_logger):
         processor.close()
 
 
+def test_upsert_updates_withoutrnokpp_existing_record(temp_excel_file, mock_logger):
+    """Перевіряємо, чи оновлюється існуючий запис (перевірка логіки _find_existing_row)"""
+    processor = ExcelProcessor(temp_excel_file, mock_logger, is_test_mode=True)
+
+    # Створюємо базовий запис
+    base_record = {
+        COLUMN_NAME: "Бойко Олег Григорович",
+        COLUMN_ID_NUMBER: None,
+        COLUMN_BIRTHDAY: "09.03.1999",
+        COLUMN_DESERTION_DATE: "15.05.2023",
+        COLUMN_MIL_UNIT: DESERTER_TAB_NAME
+    }
+
+    try:
+        # 1. Додаємо запис вперше
+        processor.upsert_record([base_record])
+
+        # Перевіряємо, що запис один
+        assert processor.get_last_row() == 2
+
+        # 2. "Прилітає" оновлення для цієї ж людини (ті самі ПІБ, РНОКПП, Дата народження)
+        # але з новими даними в інших полях (наприклад, з'явилася ВЧ)
+        update_record = base_record.copy()
+        update_record[COLUMN_TZK_REGION] = "Донецька область"
+
+        # 3. Робимо upsert знову
+        processor.upsert_record([update_record])
+
+        # 4. ГОЛОВНА ПЕРЕВІРКА: кількість рядків НЕ ПОВИННА збільшитись!
+        assert processor.get_last_row() == 2, "Замість оновлення був створений дублікат!"
+
+    finally:
+        processor.close()
+
+
 def test_search_people(temp_excel_file, mock_logger):
     """Перевіряємо, чи працює пошук по базі"""
     processor = ExcelProcessor(temp_excel_file, mock_logger, is_test_mode=True)
