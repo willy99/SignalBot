@@ -54,59 +54,69 @@ class DbrController:
     def mark_as_completed(self, ctx: RequestContext, dbr_doc_id: int, payload: list, out_number: str, out_date: str,
                           person_controller=None) -> bool:
 
-        self.logger.debug(f'UI:{ctx.user_name}: Помічаємо комплект документів як COMPLETED: {dbr_doc_id}')
+        self.logger.debug(f'UI:{ctx.user_name}: Помічаємо комплект ДБР як COMPLETED: {dbr_doc_id}')
 
         draft = self.get_dbr_doc_by_id(ctx, dbr_doc_id)
         if not draft:
             raise ValueError(f"Чернетку №{dbr_doc_id} не знайдено!")
 
         payload_data = draft.get('payload', [])
-        persons_to_update = []
 
+        # 1. Збираємо всі ключі для масового пошуку в Excel
+        search_keys = []
         for doc in payload_data:
-            row_key = get_person_key_from_str(doc.get('id_number'))
-            found_person_data = person_controller.find_person(ctx, row_key)
+            id_str = doc.get('id_number')
+            if id_str:
+                search_keys.append(get_person_key_from_str(id_str))
 
-            dbr_out_number = doc.get('dbr_num')
-            dbr_out_date = doc.get('dbr_date')
-            kpp_number = doc.get('kpp_num')
-            kpp_date = doc.get('kpp_date')
-            o_ass_num = doc.get('o_ass_num')
-            o_ass_date = doc.get('o_ass_date')
-            o_res_num = doc.get('o_res_num')
-            o_res_date = doc.get('o_res_date')
-            mil_unit = doc.get('mil_unit') if doc.get('mil_unit') else MIL_UNITS[0]
+        # 2. Отримуємо дані всіх людей одним запитом
+        all_found_data = person_controller.find_persons(search_keys)
+
+        persons_to_update = []
+        for doc in payload_data:
+            id_str = doc.get('id_number')
+
+            current_key = get_person_key_from_str(id_str)
+            found_person_data = all_found_data.get(current_key.uid)
 
             if not found_person_data:
-                self.logger.warning(f"Пропущено: не знайдено людину за ключем {row_key}")
+                self.logger.warning(f"Пропущено: не знайдено людину за ключем {id_str}")
                 continue
 
             person_dict = found_person_data.get('data', {})
             logical_id = person_dict.get(COLUMN_INCREMENTAL)
 
-            print(f'Знайдено логічний ID: {logical_id}')
-
             if logical_id is not None:
+                mil_unit = doc.get('mil_unit') or MIL_UNITS[0]
+
+                # Формуємо об'єкт Person з усіма реквізитами
                 p = Person(
                     id=logical_id,
-                    kpp_num=kpp_number,
-                    kpp_date=kpp_date,
-                    dbr_date=dbr_out_date,
-                    dbr_num=dbr_out_number,
-                    o_ass_num=o_ass_num,
-                    o_ass_date=o_ass_date,
-                    o_res_num=o_res_num,
-                    o_res_date=o_res_date,
+                    kpp_num=doc.get('kpp_num'),
+                    kpp_date=doc.get('kpp_date'),
+                    dbr_date=doc.get('dbr_date'),
+                    dbr_num=doc.get('dbr_num'),
+                    o_ass_num=doc.get('o_ass_num'),
+                    o_ass_date=doc.get('o_ass_date'),
+                    o_res_num=doc.get('o_res_num'),
+                    o_res_date=doc.get('o_res_date'),
                     review_status=REVIEW_STATUS_WAITING,
                     mil_unit=mil_unit
                 )
                 persons_to_update.append(p)
 
+        # 3. Масовий запис в Excel (фарбуємо в синій)
         if persons_to_update:
-            success = person_controller.save_persons(ctx, persons_to_update, paint_color=config.EXCEL_BLUE_COLOR, partial_update=True)
+            success = person_controller.save_persons(
+                ctx,
+                persons_to_update,
+                paint_color=config.EXCEL_BLUE_COLOR,
+                partial_update=True
+            )
             if not success:
                 raise Exception("Не вдалося оновити дані в Excel. Статус чернетки НЕ змінено.")
 
+        # 4. Фіналізуємо статус у базі даних SQLite
         dservice = DbrService(self.db, ctx)
         return dservice.mark_as_completed(dbr_doc_id, out_number, out_date)
 

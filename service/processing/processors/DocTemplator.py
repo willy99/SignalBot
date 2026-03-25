@@ -290,13 +290,15 @@ class DocTemplator:
 
             # Якщо у вас в даних є des_region - беремо його. Якщо ні - залишаємо порожнім або 'Не вказано'
             des_region = str(raw.get('desertion_region') or '').strip()
+            des_locality = str(raw.get('desertion_locality') or '').strip()
 
             formatted_docs.append({
                 'number': idx,
                 'title': title.lower(),
                 'name': name,
                 'des_place': des_place,
-                'des_region': des_region
+                'des_region': des_region,
+                'des_locality': des_locality
             })
 
         # Формуємо контекст для Word

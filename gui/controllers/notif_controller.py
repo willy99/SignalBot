@@ -77,6 +77,7 @@ class NotifController:
         return self.doc_templator.generate_notif_zip_archive(region, out_num, out_date, buffer)
 
     def mark_as_completed(self, ctx: RequestContext, doc_id: int, payload: list, out_number: str, out_date: str, person_controller=None) -> bool:
+
         self.logger.debug(f'UI:{ctx.user_name}: Помічаємо комплект документів як COMPLETED: {doc_id}')
 
         draft = self.get_doc_by_id(ctx, doc_id)
@@ -84,30 +85,36 @@ class NotifController:
             raise ValueError(f"Чернетку №{doc_id} не знайдено!")
 
         payload_data = draft.get('payload', [])
-        persons_to_update = []
 
+        search_keys = []
         for doc in payload_data:
-            row_key = get_person_key_from_str(doc.get('id_number'))
-            found_person_data = person_controller.find_person(ctx, row_key)
-            kpp_number = doc.get('kpp_num')
-            kpp_date = doc.get('kpp_date')
-            row_seq_num = doc.get('seq_num')
-            mil_unit = doc.get('mil_unit') if doc.get('mil_unit') else MIL_UNITS[0]
+            id_str = doc.get('id_number')
+            if id_str:
+                search_keys.append(get_person_key_from_str(id_str))
+
+        all_found_data = person_controller.find_persons(search_keys)
+
+        persons_to_update = []
+        for doc in payload_data:
+            id_str = doc.get('id_number')
+            current_key = get_person_key_from_str(id_str)
+            found_person_data = all_found_data.get(current_key.uid)
 
             if not found_person_data:
-                self.logger.warning(f"Пропущено: не знайдено людину за ключем {row_key}")
+                self.logger.warning(f"Пропущено: не знайдено людину за ключем {id_str}")
                 continue
 
             person_dict = found_person_data.get('data', {})
             logical_id = person_dict.get(COLUMN_INCREMENTAL)
 
-            print(f'Знайдено логічний ID: {logical_id}')
+            row_seq_num = doc.get('seq_num')
+            mil_unit = doc.get('mil_unit') or MIL_UNITS[0]
 
             if logical_id is not None:
                 p = Person(
                     id=logical_id,
-                    kpp_num=kpp_number + '/' + str(row_seq_num),
-                    kpp_date=kpp_date,
+                    kpp_num=f"{doc.get('kpp_num')}/{row_seq_num}",
+                    kpp_date=doc.get('kpp_date'),
                     mil_unit=mil_unit
                 )
                 persons_to_update.append(p)

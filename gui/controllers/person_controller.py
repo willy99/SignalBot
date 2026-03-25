@@ -66,8 +66,11 @@ class PersonController:
             return False
 
 
-    def find_person(self, ctx: RequestContext, person_key: PersonKey):
+    def find_person(self, person_key: PersonKey):
         return self.processor.find_person(person_key)
+
+    def find_persons(self, person_keys: list[PersonKey])-> dict[str, dict]:
+        return self.processor.find_persons(person_keys)
 
     def batch_search_names(self, ctx: RequestContext, names_list: List[str]) -> List[Dict[str, Any]] :
         self.logger.debug('UI:' + ctx.user_name + ': Шукаємо список з ' + str(len(names_list)) + ' людей')

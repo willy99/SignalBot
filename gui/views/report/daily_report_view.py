@@ -336,6 +336,7 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
                         {'name': 'subunit', 'label': COLUMN_SUBUNIT, 'field': 'subunit', 'align': 'left', 'classes': 'w-2/12', 'headerClasses': 'w-2/12'},
                         {'name': 'desertion_place', 'label': 'Обставини', 'field': 'desertion_place', 'align': 'left', 'classes': 'w-3/12', 'headerClasses': 'w-3/12'},
                         {'name': 'desertion_region', 'label': 'Регіон', 'field': 'desertion_region', 'classes': 'hidden', 'headerClasses': 'hidden'},
+                        {'name': 'desertion_locality', 'label': 'Н.п.', 'field': 'desertion_locality', 'classes': 'hidden', 'headerClasses': 'hidden'},
                     ]
 
                     if data_A0224:

@@ -48,7 +48,7 @@ CACHE_FILE_PATH: Final = f"\\\\{NET_SERVER_IP}\\{DOC_DIR}\\file_cache.json"
 CACHE_FOLDER_PATH: Final = f"\\\\{NET_SERVER_IP}\\{DOC_DIR}"
 INBOX_LOCAL_DIR_PATH = f"/Volumes/exchange/дд/inbox"
 OUTBOX_LOCAL_DIR_PATH = f"/Volumes/exchange/дд/outbox"
-REPORT_DAILY_DESERTION = f"/Volumes/exchange/projekt407/{REPORT_DIR}"
+REPORT_DAILY_DESERTION = f"/Volumes/exchange/projekt407/project/{REPORT_DIR}"
 
 # Налаштування структури папок
 FOLDER_YEAR_FORMAT : Final = "%Y"         # Наприклад: 2026

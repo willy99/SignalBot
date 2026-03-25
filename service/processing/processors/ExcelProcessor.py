@@ -511,6 +511,90 @@ class ExcelProcessor:
 
             return results
 
+    def find_persons(self, keys: list[PersonKey]) -> dict[str, dict]:
+        """
+        Шукає групу людей за один прохід по Excel.
+        Повертає словник {id_number: {'row_idx': int, 'data': dict}}
+        """
+        if not keys:
+            return {}
+
+        results = {}
+        keys_by_unit = {}
+        for k in keys:
+            unit = k.mil_unit if k.mil_unit else config.DESERTER_TAB_NAME
+            keys_by_unit.setdefault(unit, []).append(k)
+
+        with self.lock:
+            for unit, unit_keys in keys_by_unit.items():
+                self.switch_to_sheet(unit, silent=True)
+
+                last_row = self.get_last_row()
+                if last_row < 2:
+                    continue
+
+                # Завантажуємо весь лист в пам'ять ОДИН раз для цього підрозділу
+                data = self.sheet.range(f"A2:BB{last_row}").value
+                if not data:
+                    continue
+
+                # Отримуємо індекси колонок
+                pib_idx = self.header.get(COLUMN_NAME, 1) - 1
+                rnokpp_idx = self.header.get(COLUMN_ID_NUMBER, 1) - 1
+                des_date_idx = self.header.get(COLUMN_DESERTION_DATE, 1) - 1
+
+                # Створюємо копію списку ключів, які ще треба знайти (для оптимізації)
+                remaining_keys = unit_keys[:]
+
+                for i, row in enumerate(data):
+                    if not row[pib_idx] or not remaining_keys:
+                        continue
+
+                    pib_val = str(row[pib_idx]).lower().strip()
+                    rnokpp_val = get_strint_fromfloat(row[rnokpp_idx], "").strip()
+                    des_date_val = format_ukr_date(row[des_date_idx])
+
+                    # Перетворюємо дату з Excel в рядок для порівняння один раз на рядок
+                    des_date_str = ""
+                    if isinstance(des_date_val, (datetime, date)):
+                        des_date_str = des_date_val.strftime("%d.%m.%Y")
+                    else:
+                        des_date_str = str(des_date_val).strip()
+
+                    # Перевіряємо кожен ключ, який ми шукаємо в цьому листі
+                    found_indices = []
+                    for idx, key in enumerate(remaining_keys):
+                        target_name = (key.name or "").lower().strip()
+                        target_rnokpp = (key.rnokpp or "").strip()
+                        target_des_date = (key.des_date or "").strip()
+
+                        match_name = (target_name == pib_val) if target_name else True
+                        match_rnokpp = (target_rnokpp == rnokpp_val) if (target_rnokpp and target_rnokpp != 'None') else True
+
+                        # Порівняння дати (враховуючи ISO та UKR формати)
+                        match_date = True
+                        if target_des_date:
+                            match_date = (target_des_date == des_date_str or
+                                          (isinstance(des_date_val, (datetime, date)) and target_des_date == str(des_date_val.date())))
+
+                        if match_name and match_rnokpp and match_date:
+                            # Трансформуємо рядок
+                            serialized_row = []
+                            for cell in row:
+                                self._transform_cell(cell, serialized_row)
+
+                            results[key.uid] = {
+                                'row_idx': i + 2,
+                                'data': dict(zip(self.header, serialized_row))
+                            }
+                            found_indices.append(idx)
+
+                    # Видаляємо знайдені ключі, щоб не перевіряти їх на наступних рядках
+                    for idx in reversed(found_indices):
+                        remaining_keys.pop(idx)
+
+        return results
+
     def find_person(self, key: PersonKey) -> dict:
         with self.lock:
             if key.mil_unit:

@@ -2,14 +2,12 @@ from datetime import datetime, date
 from typing import Any, Optional
 import traceback
 import config
-from dics.deserter_xls_dic import *
 from collections import defaultdict
 from service.processing.DocumentProcessingService import DocumentProcessingService
 from service.storage.LoggerManager import LoggerManager
 from utils.utils import get_strint_fromfloat, get_year_safe
 from domain.person_filter import PersonSearchFilter
-import re
-import os
+from utils.regular_expressions import *
 
 class ExcelReporter:
     def __init__(self, excelProcessor, log_manager: LoggerManager):
@@ -629,6 +627,7 @@ class ExcelReporter:
         des_region_idx = self.excelProcessor.header.get(COLUMN_DESERTION_REGION, 1) - 1
         exp_idx = self.excelProcessor.header.get(COLUMN_EXPERIENCE, 1) - 1
         des_type_idx = self.excelProcessor.header.get(COLUMN_DESERTION_TYPE, 1) - 1
+        des_conditions_idx = self.excelProcessor.header.get(COLUMN_DESERT_CONDITIONS, 1) - 1
 
         results = []
         target_sheets = ['А0224', 'А7018']
@@ -667,18 +666,17 @@ class ExcelReporter:
                 raw_place = row[des_place_idx] if len(row) > des_place_idx else None
                 raw_region = row[des_region_idx] if len(row) > des_region_idx else None
 
+                raw_conditions = str(row[des_conditions_idx]).strip()
+
                 des_place_clean = str(raw_place).strip() if raw_place else 'Не вказано'
                 des_region_clean = str(raw_region).strip() if raw_region else ''
                 des_type_clean = str(raw_des_type).strip().lower() if raw_des_type else ''
 
-                # ==========================================
-                # 💡 ДОДАНО: Перевірка на "Подвійну подію"
-                # Якщо це несвоєчасне повернення або без поважних причин, людина має потрапити
-                # в СЗЧ навіть якщо в неї вже заповнена дата повернення.
-                # ==========================================
+                # todo
+                des_locality = extract_locality(raw_conditions)
+
                 is_dual_event = 'сзч' not in des_type_clean
 
-                # Якщо дата знайдена і вона збігається з цільовою
                 if ins_date == target_date and (ret_date is None or is_dual_event):
                     results.append({
                         'sheet_name': sheet_name,
@@ -691,6 +689,7 @@ class ExcelReporter:
                         'term_days': get_strint_fromfloat(term_days),
                         'desertion_place': des_place_clean,
                         'desertion_region': des_region_clean,
+                        'desertion_locality': des_locality,
                         'experience': row[exp_idx] if (row[exp_idx]) else 'Невідомо',
                         'desertion_type': des_type_clean
                     })
@@ -1033,3 +1032,4 @@ class ExcelReporter:
             })
 
         return results
+

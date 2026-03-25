@@ -97,38 +97,58 @@ class SupportController:
         out_number = draft.get('out_number')
         out_date = draft.get('out_date')
         payload = draft.get('payload', [])
+        package_type = draft.get('package_type')
+
+        # 1. Збираємо всі ключі для масового пошуку
+        search_keys = []
+        for doc in payload:
+            id_str = doc.get('id_number')
+            if id_str:
+                search_keys.append(get_person_key_from_str(id_str))
+
+        # 2. Викликаємо масовий пошук (один прохід по Excel)
+        all_found_data = person_ctrl.find_persons(search_keys)
 
         persons_to_update = []
         for doc in payload:
-            row_key = get_person_key_from_str(doc.get('id_number'))
-            found_person_data = person_ctrl.find_person(ctx, row_key)
+            id_str = doc.get('id_number')
+            current_key = get_person_key_from_str(id_str)
+            found_person_data = all_found_data.get(current_key.uid)
             row_seq_num = doc.get('seq_num')
 
             if not found_person_data:
-                self.logger.warning(f"Пропущено: не знайдено людину за ключем {row_key}")
+                self.logger.warning(f"Пропущено: не знайдено людину за ключем {id_str}")
                 continue
 
             person_dict = found_person_data.get('data', {})
             logical_id = person_dict.get(COLUMN_INCREMENTAL)
 
-            print(f'Знайдено логічний ID: {logical_id}')
-            package_type = draft.get('package_type')
             if logical_id is not None:
-                individual_out_number = ('/' + str(row_seq_num) if row_seq_num else '') if package_type != DOC_PACKAGE_STANDART else ''
-                mil_unit = doc.get('mil_unit') if doc.get('mil_unit') else MIL_UNITS[0]
+                # Логіка формування номера (суфікс /1, /2 тощо)
+                individual_suffix = (f'/{row_seq_num}' if row_seq_num else '') if package_type != DOC_PACKAGE_STANDART else ''
+
+                mil_unit = doc.get('mil_unit') or MIL_UNITS[0]
+
                 p = Person(
                     id=logical_id,
                     dbr_date=out_date,
-                    dbr_num=out_number + individual_out_number,
+                    dbr_num=f"{out_number}{individual_suffix}",
                     mil_unit=mil_unit
                 )
                 persons_to_update.append(p)
 
+        # 3. Масове оновлення в Excel (теж одним блоком)
         if persons_to_update:
-            success = person_ctrl.save_persons(ctx, persons_to_update, paint_color=config.EXCEL_SUPPORT_COLOR, partial_update=True)
+            success = person_ctrl.save_persons(
+                ctx,
+                persons_to_update,
+                paint_color=config.EXCEL_SUPPORT_COLOR,
+                partial_update=True
+            )
             if not success:
                 raise Exception("Не вдалося оновити дані в Excel. Статус чернетки НЕ змінено.")
 
+        # 4. Зміна статусу в БД
         dservice = DocSupportService(self.db, ctx)
         return dservice.mark_as_completed(draft_id)
 
