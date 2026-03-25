@@ -672,7 +672,6 @@ class ExcelReporter:
                 des_region_clean = str(raw_region).strip() if raw_region else ''
                 des_type_clean = str(raw_des_type).strip().lower() if raw_des_type else ''
 
-                # todo
                 des_locality = extract_locality(raw_conditions)
 
                 is_dual_event = 'сзч' not in des_type_clean

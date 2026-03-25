@@ -5,6 +5,7 @@ from service.processing.processors.DocProcessor import DocProcessor
 from service.storage.LoggerManager import LoggerManager
 import tempfile
 import os
+from utils.regular_expressions import extract_name
 
 class FileCacheManager:
     def __init__(self, cache_filepath: str, log_manager):
@@ -88,7 +89,7 @@ class FileCacheManager:
                             persons_texts = processor.cut_into_person(raw_piece_3)
 
                             for person_text in persons_texts:
-                                name = processor._extract_name(person_text)
+                                name = extract_name(person_text)
                                 if name:
                                     extracted_names.append(name.strip())
 

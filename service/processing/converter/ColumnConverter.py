@@ -5,6 +5,7 @@ from service.processing.processors.DocProcessor import DocProcessor
 from service.storage.LoggerManager import LoggerManager
 from utils.utils import format_ukr_date
 from datetime import datetime, timedelta
+from utils.regular_expressions import *
 
 class ColumnConverter:
     def __init__(self, excel_file_path, log_manager: LoggerManager):
@@ -75,7 +76,7 @@ class ColumnConverter:
                     # sheet.range((row_idx, subunit_col)).color = (255, 199, 206)  # Pale Red
 
                 # Екстракція підрозділу
-                region_my = self.docProcessor._extract_desertion_region(condition)
+                region_my = extract_desertion_region(condition)
                 # print(str(i) + ': ' + region_my + ' vs ' + rtzk_region + " ( " + rtzk + ' || ' + address + ')')
                 #if des_region and region_my != des_region:
                 #    print('>>> Incorrect: ' + region_my + ' vs ' + des_region + " (" + condition + ')')
@@ -280,14 +281,14 @@ class ColumnConverter:
                     # sheet.range((row_idx, subunit_col)).color = (255, 199, 206)  # Pale Red
 
                 # Екстракція підрозділу
-                des_region = self.docProcessor._extract_desertion_region(condition)
-                birth = self.docProcessor._extract_birthday(bio)
-                rno = self.docProcessor._extract_id_number(bio)
-                enlist_date = self.docProcessor._extract_conscription_date(bio)
-                rtzk = self.docProcessor._extract_rtzk(bio)
-                rtzk_region = self.docProcessor._extract_region(bio)
-                address = self.docProcessor._extract_address(bio)
-                phone = self.docProcessor._extract_phone(bio)
+                des_region = extract_desertion_region(condition)
+                birth = extract_birthday(bio)
+                rno = extract_id_number(bio)
+                enlist_date = extract_conscription_date(bio)
+                rtzk = extract_rtzk(bio)
+                rtzk_region = extract_region(bio)
+                address = extract_address(bio)
+                phone = extract_phone(bio)
 
                 des_region_results.append([des_region])
                 birth_results.append([birth])
