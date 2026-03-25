@@ -6,38 +6,24 @@ from service.storage.LoggerManager import LoggerManager
 import tempfile
 import os
 
-'''
-class MockWorkflow:
-    """Заглушка для workflow, щоб збирати статистику без бота"""
-
-    def __init__(self):
-        self.log_manager = LoggerManager()
-        self.stats = type('Stats', (), {
-            'attachmentWordProcessed': 0,
-            'attachmentPDFProcessed': 0,
-            'doc_names': []
-        })
-'''
-
 class FileCacheManager:
     def __init__(self, cache_filepath: str, log_manager):
         self.cache_filepath = cache_filepath
         self.cache_data: List[Dict] = []
-        # Спочатку створюємо клієнт
         self.client = StorageFactory.create_client(cache_filepath, log_manager)
-        # Потім вантажимо кеш
 
     def get_file_separator(self):
         return self.client.get_separator()
 
-    def build_cache(self, root_folder: str):
+    def build_cache(self, root_folder: str, progress_callback=None):
         print(f"📡 Починаю глибоке сканування папки: {root_folder}...")
         new_cache = []
+        yearly_stats = {}
 
         # Створюємо мок-воркфлоу один раз для всіх файлів, щоб не перевантажувати пам'ять
         # workflow = MockWorkflow()
         normalized_root = root_folder.rstrip('\\/')
-
+        current_year = None
         with self.client:
             for dirpath, dirnames, filenames in self.client.walk(root_folder):
 
@@ -53,6 +39,23 @@ class FileCacheManager:
                 display_path = re.sub(r'^\\\\[^\\]+\\[^\\]+', '', dirpath)
                 display_path = display_path.lstrip('\\')
 
+                relative_path = dirpath.lower().replace(normalized_root, "").lstrip('\\/')
+                path_parts = relative_path.split('\\') if '\\' in relative_path else relative_path.split('/')
+
+
+                if len(path_parts) > 3:
+                    current_year = path_parts[3] if path_parts[3] and re.match(r'^\d{4}', path_parts[3]) else None
+                # 3. Якщо ми знайшли файли в будь-якій підпапці цього року
+
+                if current_year and filenames:
+                    # Рахуємо тільки валідні документи
+                    valid_files_count = sum(1 for f in filenames if f.lower().endswith(('.doc', '.docx', '.pdf')) and not f.startswith(('._', '~$')))
+
+                    if valid_files_count > 0:
+                        yearly_stats[current_year] = yearly_stats.get(current_year, 0) + valid_files_count
+                        if progress_callback:
+                            progress_callback(yearly_stats)
+
                 if not display_path:
                     display_path = "(Коренева папка)"
 
@@ -66,30 +69,24 @@ class FileCacheManager:
                     if filename.lower().endswith(('.doc', '.docx', '.pdf')) and not filename.startswith(('._', '~$')):
                         temp_local_path = None
                         try:
-                            # 1. Читаємо файл з мережі через ваш SMBFileClient у пам'ять
                             file_buffer = self.client.get_file_buffer(full_path_win)
 
-                            # 2. Створюємо тимчасовий локальний файл із правильним розширенням
                             ext = '.docx' if filename.lower().endswith('.docx') else '.pdf' if filename.lower().endswith('.pdf') else '.doc'
                             with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as temp_file:
                                 temp_file.write(file_buffer.read())
                                 temp_file.flush()  # ВАЖЛИВО! Примусово скидаємо дані на диск
                                 temp_local_path = temp_file.name  # Отримуємо локальний шлях
 
-                            # 3. Годуємо парсеру ЛОКАЛЬНИЙ файл
                             processor = DocProcessor(LoggerManager(), temp_local_path, filename, use_ml=False)
 
-                            # Витягуємо блок тексту з переліком осіб
                             raw_piece_3 = processor.engine.extract_text_between(
                                 PATTERN_PIECE_3_START,
                                 PATTERN_PIECE_3_END,
                                 True
                             ) or ""
 
-                            # Розбиваємо текст на окремі абзаци
                             persons_texts = processor.cut_into_person(raw_piece_3)
 
-                            # Дістаємо імена
                             for person_text in persons_texts:
                                 name = processor._extract_name(person_text)
                                 if name:
@@ -99,18 +96,15 @@ class FileCacheManager:
                             print(f"⚠️ Помилка парсингу імен у файлі {filename}: {e}")
 
                         finally:
-                            # 4. ОБОВ'ЯЗКОВО прибираємо за собою: видаляємо тимчасовий файл
                             if temp_local_path and os.path.exists(temp_local_path):
                                 os.remove(temp_local_path)
 
-                    # === ФОРМУЄМО ЛЕГКИЙ КЕШ ===
                     new_cache.append({
                         'name': filename,
                         'path': display_path,
                         'names': extracted_names
                     })
 
-            # === ОНОВЛЕНО: Делегуємо збереження клієнту ===
             self.client.save_json(self.cache_filepath, new_cache)
 
         self.cache_data = new_cache
@@ -132,7 +126,6 @@ class FileCacheManager:
             return []
 
         query = query.strip()
-        # Розбиваємо запит по зірочках, екрануємо спецсимволи і зшиваємо назад через .*
         escaped_parts = [re.escape(part) for part in query.split('*')]
         regex_pattern = ".*".join(escaped_parts)
 
@@ -143,13 +136,10 @@ class FileCacheManager:
 
         results = []
         for item in self.cache_data:
-            # 1. Перевіряємо збіг у назві файлу
             if compiled_regex.search(item.get('name', '')):
                 results.append(item)
-                continue  # Якщо знайшли в назві, йдемо до наступного файлу (щоб не було дублікатів)
+                continue
 
-            # 2. Перевіряємо збіг у списку витягнутих імен
-            # any() поверне True, якщо хоча б одне ім'я підходить під регулярку
             if any(compiled_regex.search(person) for person in item.get('names', [])):
                 results.append(item)
 

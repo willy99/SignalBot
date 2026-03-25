@@ -399,6 +399,11 @@ def test_title_extraction(processor_factory, mock_logger):
     res = processor._extract_title_2(res)
     assert "офіцер" in res
 
+    text = "БОЛВАН Руслан Олександрович, солдат, військовослужбовець військової служби за мобілізацією, водій-електрик-моторист 1 відділення 2 взводу ударних безпілотних авіаційних комплексів роти безпілотних систем"
+    res = processor._extract_title(text)
+    assert "солдат" in res
+
+
 def test_rtzk_extraction(processor_factory, mock_logger):
     processor = processor_factory("any.docx")
     text = "Призваний Слов'янським ТЦК 10.09.2025. РНОКПП 1234567890"

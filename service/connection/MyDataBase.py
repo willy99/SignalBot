@@ -4,8 +4,8 @@ import config
 import os
 
 class MyDataBase:
-    def __init__(self):
-        self.db_name = config.DB_NAME
+    def __init__(self, db_name=config.DB_NAME):
+        self.db_name = db_name
         self.__init_db__()
         self.connection = None
 
@@ -130,4 +130,17 @@ class MyDataBase:
         query = f"DELETE FROM {table} WHERE {field} = ?"
         self.__execute_insert__(query, (value,))
         return True
+
+    def __execute_sql__(self, sql):
+        conn = self.connect()
+        try:
+            with closing(conn.cursor()) as cursor:
+                cursor.execute(sql, ())
+                conn.commit()
+                return cursor.lastrowid
+        except sqlite3.Error as e:
+            print(f"❌ Помилка в БД: {e}")
+            conn.rollback()
+            return None
+
 

@@ -251,6 +251,7 @@ class AppMenu:
                             make_menu_item('Користувачі', 'manage_accounts', '/admin/users')
                             make_menu_item('Логи', 'history', '/logs')
                             make_menu_item('Конфіг Системи', 'build', '/admin/settings')
+                            make_menu_item('Індексація файлів', 'cached', '/admin/file_index')
 
                 # === ПРОФІЛЬ ТА ВИХІД ===
                 ui.separator().props('vertical dark').classes('mx-2 h-8')

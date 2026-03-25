@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Union, Final
+from typing import Optional, Union, Final, List
 
 from dics.deserter_xls_dic import MIL_UNITS
 
@@ -31,3 +31,4 @@ class PersonSearchFilter:
     desertion_region:[str] = None
 
     include_402:[str] = None
+    main_units: List[str] = None

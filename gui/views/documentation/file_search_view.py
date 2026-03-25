@@ -20,30 +20,23 @@ def render_file_search_page(file_cache_manager: FileCacheManager, ctx: RequestCo
 
         results_container = ui.column().classes('w-full mt-6')
 
-        # ---------------------------------------------------------
-        # ВИПРАВЛЕНО: Функція копіювання тепер реконструює шлях
-        # ---------------------------------------------------------
-        async def copy_to_outbox(e):
-            row_data = e.args
+        def get_full_source_path(row_data):
             filename = row_data['name']
             folder_path = row_data['path']
-
-            # Реконструюємо повний шлях до файлу (оскільки ми видалили path_win з кешу)
             base_dir = config.DOCUMENT_STORAGE_PATH.rstrip('\\/')
-            if folder_path == "(Коренева папка)":
-                source_path = f"{base_dir}\\{filename}"
-            else:
-                source_path = f"{base_dir}\\{folder_path}\\{filename}"
-                # Витягуємо тільки \\IP-адреса\назва_шари (напр. \\192.168.110.51\exchange)
+
             match = re.match(r'^\\\\[^\\]+\\[^\\]+', base_dir)
             share_root = match.group(0) if match else base_dir
 
             if folder_path == "(Коренева папка)":
-                source_path = f"{base_dir}\\{filename}"
+                return f"{base_dir}\\{filename}"
             else:
-                # Клеїмо до share_root (\\...\exchange), бо folder_path вже містить "ДД\..."
-                source_path = f"{share_root}\\{folder_path}\\{filename}"
-                # -----------------------------------
+                return f"{share_root}\\{folder_path}\\{filename}"
+
+        async def copy_to_outbox(e):
+            row_data = e.args
+            source_path = get_full_source_path(row_data)
+            filename = row_data['name']
 
             destination_path = config.OUTBOX_DIR_PATH + file_cache_manager.get_file_separator() + ctx.user_login + file_cache_manager.get_file_separator() + filename
 
@@ -59,6 +52,29 @@ def render_file_search_page(file_cache_manager: FileCacheManager, ctx: RequestCo
                     n.message = f'Помилка копіювання: {ex}'
                     n.type = 'negative'
                     n.icon = 'error'
+                    n.spinner = False
+                    n.timeout = 5
+
+        async def download_file(e):
+            row_data = e.args
+            filename = row_data['name']
+            source_path = get_full_source_path(row_data)
+
+            with ui.notification(message=f'Підготовка до завантаження {filename}...', spinner=True, timeout=0) as n:
+                try:
+                    # Читаємо файл у буфер через клієнт (IO-bound операція)
+                    file_buffer = await run.io_bound(file_cache_manager.client.get_file_buffer, source_path)
+
+                    # Відправляємо файл клієнту
+                    ui.download(file_buffer.read(), filename)
+
+                    n.message = 'Завантаження розпочато!'
+                    n.type = 'positive'
+                    n.spinner = False
+                    n.timeout = 2
+                except Exception as ex:
+                    n.message = f'Помилка завантаження: {ex}'
+                    n.type = 'negative'
                     n.spinner = False
                     n.timeout = 5
 
@@ -106,15 +122,20 @@ def render_file_search_page(file_cache_manager: FileCacheManager, ctx: RequestCo
                 table = ui.table(columns=columns, rows=display_data, row_key='name').classes('w-full general-table')
 
                 table.add_slot('body-cell-action', '''
-                    <q-td :props="props" class="gap-2">                        
-                        <q-btn size="sm" color="green-7" icon="forward_to_inbox" label="Outbox"
-                               @click="$parent.$emit('copyToOutbox', props.row)">
-                            <q-tooltip>Копіювати файл в Outbox</q-tooltip>
-                        </q-btn>
-                    </q-td>
-                ''')
+                                <q-td :props="props" class="q-gutter-xs">                        
+                                    <q-btn size="sm" color="blue-6" icon="file_download"
+                                           @click="$parent.$emit('downloadFile', props.row)">
+                                        <q-tooltip>Завантажити на комп'ютер</q-tooltip>
+                                    </q-btn>
+                                    <q-btn size="sm" color="green-7" icon="forward_to_inbox"
+                                           @click="$parent.$emit('copyToOutbox', props.row)">
+                                        <q-tooltip>Копіювати в Outbox</q-tooltip>
+                                    </q-btn>
+                                </q-td>
+                            ''')
 
                 table.on('copyToOutbox', copy_to_outbox)
+                table.on('downloadFile', download_file)
 
         search_field.on('keydown.enter', do_search)
         search_btn.on('click', do_search)

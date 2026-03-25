@@ -1,7 +1,10 @@
 import pytest
 from service.processing.processors.ExcelProcessor import ExcelProcessor
-from dics.deserter_xls_dic import COLUMN_NAME, COLUMN_ID_NUMBER, COLUMN_BIRTHDAY, COLUMN_DESERTION_DATE, COLUMN_INCREMENTAL, COLUMN_MIL_UNIT, COLUMN_TZK_REGION
+from dics.deserter_xls_dic import *
 import config
+
+from tests.test_tools import generate_test_records
+from utils.utils import format_to_excel_date
 
 
 def test_upsert_inserts_new_record(temp_excel_file, mock_logger):
@@ -126,6 +129,35 @@ def test_search_people(temp_excel_file, mock_logger):
 
         assert len(results) == 1
         assert results[0]['data'][COLUMN_NAME] == "Петров Петро"
+
+    finally:
+        processor.close()
+
+
+def test_bulk_upsert_and_search(temp_excel_file, mock_logger):
+    """Тестуємо вставку 20 записів та пошук по них"""
+    processor = ExcelProcessor(temp_excel_file, mock_logger, is_test_mode=True)
+
+    # Генеруємо 20 записів
+    test_data = generate_test_records(20)
+
+    try:
+        # 1. Масова вставка
+        success = processor.upsert_record(test_data)
+        assert success is True
+
+        # 2. Перевіряємо кількість рядків (1 заголовок + 20 записів)
+        assert processor.get_last_row() == 21
+
+        # 3. Спробуємо знайти конкретне прізвище з генерації
+        target_name = test_data[0][COLUMN_NAME].split()[0]  # Прізвище першого згенерованого
+
+        from domain.person_filter import PersonSearchFilter
+        search_filter = PersonSearchFilter(query=target_name)
+        results = processor.search_people(search_filter)
+
+        assert len(results) >= 1
+        assert target_name in results[0]['data'][COLUMN_NAME]
 
     finally:
         processor.close()

@@ -27,6 +27,7 @@ from gui.views.admin.admin_permissions_view import render_permissions_page
 from gui.views.admin.admin_users_view import render_users_page
 from gui.views.admin.admin_settings_view import render_settings_page
 from gui.views import in_progress_view
+from gui.views.admin.admin_index_files import render_indexing_page
 from gui.auth_routes import create_login_page, require_access
 from gui.views.documentation.file_search_view import render_file_search_page
 from pathlib import Path
@@ -250,6 +251,12 @@ def init_nicegui(workflow_obj):
         app_menu.render(ctx)
         render_users_page(auth_manager)
 
+    @ui.page('/admin/file_index')
+    @require_access(auth_manager, 'admin_panel', 'write')  # Доступ ТІЛЬКИ для адмінів!
+    def admin_file_index():
+        ctx = auth_manager.get_current_context()
+        app_menu.render(ctx)
+        render_indexing_page(file_manager)
 
     @ui.page('/doc_files')
     @require_access(auth_manager, 'search', 'read')

@@ -34,7 +34,7 @@ def search_page(report_ctrl, person_ctrl, ctx: RequestContext):
     with ui.column().classes('w-full items-center p-4'):
         ui.label('Звіт Додаток №2, по підрозділам').classes('text-h4 mb-4')
 
-        with ui.row().classes('w-full max-w-6xl items-center gap-4'):
+        with ui.row().classes('w-full max-w-8xl items-center gap-4'):
             des_year_filter = ui.select(
                 options=year_options,
                 label=COLUMN_INSERT_DATE,
@@ -47,7 +47,10 @@ def search_page(report_ctrl, person_ctrl, ctx: RequestContext):
                 'w-40')
 
             # 💡 ДОДАНО: Чекбокс для включення 402 статті (за замовчуванням False)
-            include_402_cb = ui.checkbox('Включити ст. 402', value=False).classes('mt-2 text-gray-700 font-medium')
+
+            with ui.row().classes('items-center gap-2 px-2 border-l border-r border-gray-200'):
+                include_402_cb = ui.checkbox('Включити ст. 402', value=False).classes('mt-2 text-gray-700 font-medium')
+                dsb_set_cb = ui.checkbox('ДШБ сет', value=False).classes('mt-2 text-gray-700 font-medium')
 
             # Додаємо пошук по Enter
             search_btn = ui.button('Пошук', icon='search', on_click=lambda: do_report()).props('elevated')
@@ -68,10 +71,13 @@ def search_page(report_ctrl, person_ctrl, ctx: RequestContext):
             ui.notify('Введіть хоч якусь дату/рік для репорту', type='warning')
             return
 
+        limit_main_units = REPORT_FILTER_DSB if dsb_set_cb.value else None
+
         search_filter = PersonSearchFilter(
             des_year=[des_year_val] if des_year_val else [],
             des_date_from=date_from_val, des_date_to=date_to_val,
-            include_402=include_402_cb.value
+            include_402=include_402_cb.value,
+            main_units=limit_main_units
         )
 
         des_year_filter.disable()

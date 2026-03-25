@@ -80,6 +80,7 @@ class ExcelReporter:
             q_des_year = search_filter.des_year
             q_des_date_from = date.fromisoformat(search_filter.des_date_from) if search_filter.des_date_from else None
             q_des_date_to = date.fromisoformat(search_filter.des_date_to) if search_filter.des_date_to else None
+            q_main_units = search_filter.main_units
 
             # Отримуємо індекси стовпців з вашого column_map
             name_idx: Final[int] = self.excelProcessor.header.get(COLUMN_NAME) - 1
@@ -113,6 +114,7 @@ class ExcelReporter:
             processed = 0
             for i, row in enumerate(data):
                 # filter date
+
                 des_date = row[des_date_idx] # mandatory field
                 des_date_year = get_year_safe(des_date)
 
@@ -147,6 +149,17 @@ class ExcelReporter:
                 suspended = str(row[suspended_idx]).strip()
 
                 # ЛОГІКА ФІЛЬТРАЦІЇ ДЛЯ СЗЧ
+
+                if search_filter.main_units:
+                    # Перевіряємо, чи є взагалі такий батальйон у нашому конфігу
+                    if unit not in REPORT_FILTER_DSB:
+                        continue
+
+                    # Якщо батальйон збігся, перевіряємо чи входить рота у список дозволених для цього батальйону
+                    allowed_subunits = REPORT_FILTER_DSB[unit]
+                    if sub_unit not in allowed_subunits:
+                        continue
+
                 if not search_filter.include_402:
                     match_exclude_article = cc_article in REPORT_SUBUNIT_EXCLUDE_ARTICLES
                     if match_exclude_article:
