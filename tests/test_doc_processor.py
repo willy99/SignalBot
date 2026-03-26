@@ -2,6 +2,8 @@ from unittest.mock import MagicMock
 
 import pytest
 from pathlib import Path
+
+import utils.utils
 from service.processing.processors.DocProcessor import DocProcessor
 from dics.deserter_xls_dic import *
 from service.processing.parsers.MLParser import MLParser
@@ -39,6 +41,18 @@ def processor_factory(mock_logger):
 
     return _create_processor
 
+def test_utils_clean_text():
+    text = 'ПЛЕМ\'ЯНИК Артем Сергійович'
+    clean_text = utils.utils.clean_text(text)
+    assert clean_text == 'ПЛЕМ\'ЯНИК Артем Сергійович'
+
+    text = 'ПЛЕМʼЯНИК Артем Сергійович'
+    clean_text = utils.utils.clean_text(text)
+    assert clean_text == 'ПЛЕМ\'ЯНИК Артем Сергійович'
+
+    text = 'ПЛЕМ’ЯНИК Артем Сергійович'
+    clean_text = utils.utils.clean_text(text)
+    assert clean_text == 'ПЛЕМ\'ЯНИК Артем Сергійович'
 
 def test_process_doc_fedorov_simple(processor_factory, mock_logger):
     # Тестуємо реальний кейс Федорова (СЗЧ)

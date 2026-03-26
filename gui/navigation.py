@@ -57,7 +57,7 @@ def init_nicegui(workflow_obj):
     dbr_ctrl = DbrController(workflow_obj, auth_manager)
     inbox_ctrl = InboxController(workflow_obj, auth_manager)
     notif_ctrl = NotifController(doc_templator, workflow_obj, auth_manager)
-    config_ctrl = ConfigController(workflow_obj)
+    config_ctrl = ConfigController(workflow_obj, auth_manager)
 
     app_menu = AppMenu(auth_manager, task_ctrl, inbox_ctrl, person_ctrl)
 
@@ -176,28 +176,28 @@ def init_nicegui(workflow_obj):
 
 
     @ui.page('/tasks')
-    @require_access(auth_manager, 'search', 'read')
+    @require_access(auth_manager, 'task', 'read')
     def task_list():
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
         task_list_view.render_task_list_page(task_ctrl, ctx)
 
     @ui.page('/tasks/today')
-    @require_access(auth_manager, 'search', 'read')
+    @require_access(auth_manager, 'task', 'read')
     def task_list():
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
         task_list_view.render_tasks_today(task_ctrl, ctx)
 
     @ui.page('/tasks/all')
-    @require_access(auth_manager, 'search', 'read')
+    @require_access(auth_manager, 'task', 'read')
     def task_list():
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
         task_list_view.render_tasks_all(task_ctrl, ctx)
 
     @ui.page('/tasks/edit/{task_id}')
-    # @require_access(...)
+    @require_access(auth_manager, 'task', 'edit')
     def edit_task_page(task_id: str = 'new'):
         ctx = auth_manager.get_current_context()
         actual_id = None if task_id == 'new' else int(task_id)
@@ -205,18 +205,21 @@ def init_nicegui(workflow_obj):
         task_edit_view.render_task_edit_page(task_ctrl, ctx, actual_id)
 
     @ui.page('/inbox')
-    @require_access(auth_manager, 'task', 'read')  # Або будь-яке інше право, яке ви використовуєте для доступу
+    @require_access(auth_manager, 'task', 'read')
     def inbox_page():
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
         inbox_triage_view.render_inbox_page(inbox_ctrl, task_ctrl, person_ctrl, auth_manager, ctx)
 
     @ui.page('/calendar')
-    @require_access(auth_manager, 'search', 'read')
+    @require_access(auth_manager, 'task', 'read')
     def calendar_general():
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
         calendar_view.render_calendar_page(task_ctrl, ctx)
+
+
+    # Доступ ТІЛЬКИ для адмінів!
 
     @ui.page('/admin/settings')
     @require_access(auth_manager, 'admin_panel', 'write')
@@ -233,9 +236,6 @@ def init_nicegui(workflow_obj):
         log_dir = "logs"
         log_file = os.path.join(log_dir, config.LOGGER_FILE_NAME)
         render_logs_page(log_file)
-
-
-    # Доступ ТІЛЬКИ для адмінів!
 
     @ui.page('/admin/permissions')
     @require_access(auth_manager, 'admin_panel', 'write')

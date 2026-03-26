@@ -93,7 +93,7 @@ class DocProcessor:
         text = text_pieces[self.__PIECE_3]
         ml_extracted = self.ml_parser.parse_text(text)
         if text is not None:
-            fields[col.COLUMN_NAME] = self.get_best_match(ml_extracted.get(col.COLUMN_NAME), extract_name(text))
+            fields[col.COLUMN_NAME] = self.get_best_match(ml_extracted.get(col.COLUMN_NAME), extract_name(clean_text(text)))
             fields[col.COLUMN_ID_NUMBER] = self.get_best_match(ml_extracted.get(col.COLUMN_ID_NUMBER), extract_id_number(text))
             fields[col.COLUMN_TZK] = extract_rtzk(clean_text(text))
             fields[col.COLUMN_PHONE] = self.get_best_match(ml_extracted.get(col.COLUMN_PHONE), extract_phone(text))

@@ -93,3 +93,6 @@ ML_MODEL_PATH = os.path.join(os.path.expanduser("~/work/signalBot/service/ml/out
 # Шлях до системної папки signal-cli (де лежать вхідні файли)
 SIGNAL_ATTACHMENTS_DIR : Final = os.path.expanduser("~/.local/share/signal-cli/attachments/")
 TMP_DIR: Final = os.path.expanduser("~/tmp/")
+
+
+SESSION_TIMEOUT = 60 * 60  # 30 хвилин у секундах

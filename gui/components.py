@@ -299,7 +299,7 @@ class AppMenu:
                     ui.icon('account_circle', color='gray-300', size='sm')
                     ui.label(user_name).classes('text-white font-medium')
 
-                ui.button(icon='logout', on_click=logout).props('flat round color="red-400"').tooltip('Вийти з системи')
+                ui.button(icon='logout', on_click=lambda: logout(self.auth_manager)).props('flat round color="red-400"').tooltip('Вийти з системи')
 
         inject_watermark()
 

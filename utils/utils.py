@@ -11,8 +11,9 @@ from service.constants import DB_DATE_FORMAT
 
 def clean_text(text):
     if text is None: return None
-    return " ".join(text.split())
-
+    result = " ".join(text.split())
+    result = result.replace('ʼ', '\'').replace('’','\'')
+    return result
 
 def get_effective_date():
     """Визначає 'робочу' дату з урахуванням години переходу."""
