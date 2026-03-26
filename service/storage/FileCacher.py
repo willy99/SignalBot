@@ -6,12 +6,18 @@ from service.storage.LoggerManager import LoggerManager
 import tempfile
 import os
 from utils.regular_expressions import extract_name
+import time
 
 class FileCacheManager:
     def __init__(self, cache_filepath: str, log_manager):
         self.cache_filepath = cache_filepath
         self.cache_data: List[Dict] = []
         self.client = StorageFactory.create_client(cache_filepath, log_manager)
+
+        self.is_indexing = False
+        self.current_stats = {}
+        self.start_time = None
+        self.total_count = 0
 
     def get_file_separator(self):
         return self.client.get_separator()
@@ -20,96 +26,108 @@ class FileCacheManager:
         print(f"📡 Починаю глибоке сканування папки: {root_folder}...")
         new_cache = []
         yearly_stats = {}
+        self.is_indexing = True  # Встановлюємо статус відразу
+        self.start_time = time.time()
+        self.current_stats = {}  # Очищуємо стару статситику
+        self.total_count = 0
 
-        # Створюємо мок-воркфлоу один раз для всіх файлів, щоб не перевантажувати пам'ять
-        # workflow = MockWorkflow()
-        normalized_root = root_folder.rstrip('\\/')
-        current_year = None
-        with self.client:
-            for dirpath, dirnames, filenames in self.client.walk(root_folder):
+        try:
+            # Створюємо мок-воркфлоу один раз для всіх файлів, щоб не перевантажувати пам'ять
+            # workflow = MockWorkflow()
+            normalized_root = root_folder.rstrip('\\/')
 
-                # =========================================================
-                # 1. ФІЛЬТРАЦІЯ КОРЕНЕВИХ ПАПОК (Магія in-place модифікації)
-                # =========================================================
-                # Перевіряємо, чи ми зараз знаходимося в самій кореневій папці
-                if dirpath.rstrip('\\/') == normalized_root:
-                    # Залишаємо в dirnames ТІЛЬКИ папки, що починаються з 4 цифр
-                    # Це накаже walk() ВЗАГАЛІ НЕ ЗАХОДИТИ в інші "сміттєві" директорії!
-                    dirnames[:] = [d for d in dirnames if re.match(r'^\d{4}', d)]
+            with self.client:
+                for dirpath, dirnames, filenames in self.client.walk(root_folder):
 
-                display_path = re.sub(r'^\\\\[^\\]+\\[^\\]+', '', dirpath)
-                display_path = display_path.lstrip('\\')
+                    # =========================================================
+                    # 1. ФІЛЬТРАЦІЯ КОРЕНЕВИХ ПАПОК (Магія in-place модифікації)
+                    # =========================================================
+                    # Перевіряємо, чи ми зараз знаходимося в самій кореневій папці
+                    if dirpath.rstrip('\\/') == normalized_root:
+                        # Залишаємо в dirnames ТІЛЬКИ папки, що починаються з 4 цифр
+                        # Це накаже walk() ВЗАГАЛІ НЕ ЗАХОДИТИ в інші "сміттєві" директорії!
+                        dirnames[:] = [d for d in dirnames if re.match(r'^\d{4}', d)]
 
-                relative_path = dirpath.lower().replace(normalized_root, "").lstrip('\\/')
-                path_parts = relative_path.split('\\') if '\\' in relative_path else relative_path.split('/')
+                    display_path = re.sub(r'^\\\\[^\\]+\\[^\\]+', '', dirpath)
+                    display_path = display_path.lstrip('\\')
 
+                    relative_path = dirpath.lower().replace(normalized_root, "").lstrip('\\/')
+                    path_parts = relative_path.split('\\') if '\\' in relative_path else relative_path.split('/')
 
-                if len(path_parts) > 3:
-                    current_year = path_parts[3] if path_parts[3] and re.match(r'^\d{4}', path_parts[3]) else None
-                # 3. Якщо ми знайшли файли в будь-якій підпапці цього року
+                    current_year = None
+                    if len(path_parts) > 3:
+                        current_year = path_parts[3] if path_parts[3] and re.match(r'^\d{4}', path_parts[3]) else None
+                    # 3. Якщо ми знайшли файли в будь-якій підпапці цього року
 
-                if current_year and filenames:
-                    # Рахуємо тільки валідні документи
-                    valid_files_count = sum(1 for f in filenames if f.lower().endswith(('.doc', '.docx', '.pdf')) and not f.startswith(('._', '~$')))
+                    if current_year and filenames:
+                        # Рахуємо тільки валідні документи
+                        valid_files_count = sum(1 for f in filenames if f.lower().endswith(('.doc', '.docx', '.pdf')) and not f.startswith(('._', '~$')))
 
-                    if valid_files_count > 0:
-                        yearly_stats[current_year] = yearly_stats.get(current_year, 0) + valid_files_count
-                        if progress_callback:
-                            progress_callback(yearly_stats)
+                        if valid_files_count > 0:
+                            self.current_stats[current_year] = self.current_stats.get(current_year, 0) + valid_files_count
+                            self.total_count += valid_files_count
 
-                if not display_path:
-                    display_path = "(Коренева папка)"
+                            if progress_callback:
+                                progress_callback(self.current_stats)
 
-                for filename in filenames:
-                    print('>> processing ' + str(filename) + ' in ' + str(display_path))
-                    full_path_win = f"{dirpath}\\{filename}"
-                    extracted_names = []
+                    if not display_path:
+                        display_path = "(Коренева папка)"
 
-                    # === СМАРТ-ПАРСИНГ: Обробляємо тільки Word-документи ===
-                    # Ігноруємо системні файли macOS (._) та відкриті тимчасові файли Word (~$)
-                    if filename.lower().endswith(('.doc', '.docx', '.pdf')) and not filename.startswith(('._', '~$')):
-                        temp_local_path = None
-                        try:
-                            file_buffer = self.client.get_file_buffer(full_path_win)
+                    for filename in filenames:
+                        print('>> processing ' + str(filename) + ' in ' + str(display_path))
+                        full_path_win = f"{dirpath}\\{filename}"
+                        extracted_names = []
 
-                            ext = '.docx' if filename.lower().endswith('.docx') else '.pdf' if filename.lower().endswith('.pdf') else '.doc'
-                            with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as temp_file:
-                                temp_file.write(file_buffer.read())
-                                temp_file.flush()  # ВАЖЛИВО! Примусово скидаємо дані на диск
-                                temp_local_path = temp_file.name  # Отримуємо локальний шлях
+                        # === СМАРТ-ПАРСИНГ: Обробляємо тільки Word-документи ===
+                        # Ігноруємо системні файли macOS (._) та відкриті тимчасові файли Word (~$)
+                        if filename.lower().endswith(('.doc', '.docx', '.pdf')) and not filename.startswith(('._', '~$')):
+                            temp_local_path = None
+                            try:
+                                file_buffer = self.client.get_file_buffer(full_path_win)
 
-                            processor = DocProcessor(LoggerManager(), temp_local_path, filename, use_ml=False)
+                                ext = '.docx' if filename.lower().endswith('.docx') else '.pdf' if filename.lower().endswith('.pdf') else '.doc'
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as temp_file:
+                                    temp_file.write(file_buffer.read())
+                                    temp_file.flush()  # ВАЖЛИВО! Примусово скидаємо дані на диск
+                                    temp_local_path = temp_file.name  # Отримуємо локальний шлях
 
-                            raw_piece_3 = processor.engine.extract_text_between(
-                                PATTERN_PIECE_3_START,
-                                PATTERN_PIECE_3_END,
-                                True
-                            ) or ""
+                                processor = DocProcessor(LoggerManager(), temp_local_path, filename, use_ml=False)
 
-                            persons_texts = processor.cut_into_person(raw_piece_3)
+                                raw_piece_3 = processor.engine.extract_text_between(
+                                    PATTERN_PIECE_3_START,
+                                    PATTERN_PIECE_3_END,
+                                    True
+                                ) or ""
 
-                            for person_text in persons_texts:
-                                name = extract_name(person_text)
-                                if name:
-                                    extracted_names.append(name.strip())
+                                persons_texts = processor.cut_into_person(raw_piece_3)
 
-                        except Exception as e:
-                            print(f"⚠️ Помилка парсингу імен у файлі {filename}: {e}")
+                                for person_text in persons_texts:
+                                    name = extract_name(person_text)
+                                    if name:
+                                        extracted_names.append(name.strip())
 
-                        finally:
-                            if temp_local_path and os.path.exists(temp_local_path):
-                                os.remove(temp_local_path)
+                            except Exception as e:
+                                print(f"⚠️ Помилка парсингу імен у файлі {filename}: {e}")
 
-                    new_cache.append({
-                        'name': filename,
-                        'path': display_path,
-                        'names': extracted_names
-                    })
+                            finally:
+                                if temp_local_path and os.path.exists(temp_local_path):
+                                    os.remove(temp_local_path)
 
-            self.client.save_json(self.cache_filepath, new_cache)
+                        new_cache.append({
+                            'name': filename,
+                            'path': display_path,
+                            'names': extracted_names
+                        })
 
-        self.cache_data = new_cache
-        print(f"✅ Сканування завершено! Знайдено файлів: {len(self.cache_data)}")
+                self.client.save_json(self.cache_filepath, new_cache)
+
+                self.cache_data = new_cache
+                print(f"✅ Сканування завершено! Знайдено файлів: {len(self.cache_data)}")
+        except Exception as e:
+            print(f"❌ Критична помилка індексації: {e}")
+            raise e  # Прокидаємо далі, щоб UI показав notify
+        finally:
+            self.is_indexing = False
 
     def load_cache(self):
         """Завантажує індекс з файлу через абстрактний клієнт"""

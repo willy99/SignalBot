@@ -1,6 +1,6 @@
 from nicegui import ui, app
 from functools import wraps
-
+import asyncio
 
 def create_login_page(auth_manager, log_manager):
     logger = log_manager.get_logger()
@@ -52,30 +52,30 @@ def create_login_page(auth_manager, log_manager):
 def require_access(auth_manager, module_name, action='read'):
     """
     Декоратор для захисту маршрутів (сторінок).
-    Якщо доступу немає, перекидає на сторінку логіну або головну.
+    Підтримує як звичайні (def), так і асинхронні (async def) функції.
     """
 
     def decorator(func):
         @wraps(func)
-        def wrapper(*args, **kwargs):
-            # 1. Перевірка на авторизацію
+        async def wrapper(*args, **kwargs):
             if not app.storage.user.get('authenticated', False):
                 ui.notify('Будь ласка, увійдіть у систему', type='warning')
                 ui.navigate.to('/login')
                 return
 
-            # 2. Перевірка на наявність прав до модуля
             if not auth_manager.has_access(module_name, action):
                 ui.notify('У вас немає доступу до цієї сторінки', type='negative')
                 ui.navigate.to('/')
                 return
+
+            if asyncio.iscoroutinefunction(func):
+                return await func(*args, **kwargs)
 
             return func(*args, **kwargs)
 
         return wrapper
 
     return decorator
-
 
 def logout():
     """Функція для виходу з системи"""

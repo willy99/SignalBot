@@ -2,6 +2,7 @@ from nicegui import app
 import urllib.parse
 
 from gui.controllers.inbox_controller import InboxController
+from gui.controllers.person_controller import PersonController
 from gui.controllers.task_controller import TaskController
 from gui.services.auth_manager import AuthManager
 from dics.security_config import MODULE_DOC_SUPPORT, MODULE_DOC_DBR, MODULE_DOC_NOTIF, MODULE_PERSON, MODULE_REPORT_UNITS, MODULE_REPORT_GENERAL, MODULE_ADMIN
@@ -17,15 +18,18 @@ import config
 
 
 class AppMenu:
-    def __init__(self, auth_manager: AuthManager, task_controller: TaskController, inbox_controller: InboxController):
+    def __init__(self, auth_manager: AuthManager, task_controller: TaskController, inbox_controller: InboxController, person_controller: PersonController):
         # Ініціалізуємо один раз при старті сервера
         self.auth_manager = auth_manager
         self.task_ctrl = task_controller
         self.inbox_ctrl = inbox_controller
+        self.person_ctrl = person_controller
 
     def render(self, ctx: RequestContext):
         """Цей метод викликається на кожній сторінці для малювання меню"""
         ui.add_head_html('<link rel="stylesheet" href="/static/style.css">')
+        ui.add_head_html(
+            '<style>.animate-spin { animation: spin 1s linear infinite; } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }</style>')
 
         # DIRTY Status registrant
         ui.add_head_html('''
@@ -54,6 +58,38 @@ class AppMenu:
                     props = 'flat'
                 ui.button(title, on_click=lambda: ui.navigate.to('/')) \
                     .props(props).classes('font-bold text-xl text-white normal-case')
+
+                # ==========================================
+                # 🔄 ІКОНКА СИНХРОНІЗАЦІЇ (Refresh Excel)
+                # ==========================================
+                with ui.button(icon='cloud_sync', on_click=lambda: handle_sync()) \
+                        .props('flat round color="white"') \
+                        .classes('transition-transform') as sync_btn:
+
+                    ui.tooltip('Оновити дані з Excel (синхронізація)').classes('bg-gray-800')
+
+                    async def handle_sync():
+                        # 1. Починаємо анімацію обертання (додаємо CSS клас)
+                        sync_btn.classes('animate-spin')
+                        ui.notify('Почато синхронізацію з базою...', color='info', pos='bottom-right', icon='cloud_sync')
+
+                        try:
+                            # 2. Викликаємо важку операцію в окремому потоці, щоб не фрізити UI
+                            # Припускаємо, що self.person_ctrl або інший контролер має метод sync
+                            success = await run.io_bound(self.person_ctrl.sync, ctx)
+
+                            if success:
+                                ui.notify('Дані успішно синхронізовано!', color='positive', pos='bottom-right', icon='done')
+                            else:
+                                ui.notify('Помилка при синхронізації', color='negative')
+
+                        except Exception as e:
+                            ui.notify(f'Критична помилка: {str(e)}', color='negative')
+                            print(f"Sync error for {ctx.user_login}: {e}")
+
+                        finally:
+                            # 3. Зупиняємо анімацію в будь-якому випадку
+                            sync_btn.classes(remove='animate-spin')
 
                 # ==========================================
                 # 🌟 1. ІКОНКА INBOX (Нова логіка)

@@ -59,7 +59,7 @@ def init_nicegui(workflow_obj):
     notif_ctrl = NotifController(doc_templator, workflow_obj, auth_manager)
     config_ctrl = ConfigController(workflow_obj)
 
-    app_menu = AppMenu(auth_manager, task_ctrl, inbox_ctrl)
+    app_menu = AppMenu(auth_manager, task_ctrl, inbox_ctrl, person_ctrl)
 
     create_login_page(auth_manager, workflow_obj.log_manager)
 
@@ -252,11 +252,11 @@ def init_nicegui(workflow_obj):
         render_users_page(auth_manager)
 
     @ui.page('/admin/file_index')
-    @require_access(auth_manager, 'admin_panel', 'write')  # Доступ ТІЛЬКИ для адмінів!
-    def admin_file_index():
+    @require_access(auth_manager, 'admin_panel', 'write')
+    async def admin_file_index():
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
-        render_indexing_page(file_manager)
+        await render_indexing_page(file_manager)  # Тепер await працюватиме правильно
 
     @ui.page('/doc_files')
     @require_access(auth_manager, 'search', 'read')

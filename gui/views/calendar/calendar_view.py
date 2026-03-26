@@ -84,11 +84,6 @@ def render_calendar_page(task_ctrl, ctx):
             # Забираємо задачі через ваш контролер
             tasks = task_ctrl.get_all_tasks(ctx, search_filter)
 
-            print('>>> tasks')
-            for task in tasks:
-                print(str(task.id) + '/ ' + str(task.task_subject))
-
-
             state['tasks'] = tasks or []
 
             draw_calendar()

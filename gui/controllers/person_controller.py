@@ -76,6 +76,11 @@ class PersonController:
         self.logger.debug('UI:' + ctx.user_name + ': Шукаємо список з ' + str(len(names_list)) + ' людей')
         return self.processor.batch_search_names(names_list)
 
+    def sync(self, ctx: RequestContext):
+        self.logger.debug(f'UI:{ctx.user_name}: Сінхронізуємо базу')
+        self.processor.save()
+        return True
+
     def save_persons(self, ctx: RequestContext, person_list: list, partial_update=False, paint_color=None):
         self.logger.debug(f'UI:{ctx.user_name}: Зберігаємо пакет персон ({len(person_list)} шт.)')
         try:

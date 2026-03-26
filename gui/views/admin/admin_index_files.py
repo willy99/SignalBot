@@ -1,11 +1,12 @@
-from nicegui import ui, run
+from nicegui import ui, run, app
 import asyncio
 import config
-from service.storage.FileCacher import FileCacheManager
 import time
 
+from service.storage.FileCacher import FileCacheManager
 
-def render_indexing_page(manager: FileCacheManager):
+
+async def render_indexing_page(manager: FileCacheManager):
     chart_options = {
         'title': {'text': 'Прогрес індексації за роками та папками'},
         'tooltip': {'trigger': 'axis', 'axisPointer': {'type': 'shadow'}},
@@ -26,78 +27,67 @@ def render_indexing_page(manager: FileCacheManager):
         with ui.row().classes('items-center gap-4 w-full'):
             index_btn = ui.button('ЗАПУСТИТИ ІНДЕКСАЦІЮ', icon='play_arrow',
                                   on_click=lambda: start_indexing())
+
+            # --- ВИПРАВЛЕННЯ 1: Додаємо атрибут вручну, щоб bind спрацював ---
             index_btn.loading = False
 
             ui.spinner(size='lg').bind_visibility_from(index_btn, 'loading')
 
             status_text = ui.label('Готовий до роботи').classes('text-gray-500 font-medium')
-
-            # Таймер та лічильник під час роботи
             active_stats = ui.label('').classes('text-orange-500 font-mono')
-
-            # Фінальна статистика
             stats_label = ui.label('').classes('text-blue-600 font-bold')
 
         chart = ui.echart(chart_options).classes('w-full h-96 shadow-lg border rounded-xl p-4')
 
+    def update_ui_from_manager():
+        """Синхронізує елементи UI з поточними даними в менеджері"""
+        # --- ВИПРАВЛЕННЯ 2: Перевірка на існування елементів (захист від RuntimeError) ---
+        if index_btn.is_deleted:
+            return 0
+
+        stats = manager.current_stats or {}
+        available_years = sorted(stats.keys())
+
+        chart.options['xAxis']['data'] = available_years
+        chart.options['series'][0]['data'] = [stats.get(y, 0) for y in available_years]
+        chart.update()
+
+        total = sum(stats.values())
+
+        if manager.is_indexing and manager.start_time:
+            elapsed = int(time.time() - manager.start_time)
+            timer_str = time.strftime('%H:%M:%S', time.gmtime(elapsed))
+            active_stats.set_text(f'⏱ {timer_str} | 📂 Знайдено: {total}')
+            index_btn.loading = True
+            index_btn.props('loading')
+        else:
+            index_btn.loading = False
+            index_btn.props(remove='loading')
+            active_stats.set_text('')
+            if total > 0:
+                stats_label.set_text(f'📊 Результат: {total} файлів.')
+
+        return total
+
     async def start_indexing():
+        if manager.is_indexing:
+            ui.notify('Індексація вже триває', type='warning')
+            return
+
+        manager.current_stats = {}
+        manager.start_time = time.time()
         stats_label.set_text('')
-        active_stats.set_text('')
-        start_time = time.time()
-        total_files = 0  # Ця змінна буде оновлюватися через nonlocal
-        is_running = True
 
         index_btn.loading = True
         index_btn.props('loading')
         status_text.set_text('Йде сканування...')
 
-        loop = asyncio.get_event_loop()
+        # Запускаємо процес
+        asyncio.create_task(run.io_bound(manager.build_cache, config.DOCUMENT_STORAGE_PATH))
 
-        # Функція для оновлення таймера в реальному часі
-        async def update_timer():
-            while is_running:
-                now = time.time()
-                elapsed = int(now - start_time)
-                # Форматування в 00:00:00
-                timer_str = time.strftime('%H:%M:%S', time.gmtime(elapsed))
-                active_stats.set_text(f'⏱ {timer_str} | 📂 Знайдено: {total_files}')
-                await asyncio.sleep(1)
+    # --- ВИПРАВЛЕННЯ 3: Використовуємо ui.timer замість нескінченного циклу ---
+    # Він автоматично зупиниться, коли ви підете зі сторінки
+    ui.timer(1.0, update_ui_from_manager)
 
-        def handle_progress(stats):
-            nonlocal total_files  # ВАЖЛИВО: дозволяє змінювати змінну ззовні
-            total_files = sum(stats.values())
-
-            def update():
-                available_years = sorted(stats.keys())
-                chart.options['xAxis']['data'] = available_years
-                chart.options['series'][0]['data'] = [stats.get(y, 0) for y in available_years]
-                chart.update()
-                # Ми оновлюємо total_files і в таймері, і тут для надійності
-
-            loop.call_soon_threadsafe(update)
-
-        # Запускаємо таймер як фонову задачу NiceGUI
-        timer_task = asyncio.create_task(update_timer())
-
-        try:
-            await run.io_bound(manager.build_cache,
-                               config.DOCUMENT_STORAGE_PATH,
-                               progress_callback=handle_progress)
-            ui.notify('Індексація завершена!', type='positive')
-        except Exception as e:
-            ui.notify(f'Помилка: {e}', type='negative')
-            status_text.set_text(f'❌ Помилка: {str(e)}')
-        finally:
-            is_running = False
-            timer_task.cancel()  # Зупиняємо таймер
-
-            end_time = time.time()
-            duration = int(end_time - start_time)
-            time_str = time.strftime('%H:%M:%S', time.gmtime(duration))
-
-            index_btn.loading = False
-            index_btn.props(remove='loading')
-
-            status_text.set_text('Готовий до роботи.')
-            active_stats.set_text('')  # Прибираємо проміжний статус
-            stats_label.set_text(f'📊 Результат: {total_files} файлів. Час виконання: {time_str}')
+    # Початкове оновлення при вході
+    update_ui_from_manager()
