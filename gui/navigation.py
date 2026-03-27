@@ -18,6 +18,7 @@ from gui.views.documentation import support_doc_standart_view, support_doc_detai
 from gui.views.report import subunits_report_view
 from gui.views.report import yearly_report_view
 from gui.views.report import dups_report_view
+from gui.views.report import error_birthday_report_view
 from gui.views.report import waiting_for_erdr_report_view
 from gui.views.report.logs_view import render_logs_page
 from gui.views.report import daily_report_view
@@ -95,17 +96,25 @@ def init_nicegui(workflow_obj):
 
     @ui.page('/report_yearly')
     @require_access(auth_manager, 'report_general', PERM_READ)
-    def report_units():
+    def report_yearly():
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
         yearly_report_view.render_yearly_report_page(report_ctrl, ctx)
 
     @ui.page('/report_name_dups')
     @require_access(auth_manager, 'report_general', PERM_READ)
-    def report_units():
+    def report_name_dups():
         ctx = auth_manager.get_current_context()
         app_menu.render(ctx)
         dups_report_view.render_duplicates_report_page(report_ctrl, ctx)
+
+    @ui.page('/report_error_birthday')
+    @require_access(auth_manager, 'report_general', PERM_READ)
+    def report_error_birthday():
+        ctx = auth_manager.get_current_context()
+        app_menu.render(ctx)
+        error_birthday_report_view.render_inn_mismatch_page(report_ctrl, person_ctrl, ctx)
+
 
     @ui.page('/report_waiting_erdr')
     @require_access(auth_manager, 'report_general', PERM_READ)

@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Any, Optional
 import traceback
 import config
@@ -894,6 +894,80 @@ class ExcelReporter:
 
         return dupp_names
 
+    def get_inn_birthday_mismatch_report(self, search_filter: PersonSearchFilter) -> List[Dict[str, Any]]:
+        inc_idx = self.excelProcessor.header.get(COLUMN_INCREMENTAL) - 1
+        name_idx = self.excelProcessor.header.get(COLUMN_NAME) - 1
+        id_idx = self.excelProcessor.header.get(COLUMN_ID_NUMBER) - 1
+        birth_idx = self.excelProcessor.header.get(COLUMN_BIRTHDAY) - 1
+        ins_date_idx = self.excelProcessor.header.get(COLUMN_INSERT_DATE, 1) - 1
+
+        last_row = self.excelProcessor.get_last_row()
+        # Беремо дані (припускаємо, що А2:BB... охоплює потрібні колонки)
+        self.excelProcessor.switch_to_sheet(search_filter.mil_unit)
+        data = self.excelProcessor.sheet.range(f"A2:BB{last_row}").value
+        q_ins_year = search_filter.ins_year
+
+        mismatches = []
+        base_date = datetime(1899, 12, 31)
+
+        for row in data:
+            if not row: continue
+            inc = get_strint_fromfloat(row[inc_idx], "").strip()
+            name = str(row[name_idx] or '').strip()
+            raw_id = get_strint_fromfloat(row[id_idx], "").strip()
+            raw_birth = row[birth_idx]
+
+            ins_date_val = row[ins_date_idx]
+            ins_date_year = None
+            ins_date_str = ""
+
+            if isinstance(ins_date_val, (datetime, date)):
+                ins_date_year = str(ins_date_val.year)
+                ins_date_str = ins_date_val.strftime(config.EXCEL_DATE_FORMAT)
+            elif ins_date_val:
+                ins_date_str = str(ins_date_val).strip()
+                if len(ins_date_str) >= 4:
+                    ins_date_year = ins_date_str[-4:]
+
+            match_des_year = True
+            if q_ins_year:
+                if isinstance(q_ins_year, list):
+                    match_des_year = (ins_date_year in q_ins_year)
+                else:
+                    match_des_year = (ins_date_year == str(q_ins_year))
+
+            if not match_des_year: continue
+
+            # Перевіряємо тільки якщо є і ПІБ, і ІПН (мінімум 5 цифр)
+            if not name or len(raw_id) < 5:
+                continue
+
+            try:
+                # 1. Вираховуємо дату з перших 5 цифр ІПН
+                days_offset = int(raw_id[:5])
+                expected_birth = base_date + timedelta(days=days_offset)
+
+                # 2. Отримуємо фактичну дату з таблиці
+                actual_birth = None
+                if isinstance(raw_birth, datetime):
+                    actual_birth = raw_birth
+                elif isinstance(raw_birth, (int, float)):  # Excel іноді віддає числом
+                    actual_birth = base_date + timedelta(days=int(raw_birth))
+
+                # 3. Порівнюємо (тільки дату, без часу)
+                if actual_birth and expected_birth.date() != actual_birth.date():
+                    mismatches.append({
+                        'id': inc,
+                        'name': name,
+                        'id_number': raw_id,
+                        'actual_birthday': actual_birth.strftime('%d.%m.%Y'),
+                        'expected_birthday': expected_birth.strftime('%d.%m.%Y'),
+                    })
+            except (ValueError, TypeError):
+                continue  # Якщо ІПН не число або крива дата — пропускаємо
+
+        return mismatches
+
     def get_waiting_for_erdr_report(self, search_filter: PersonSearchFilter):
         results = []
 
@@ -919,7 +993,6 @@ class ExcelReporter:
         erdr_date_idx = header.get(COLUMN_ERDR_DATE, 1) - 1
         erdr_num_idx = header.get(COLUMN_ERDR_NOTATION, 1) - 1
 
-        q_des_year = search_filter.des_year
         q_des_year = search_filter.des_year
         q_des_date_from = date.fromisoformat(search_filter.des_date_from) if search_filter.des_date_from else None
         q_des_date_to = date.fromisoformat(search_filter.des_date_to) if search_filter.des_date_to else None

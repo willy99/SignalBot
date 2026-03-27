@@ -47,6 +47,11 @@ class ReportController:
         results = self.reporter.get_dupp_names_report()
         return results
 
+    def get_error_birthday_report(self, ctx: RequestContext, search_filter: PersonSearchFilter):
+        self.logger.debug('UI:' + ctx.user_name + ': Генеруємо репорт дублікатів прізвищ в системі: ')
+        results = self.reporter.get_inn_birthday_mismatch_report(search_filter)
+        return results
+
     def get_waiting_for_erdr_report(self, ctx: RequestContext, search_filter: PersonSearchFilter):
         self.logger.debug('UI:' + ctx.user_name + ': Генеруємо репорт - справи очікуючі ЄРДР: ')
         results = self.reporter.get_waiting_for_erdr_report(search_filter)

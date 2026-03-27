@@ -5,7 +5,7 @@ from gui.controllers.inbox_controller import InboxController
 from gui.controllers.person_controller import PersonController
 from gui.controllers.task_controller import TaskController
 from gui.services.auth_manager import AuthManager
-from dics.security_config import MODULE_DOC_SUPPORT, MODULE_DOC_DBR, MODULE_DOC_NOTIF, MODULE_PERSON, MODULE_REPORT_UNITS, MODULE_REPORT_GENERAL, MODULE_ADMIN, PERM_READ
+from dics.security_config import MODULE_DOC_SUPPORT, MODULE_DOC_DBR, MODULE_DOC_NOTIF, MODULE_PERSON, MODULE_REPORT_UNITS, MODULE_REPORT_GENERAL, MODULE_ADMIN, PERM_READ, PERM_EDIT
 
 if not hasattr(app, 'alarmed_tasks'):
     app.alarmed_tasks = set()
@@ -263,9 +263,12 @@ class AppMenu:
                 # 4. Звіти
                 can_report_units = self.auth_manager.has_access(MODULE_REPORT_UNITS, PERM_READ)
                 can_report_general = self.auth_manager.has_access(MODULE_REPORT_GENERAL, PERM_READ)
+                can_report_general_edit = self.auth_manager.has_access(MODULE_REPORT_GENERAL, PERM_EDIT)
                 if can_report_units or can_report_general:
                     with ui.button('Звіти', icon='analytics').props('flat text-white icon-right="expand_more"'):
                         with ui.menu():
+                            if can_report_general:
+                                make_menu_item('Щоденний звіт', 'event_available', '/report_daily')
                             if can_report_units:
                                 make_menu_item('Звіт по підрозділам', 'bar_chart', '/report_units')
                             if can_report_general:
@@ -274,8 +277,8 @@ class AppMenu:
                                 make_menu_item('Дублікати прізвищ', 'people_outline', '/report_name_dups')
                             if can_report_general:
                                 make_menu_item('Чекаємо на ЄРДР', 'pending_actions', '/report_waiting_erdr')
-                            if can_report_general:
-                                make_menu_item('Щоденний звіт', 'event_available', '/report_daily')
+                            if can_report_general_edit:
+                                make_menu_item('РНОКПП!=Дата Народження', 'free_cancellation', '/report_error_birthday')
 
                 # 5. Адмінка
                 if self.auth_manager.has_access(MODULE_ADMIN, PERM_READ):
