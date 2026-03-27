@@ -2,6 +2,7 @@ from nicegui import ui, app, context
 from functools import wraps
 import asyncio
 
+from dics.security_config import PERM_READ
 from gui.services.auth_manager import AuthManager
 
 
@@ -98,7 +99,7 @@ def refresh_session(auth_manager: AuthManager):
         return wrapper
     return decorator
 
-def require_access(auth_manager, module_name, action='read'):
+def require_access(auth_manager, module_name, action=PERM_READ):
     """
     Декоратор для захисту маршрутів (сторінок).
     Підтримує як звичайні (def), так і асинхронні (async def) функції.
@@ -118,6 +119,7 @@ def require_access(auth_manager, module_name, action='read'):
                     return
 
             if not auth_manager.has_access(module_name, action):
+                print(f"DEBUG: Access denied for {module_name}:{action}")  # Подивитись в консоль
                 ui.notify('У вас немає доступу до цієї сторінки', type='negative')
                 ui.navigate.to('/')
                 return

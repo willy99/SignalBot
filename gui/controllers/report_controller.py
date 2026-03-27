@@ -1,6 +1,7 @@
 from typing import List
 
 import config
+from dics.security_config import PERM_READ
 from gui.services.request_context import RequestContext
 from domain.person_filter import PersonSearchFilter
 from gui.services.auth_manager import AuthManager
@@ -55,7 +56,7 @@ class ReportController:
         return self.reporter.get_brief_summary()
 
     def is_admin(self):
-        return self.auth_manager.has_access('admin_panel', 'read')
+        return self.auth_manager.has_access('admin_panel', PERM_READ)
 
     def generate_daily_report_word(self, target_date: str, raw_documents: list) -> tuple[bytes, str]:
         file_bytes, file_name = self.doc_templator.make_daily_report(target_date, raw_documents)

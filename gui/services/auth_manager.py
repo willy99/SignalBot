@@ -3,7 +3,7 @@ from domain.user import User
 from werkzeug.security import generate_password_hash
 from nicegui import app, ui
 from gui.services.request_context import RequestContext
-from dics.security_config import PERM_READ, PERM_EDIT, PERM_DELETE
+from dics.security_config import PERM_READ
 from service.users.AuthService import AuthService
 import time
 import config
@@ -35,7 +35,8 @@ class AuthManager:
             'user_info': {
                 'username': user.username,
                 'role': user.role,
-                'full_name': user.full_name
+                'full_name': user.full_name,
+                'id': user.id
             },
             'last_activity': time.time() # Початок відліку сесії
         })

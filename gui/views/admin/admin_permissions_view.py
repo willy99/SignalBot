@@ -12,7 +12,7 @@ def render_permissions_page(auth_manager):
 
     # Ініціалізуємо порожній словник прав для всіх модулів
     for mod in AVAILABLE_MODULES.keys():
-        state['permissions'][mod] = {'read': False, 'write': False, 'delete': False}
+        state['permissions'][mod] = {PERM_READ: False, PERM_EDIT: False, PERM_DELETE: False}
 
     with ui.row().classes('w-full justify-center px-4'):
         with ui.card().classes('w-full max-w-6xl p-6 shadow-md'):
@@ -39,10 +39,10 @@ def render_permissions_page(auth_manager):
                 current_perms = auth_manager.get_user_permissions(role)
 
                 for mod in AVAILABLE_MODULES.keys():
-                    mod_perms = current_perms.get(mod, {'read': False, 'write': False, 'delete': False})
-                    state['permissions'][mod]['read'] = mod_perms.get('read', False)
-                    state['permissions'][mod]['write'] = mod_perms.get('write', False)
-                    state['permissions'][mod]['delete'] = mod_perms.get('delete', False)
+                    mod_perms = current_perms.get(mod, {PERM_READ: False, PERM_EDIT: False, PERM_DELETE: False})
+                    state['permissions'][mod][PERM_READ] = mod_perms.get(PERM_READ, False)
+                    state['permissions'][mod][PERM_EDIT] = mod_perms.get(PERM_EDIT, False)
+                    state['permissions'][mod][PERM_DELETE] = mod_perms.get(PERM_DELETE, False)
 
                 render_checkboxes()
 
@@ -58,9 +58,9 @@ def render_permissions_page(auth_manager):
                         auth_manager.set_permissions(
                             role=role,
                             module_name=mod,
-                            can_read=int(perms['read']),
-                            can_write=int(perms['write']),
-                            can_delete=int(perms['delete'])
+                            can_read=int(perms[PERM_READ]),
+                            can_write=int(perms[PERM_EDIT]),
+                            can_delete=int(perms[PERM_DELETE])
                         )
                     ui.notify(f'Права для ролі "{role}" успішно збережено!', type='positive', position='top')
                 except Exception as e:
@@ -87,27 +87,27 @@ def render_permissions_page(auth_manager):
 
                             # ЗБЕРІГАЄМО ПОСИЛАННЯ НА КОЖЕН ЧЕКБОКС
                             with ui.row().classes('w-1/5 justify-center'):
-                                cb_read = ui.checkbox('').bind_value(state['permissions'][mod_id], 'read').props('color="blue"')
+                                cb_read = ui.checkbox('').bind_value(state['permissions'][mod_id], PERM_READ).props('color="blue"')
 
                             with ui.row().classes('w-1/5 justify-center'):
-                                cb_write = ui.checkbox('').bind_value(state['permissions'][mod_id], 'write').props('color="green"')
+                                cb_write = ui.checkbox('').bind_value(state['permissions'][mod_id], PERM_EDIT).props('color="green"')
 
                             with ui.row().classes('w-1/5 justify-center'):
-                                cb_delete = ui.checkbox('').bind_value(state['permissions'][mod_id], 'delete').props('color="red"')
+                                cb_delete = ui.checkbox('').bind_value(state['permissions'][mod_id], PERM_DELETE).props('color="red"')
 
                             # === ЛОГІКА "ЗАХИСТУ ВІД ДУРАКА" ===
                             def enforce_logic(val, action, r=cb_read, w=cb_write, d=cb_delete):
                                 # val - це булеве значення (True/False), яке прийшло з галочки
-                                if action == 'read' and not val:
+                                if action == PERM_READ and not val:
                                     w.set_value(False)
                                     d.set_value(False)
-                                elif action in ['write', 'delete'] and val:
+                                elif action in [PERM_EDIT, PERM_DELETE] and val:
                                     r.set_value(True)
 
                             # e.args містить нове значення (True або False)
-                            cb_read.on('update:model-value', lambda e, r=cb_read, w=cb_write, d=cb_delete: enforce_logic(e.args, 'read', r, w, d))
-                            cb_write.on('update:model-value', lambda e, r=cb_read, w=cb_write, d=cb_delete: enforce_logic(e.args, 'write', r, w, d))
-                            cb_delete.on('update:model-value', lambda e, r=cb_read, w=cb_write, d=cb_delete: enforce_logic(e.args, 'delete', r, w, d))
+                            cb_read.on('update:model-value', lambda e, r=cb_read, w=cb_write, d=cb_delete: enforce_logic(e.args, PERM_READ, r, w, d))
+                            cb_write.on('update:model-value', lambda e, r=cb_read, w=cb_write, d=cb_delete: enforce_logic(e.args, PERM_EDIT, r, w, d))
+                            cb_delete.on('update:model-value', lambda e, r=cb_read, w=cb_write, d=cb_delete: enforce_logic(e.args, PERM_DELETE, r, w, d))
 
                     # Кнопка збереження
                     with ui.row().classes('w-full justify-end mt-6'):

@@ -35,7 +35,7 @@ class AuthService:
         query = "SELECT module_name, can_read, can_write, can_delete FROM role_permissions WHERE role = ?"
         rows = self.db.__execute_fetchall__(query, (role,))
         # ... логіка парсингу в dict (як була у вас) ...
-        return {r[0]: {'read': bool(r[1]), 'write': bool(r[2]), 'delete': bool(r[3])} for r in rows}
+        return {r[0]: {PERM_READ: bool(r[1]), PERM_EDIT: bool(r[2]), PERM_DELETE: bool(r[3])} for r in rows}
 
     def create_user(self, username: str, password: str, role: str, full_name: str):
 

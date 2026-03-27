@@ -433,6 +433,8 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
             def refresh_buffer_ui():
                 buffer_container.clear()
                 buffer_data = state['buffer']
+                is_empty = len(buffer_data) == 0
+                is_completed = state['status'] == DOC_STATUS_COMPLETED
 
                 with buffer_container:
                     if not buffer_data:
@@ -466,9 +468,15 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                                         edit_button.disable()
                                         delete_button.disable()
 
-                save_draft_btn.set_visibility(len(buffer_data) > 0)
-                complete_btn.set_visibility(len(buffer_data) > 0)
+                save_draft_btn.set_visibility(not is_empty)
+                complete_btn.set_visibility(not is_empty)
 
+                if is_empty or is_completed:
+                    save_draft_btn.disable()
+                    complete_btn.disable()
+                else:
+                    save_draft_btn.enable()
+                    complete_btn.enable()
 
             def refresh_status_ui():
                 current_status = state.get('status', DOC_STATUS_DRAFT)

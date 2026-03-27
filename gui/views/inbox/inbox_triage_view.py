@@ -1,5 +1,6 @@
 from nicegui import ui, run, events
 
+from dics.security_config import PERM_DELETE
 from gui.controllers.inbox_controller import InboxController
 from gui.controllers.task_controller import TaskController
 from gui.services.auth_manager import AuthManager
@@ -12,7 +13,7 @@ from gui.controllers.person_controller import PersonController
 from gui.views.person.person_view import edit_person
 
 def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, person_ctrl:PersonController, auth_manager:AuthManager, ctx: RequestContext):
-    can_assign = auth_manager.has_access('task', 'delete')
+    can_assign = auth_manager.has_access('task', PERM_DELETE)
     users_list = task_ctrl.get_available_users()
     user_options = {u['username']: u.get('full_name') or u['username'] for u in users_list if 'username' in u}
 
