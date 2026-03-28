@@ -1,4 +1,6 @@
 import re
+
+from gui.services.request_context import RequestContext
 from service.storage.StorageFactory import StorageFactory
 from dics.deserter_xls_dic import *
 from service.processing.processors.DocProcessor import DocProcessor
@@ -83,7 +85,7 @@ class FileCacheManager:
                         if filename.lower().endswith(('.doc', '.docx', '.pdf')) and not filename.startswith(('._', '~$')):
                             temp_local_path = None
                             try:
-                                file_buffer = self.client.get_file_buffer(full_path_win)
+                                file_buffer = self.client.get_file_buffer(None, full_path_win)
 
                                 ext = '.docx' if filename.lower().endswith('.docx') else '.pdf' if filename.lower().endswith('.pdf') else '.doc'
                                 with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as temp_file:
@@ -164,7 +166,8 @@ class FileCacheManager:
 
         return results
 
-    def copy_to_local(self, remote_source_path: str, local_dest_path: str):
+    def copy_to_local(self, ctx: RequestContext, remote_source_path: str, local_dest_path: str):
+
         """Завантажує файл з мережі в локальну папку (через клієнт)"""
         with self.client:
             self.client.copy_file(remote_source_path, local_dest_path)

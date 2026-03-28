@@ -1,6 +1,7 @@
 from nicegui import ui, run
 
 import config
+from dics.security_config import MODULE_DOC_SUPPORT, PERM_DELETE, PERM_EDIT
 from gui.controllers.support_controller import SupportController
 from gui.services.auth_manager import AuthManager
 from service.constants import DOC_STATUS_COMPLETED, DOC_STATUS_DRAFT, DOC_PACKAGE_STANDART
@@ -10,6 +11,9 @@ from domain.document_filter import DocumentFilter
 
 
 def render_drafts_list_page(controller: SupportController, auth_manager: AuthManager):
+    can_delete = auth_manager.has_access(MODULE_DOC_SUPPORT, PERM_DELETE)
+    can_edit = auth_manager.has_access(MODULE_DOC_SUPPORT, PERM_EDIT)
+
     ui.label('Список пакетів супроводів').classes('w-full text-center text-3xl font-bold mb-8')
 
     # Стан фільтрів на UI
@@ -119,12 +123,16 @@ def render_drafts_list_page(controller: SupportController, auth_manager: AuthMan
             # Кнопки створення пакетів (Права сторона)
             # ==========================================
             with ui.row().classes('items-center gap-2 shrink-0'):
-                ui.button('Новий Зведений', icon='add',
+                create_standart = ui.button('Новий Зведений', icon='add',
                           on_click=lambda: ui.navigate.to('/doc_support/s_create')
                           ).props('color="primary"').classes('h-10')
-                ui.button('Новий Детальний', icon='add_circle',
+                create_detailed = ui.button('Новий Детальний', icon='add_circle',
                           on_click=lambda: ui.navigate.to('/doc_support/d_create')
                           ).props('color="secondary" outline').classes('h-10')
+
+                if not can_edit:
+                    create_standart.disable()
+                    create_detailed.disable()
 
         # Створюємо порожню таблицю
         table = ui.table(columns=columns, rows=[], row_key='id').classes('w-full max-w-8xl general-table')
@@ -135,13 +143,15 @@ def render_drafts_list_page(controller: SupportController, auth_manager: AuthMan
         )
 
         # Кастомні слоти
-        table.add_slot('body-cell-actions', '''
+        table.add_slot('body-cell-actions', f'''
             <q-td :props="props" class="gap-2">
                 <q-btn flat dense color="primary" icon="edit" @click="$parent.$emit('edit', props.row)">
                     <q-tooltip>Редагувати</q-tooltip>
-                </q-btn>
-                <q-btn flat dense color="negative" icon="delete" @click="$parent.$emit('delete', props.row.id)">
-                    <q-tooltip>Видалити</q-tooltip>
+                </q-btn>                
+                <q-btn flat dense color="negative" icon="delete"
+                    :disable="!{str(can_delete).lower()}" 
+                    @click="$parent.$emit('delete', props.row.id)">
+                    <q-tooltip>{{{{ !{str(can_delete).lower()} ? 'Немає прав на видалення' : 'Видалити пакет' }}}}</q-tooltip>
                 </q-btn>
             </q-td>
         ''')

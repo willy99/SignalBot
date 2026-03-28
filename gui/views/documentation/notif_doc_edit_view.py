@@ -1,7 +1,8 @@
 from nicegui import ui, run
+
+from dics.security_config import PERM_EDIT, MODULE_DOC_NOTIF
 from gui.controllers.notif_controller import NotifController
 from gui.services.auth_manager import AuthManager
-from gui.services.request_context import RequestContext
 from gui.controllers.person_controller import PersonController
 from domain.person_filter import PersonSearchFilter, YES
 from datetime import datetime, timedelta
@@ -15,6 +16,7 @@ from gui.tools.ui_components import date_input, fix_date, mark_clean, mark_dirty
 
 def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController,
                       auth_manager: AuthManager, notif_doc_id: int = None):
+    can_edit = auth_manager.has_access(MODULE_DOC_NOTIF, PERM_EDIT)
     state = {
         'status': DOC_STATUS_DRAFT,
         'out_date': None,
@@ -145,15 +147,19 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
         with ui.row().classes('items-center gap-4'):
             save_draft_btn = ui.button('ЗБЕРЕГТИ ЧЕРНЕТКУ', icon='save', on_click=on_save_draft_click).props('outline color="primary"').classes('h-10')
             save_draft_btn.disable()
+            save_draft_btn.set_visibility(can_edit)
 
             generate_docs_btn = ui.button('WORD: Разом', icon='description', on_click=on_generate_docs_click).props('color="blue"').classes('h-10')
             generate_docs_btn.disable()
+            generate_docs_btn.set_visibility(can_edit)
 
             generate_indiv_docs_btn = ui.button('WORD (Окремо)', icon='file_copy', on_click=on_generate_indiv_docs_click).props('color="blue"').classes('h-10')
             generate_indiv_docs_btn.disable()
+            generate_indiv_docs_btn.set_visibility(can_edit)
 
             complete_btn = ui.button('ВІДПРАВКА', icon='send', on_click=on_send_kpp_click).props('color="green"').classes('h-10')
             complete_btn.disable()
+            complete_btn.set_visibility(can_edit)
 
     ui_options = person_ctrl.get_column_options()
     title_options = ui_options.get(COLUMN_TITLE_2, [])
@@ -342,7 +348,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
             def update_selection_ui():
                 count = len(state['selected_candidates'])
                 selected_count_label.set_text(f'Вибрано: {count}')
-                actions_row.set_visibility(count > 0)
+                actions_row.set_visibility(count > 0 and can_edit)
 
             def on_add_selected_click():
                 if not state['selected_candidates']:

@@ -1,9 +1,9 @@
 from nicegui import ui, run
 
 from dics.deserter_xls_dic import VALID_PATTERN_DOC_NUM
+from dics.security_config import PERM_EDIT, MODULE_DOC_SUPPORT
 from domain.person_filter import PersonSearchFilter
 from gui.services.auth_manager import AuthManager
-from gui.services.request_context import RequestContext
 from utils.utils import to_genitive_case, to_genitive_title
 from gui.tools.validation import is_valid_doc_number
 import config
@@ -22,6 +22,8 @@ DEF_MED, DEF_CARD, DEF_SET_DOCS, DEF_MOVE, DEF_OTHER = 1, 2, 2, 1, 0
 
 def render_document_page(controller: SupportController, person_controller: PersonController,
                          file_cache_manager: FileCacheManager, auth_manager: AuthManager, draft_id: int = None):
+    can_edit = auth_manager.has_access(MODULE_DOC_SUPPORT, PERM_EDIT)
+
     state = {
         'status': DOC_STATUS_DRAFT,
         'out_date': '',
@@ -162,15 +164,19 @@ def render_document_page(controller: SupportController, person_controller: Perso
         with ui.row().classes('items-center gap-4'):
             generate_logs_btn = ui.button('INFO ДЛЯ СEДО', icon='description', on_click=on_generate_logs_click).props('outline color="primary"').classes('h-10')
             generate_logs_btn.disable()
+            generate_logs_btn.set_visibility(can_edit)
 
             save_draft_btn = ui.button('ЗБЕРЕГТИ ЧЕРНЕТКУ', icon='save', on_click=on_save_draft_click).props('outline color="primary"').classes('h-10')
             save_draft_btn.disable()
+            save_draft_btn.set_visibility(can_edit)
 
             generate_docs_btn = ui.button('СФОРМУВАТИ (WORD)', icon='print', on_click=on_generate_docs_click).props('color="blue"').classes('h-10')
             generate_docs_btn.disable()
+            generate_docs_btn.set_visibility(can_edit)
 
             complete_btn = ui.button('ВІДПРАВКА НА ДБР', icon='send', on_click=on_send_dbr_click).props('color="green"').classes('h-10')
             complete_btn.disable()
+            complete_btn.set_visibility(can_edit)
 
     with ui.grid(columns=12).classes('w-full px-4 gap-6 items-start'):
 

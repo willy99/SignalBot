@@ -3,6 +3,7 @@ from nicegui import ui, run
 from dics.deserter_xls_dic import COLUMN_ORDER_ASSIGNMENT_NUMBER, COLUMN_ORDER_ASSIGNMENT_DATE, \
     COLUMN_ORDER_RESULT_NUMBER, COLUMN_ORDER_RESULT_DATE, COLUMN_KPP_NUMBER, COLUMN_KPP_DATE, COLUMN_DBR_NUMBER, \
     COLUMN_DBR_DATE, VALID_PATTERN_DOC_NUM, VALID_PATTERN_DOC_NUM_FULL
+from dics.security_config import MODULE_DOC_DBR, PERM_EDIT
 from gui.controllers.dbr_controller import DbrController
 from gui.controllers.person_controller import PersonController
 from gui.services.auth_manager import AuthManager
@@ -17,6 +18,7 @@ import re
 
 def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file_cache_manager: FileCacheManager,
                     auth_manager: AuthManager, dbr_doc_id: int = None):
+    can_edit = auth_manager.has_access(MODULE_DOC_DBR, PERM_EDIT)
 
     state = {
         'status': DOC_STATUS_DRAFT,
@@ -101,8 +103,11 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
         with ui.row().classes('items-center gap-2'):
             save_draft_btn = ui.button('ЗБЕРЕГТИ ЧЕРНЕТКУ', on_click=on_save_draft_click, icon='save').classes('h-10').props('outline color="primary"')
             save_draft_btn.disable()
+            save_draft_btn.set_visibility(can_edit)
+
             complete_btn = ui.button('ПІДТВЕРДИТИ ВІДПРАВКУ', on_click=on_send_dbr_click, icon='send').classes('h-10').props('color="green"')
             complete_btn.disable()
+            complete_btn.set_visibility(can_edit)
 
 
     with ui.grid(columns=12).classes('w-full gap-6 items-start max-w-7xl mx-auto'):
@@ -469,8 +474,8 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                                         edit_button.disable()
                                         delete_button.disable()
 
-                save_draft_btn.set_visibility(not is_empty)
-                complete_btn.set_visibility(not is_empty)
+                save_draft_btn.set_visibility(not is_empty and can_edit)
+                complete_btn.set_visibility(not is_empty and can_edit)
 
                 if is_empty or is_completed:
                     save_draft_btn.disable()

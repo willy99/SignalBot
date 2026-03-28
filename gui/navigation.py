@@ -67,7 +67,6 @@ def init_nicegui(workflow_obj):
     create_login_page(auth_manager, workflow_obj.log_manager)
 
     @ui.page('/')
-    @require_access(auth_manager, 'search', PERM_READ)
     def index():
         render_home_page(auth_manager)
 
@@ -137,7 +136,7 @@ def init_nicegui(workflow_obj):
 
     @ui.page('/doc_dbr/create')
     @ui.page('/doc_dbr/edit/{draft_id}')
-    @require_access(auth_manager, 'doc_dbr', PERM_EDIT)
+    @require_access(auth_manager, 'doc_dbr', PERM_READ)
     def doc_dbr_edit(draft_id: int = None):
         app_menu.render(auth_manager)
         dbr_doc_edit_view.render_dbr_page(dbr_ctrl, person_ctrl, file_manager, auth_manager, draft_id)
@@ -151,14 +150,14 @@ def init_nicegui(workflow_obj):
 
     @ui.page('/doc_support/d_create')
     @ui.page('/doc_support/d_edit/{draft_id}')
-    @require_access(auth_manager, 'doc_support', PERM_EDIT)
+    @require_access(auth_manager, 'doc_support', PERM_READ)
     def support_doc_edit(draft_id: int = None):
         app_menu.render(auth_manager)
         support_doc_detailed_view.render_document_page(support_ctrl, person_ctrl, file_manager, auth_manager, draft_id)
 
     @ui.page('/doc_support/s_create')
     @ui.page('/doc_support/s_edit/{draft_id}')
-    @require_access(auth_manager, 'doc_support', PERM_EDIT)
+    @require_access(auth_manager, 'doc_support', PERM_READ)
     def support_doc_edit(draft_id: int = None):
         app_menu.render(auth_manager)
         support_doc_standart_view.render_support_standard_page(support_ctrl, person_ctrl, file_manager, auth_manager, draft_id)
@@ -171,7 +170,7 @@ def init_nicegui(workflow_obj):
 
     @ui.page('/doc_notif/create')
     @ui.page('/doc_notif/edit/{draft_id}')
-    @require_access(auth_manager, 'doc_notif', PERM_EDIT)
+    @require_access(auth_manager, 'doc_notif', PERM_READ)
     def notif_doc_edit(draft_id: int = None):
         app_menu.render(auth_manager)
         notif_doc_edit_view.render_notif_page(notif_ctrl, person_ctrl, auth_manager, draft_id)

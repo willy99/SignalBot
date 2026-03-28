@@ -1,6 +1,8 @@
 import os
 import shutil
 import io
+
+from gui.services.request_context import RequestContext
 from service.storage.FileStorageClient import FileStorageClient
 from service.storage.LoggerManager import LoggerManager
 import json
@@ -29,7 +31,7 @@ class LocalFileClient(FileStorageClient):
             self.logger.error(f"❌ Помилка створення локальної директорії: {e}")
             raise
 
-    def get_file_buffer(self, path: str) -> io.BytesIO:
+    def get_file_buffer(self, ctx: RequestContext, path: str) -> io.BytesIO:
         try:
             with open(path, 'rb') as f:
                 return io.BytesIO(f.read())

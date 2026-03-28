@@ -166,7 +166,7 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
             else:
                 file_path = f"{config.INBOX_LOCAL_DIR_PATH}/{filename}"
 
-            def extract():
+            def extract(ctx):
                 engine = ParserFactory.get_parser(file_path, inbox_ctrl.log_manager)
                 return engine.get_full_text()
 

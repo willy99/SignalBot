@@ -58,7 +58,7 @@ class InboxService:
         with client:
             try:
                 # get_file_buffer вже реалізований у вас в SMBFileClient
-                buffer = client.get_file_buffer(target_path)
+                buffer = client.get_file_buffer(self.ctx, target_path)
                 return buffer
             except Exception as e:
                 self.logger.error(f"Помилка завантаження файлу {target_path}: {e}")

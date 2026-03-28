@@ -1,6 +1,7 @@
 from nicegui import ui
 
 from dics.security_config import PERM_READ, PERM_EDIT
+from gui.auth_routes import logout
 
 
 # Якщо ви використовуєте menu() на головній сторінці, не забудьте його імпортувати
@@ -18,6 +19,9 @@ def create_nav_card(title: str, description: str, icon_name: str, route: str, co
 
 def render_home_page(auth_manager):
     # menu(auth_manager) # Розкоментуйте, якщо головна сторінка також містить верхнє меню
+    can_search = auth_manager.has_access('search', PERM_READ)
+    if not can_search:
+        logout(auth_manager)
 
     with ui.column().classes('w-full items-center px-4 py-8 bg-gray-50 min-h-screen'):
 

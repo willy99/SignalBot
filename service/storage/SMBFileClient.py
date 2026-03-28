@@ -2,6 +2,7 @@ import io
 import os
 import smbclient
 import config
+from gui.services.request_context import RequestContext
 from service.storage.FileStorageClient import FileStorageClient
 from service.storage.LoggerManager import LoggerManager
 import json
@@ -70,7 +71,7 @@ class SMBFileClient(FileStorageClient):
                 self.logger.error(f"❌ Не вдалося створити папки на SMB: {e}")
                 raise
 
-    def get_file_buffer(self, share_path: str) -> io.BytesIO:
+    def get_file_buffer(self, ctx: RequestContext, share_path: str) -> io.BytesIO:
         with self._smb_lock:
             try:
                 with smbclient.open_file(share_path, mode="rb") as f:

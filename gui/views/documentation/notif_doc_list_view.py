@@ -1,6 +1,7 @@
 from nicegui import ui, run
 
 import config
+from dics.security_config import MODULE_DOC_NOTIF, PERM_DELETE, PERM_EDIT
 from gui.controllers.notif_controller import NotifController
 from gui.services.auth_manager import AuthManager
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
@@ -10,6 +11,9 @@ from domain.document_filter import DocumentFilter
 
 
 def render_notif_drafts_list_page(notif_ctrl: NotifController, auth_manager: AuthManager):
+    can_delete = auth_manager.has_access(MODULE_DOC_NOTIF, PERM_DELETE)
+    can_edit = auth_manager.has_access(MODULE_DOC_NOTIF, PERM_EDIT)
+
     ui.label('Список пакетів для відправки повідомлень').classes('w-full text-center text-3xl font-bold mb-8')
 
     # Стан фільтрів на UI
@@ -116,9 +120,11 @@ def render_notif_drafts_list_page(notif_ctrl: NotifController, auth_manager: Aut
                 search_btn = ui.button(icon='search', on_click=apply_filters).props('color="primary" round dense').tooltip('Застосувати фільтри')
                 ui.button(icon='clear_all', on_click=clear_filters).props('color="gray" flat round dense').tooltip('Очистити')
 
-            ui.button('Створити новий пакет', icon='add',
+            create_button = ui.button('Створити новий пакет', icon='add',
                       on_click=lambda: ui.navigate.to('/doc_notif/create')
                       ).props('color="primary"').classes('shrink-0 h-10')
+            if not can_edit:
+                create_button.disable()
 
         # Створюємо порожню таблицю
         table = ui.table(columns=columns, rows=[], row_key='id').classes('w-full max-w-8xl shadow-md')
@@ -137,16 +143,18 @@ def render_notif_drafts_list_page(notif_ctrl: NotifController, auth_manager: Aut
             </q-td>
         ''')
 
-        table.add_slot('body-cell-actions', '''
-            <q-td :props="props" class="gap-2">
-                <q-btn flat dense color="primary" icon="edit" @click="$parent.$emit('edit', props.row.id)">
-                    <q-tooltip>Відкрити / Редагувати</q-tooltip>
-                </q-btn>
-                <q-btn flat dense color="negative" icon="delete" @click="$parent.$emit('delete', props.row.id)">
-                    <q-tooltip>Видалити пакет</q-tooltip>
-                </q-btn>
-            </q-td>
-        ''')
+        table.add_slot('body-cell-actions', f'''
+                    <q-td :props="props" class="gap-2">
+                        <q-btn flat dense color="primary" icon="edit" @click="$parent.$emit('edit', props.row.id)">
+                            <q-tooltip>Відкрити / Редагувати</q-tooltip>
+                        </q-btn>
+                        <q-btn flat dense color="negative" icon="delete" 
+                               :disable="!{str(can_delete).lower()}"
+                               @click="$parent.$emit('delete', props.row.id)">
+                            <q-tooltip>{{{{ !{str(can_delete).lower()} ? 'Немає прав на видалення' : 'Видалити пакет' }}}}</q-tooltip>
+                        </q-btn>
+                    </q-td>
+                ''')
 
         table.on('edit', lambda e: ui.navigate.to(f'/doc_notif/edit/{e.args}'))
 

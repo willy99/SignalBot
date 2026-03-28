@@ -4,6 +4,9 @@ import datetime
 import config
 import os
 
+from gui.services.request_context import RequestContext
+
+
 class FileStorageClient(ABC):
 
     @abstractmethod
@@ -11,7 +14,7 @@ class FileStorageClient(ABC):
         pass
 
     @abstractmethod
-    def get_file_buffer(self, path: str) -> io.BytesIO:
+    def get_file_buffer(self, ctx: RequestContext, path: str) -> io.BytesIO:
         pass
 
     @abstractmethod

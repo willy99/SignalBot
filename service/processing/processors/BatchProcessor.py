@@ -45,7 +45,7 @@ class BatchProcessor:
                     try:
                         local_path = os.path.join(config.TMP_DIR, file_name)
                         #copy
-                        file_data = smb.get_file_buffer(full_path)
+                        file_data = smb.get_file_buffer(None, full_path)
                         if file_data:
                             with open(local_path, 'wb') as f:
                                 f.write(file_data.getbuffer())

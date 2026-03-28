@@ -81,7 +81,7 @@ class ReportController:
     def is_admin(self):
         return self.auth_manager.has_access('admin_panel', PERM_READ)
 
-    def generate_daily_report_word(self, target_date: str, raw_documents: list) -> tuple[bytes, str]:
+    def generate_daily_report_word(self, ctx: RequestContext, target_date: str, raw_documents: list) -> tuple[bytes, str]:
         file_bytes, file_name = self.doc_templator.make_daily_report(target_date, raw_documents)
 
         try:

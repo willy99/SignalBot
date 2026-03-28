@@ -49,8 +49,8 @@ class AuthManager:
         """Перевірка, чи не застаріла сесія."""
         if not app.storage.user.get('authenticated'):
             return False
-        print('1>> ' + str(datetime.fromtimestamp(  app.storage.user.get('last_activity') ).strftime('%H:%M:%S')))
-        print('2>> ' + str(datetime.fromtimestamp(  ctx.last_activity ).strftime('%H:%M:%S')))
+        # print('1>> ' + str(datetime.fromtimestamp(  app.storage.user.get('last_activity') ).strftime('%H:%M:%S')))
+        # print('2>> ' + str(datetime.fromtimestamp(  ctx.last_activity ).strftime('%H:%M:%S')))
 
         storage_time = app.storage.user.get('last_activity', 0)
         ctx_time = ctx.last_activity if ctx else 0
@@ -58,7 +58,7 @@ class AuthManager:
         last_activity = max(storage_time, ctx_time)
 
         time_str = datetime.fromtimestamp(last_activity).strftime('%H:%M:%S')
-        print(f'>>> check sessions (formatted): {time_str}')
+        # print(f'>>> check sessions (formatted): {time_str}')
 
         if time.time() - last_activity > config.SESSION_TIMEOUT:
             self.logout()
@@ -83,18 +83,12 @@ class AuthManager:
         Централізований запуск важких функцій у фоновому потоці
         з автоматичним менеджментом сесії.
         """
-        # 1. Перед запуском: Перевіряємо чи жива сесія в UI
         if not self.check_session(ctx):
             return None  # Або raise PermissionError
 
         try:
-            # 2. ЗАПУСК: Відправляємо функцію в потік через auth_manager.execute
-            # Передаємо ctx першим аргументом, як того очікує твій декоратор
             result = await run.io_bound(func, ctx, *args, **kwargs)
 
-            # 3. ПІСЛЯ ЗАПУСКУ: Синхронізуємо час назад у браузер
-            # Оскільки ми повернулися з потоку, де ctx міг оновитися,
-            # ми фіксуємо це в глобальному сховищі користувача.
             app.storage.user['last_activity'] = time.time()
             if ctx:
                 ctx.last_activity = app.storage.user['last_activity']
