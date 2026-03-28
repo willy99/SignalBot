@@ -2,9 +2,11 @@ from nicegui import ui, app, context
 from functools import wraps
 import asyncio
 
+import config
 from dics.security_config import PERM_READ
 from gui.services.auth_manager import AuthManager
-
+from gui.services.request_context import RequestContext
+import time
 
 def create_login_page(auth_manager, log_manager):
     logger = log_manager.get_logger()
@@ -52,52 +54,23 @@ def create_login_page(auth_manager, log_manager):
 def refresh_session_method(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
-        # Беремо менеджер безпосередньо з екземпляра контролера (self)
-        manager: AuthManager = getattr(self, 'auth_manager', None)
+        # Шукаємо ctx серед позиційних аргументів або в kwargs
+        ctx: RequestContext = next((a for a in args if isinstance(a, RequestContext)), kwargs.get('ctx'))
 
-        print('>>> manager ' + str(manager))
+        if ctx:
+            print(f'>>> [THREAD CHECK] User: {ctx.user_login}, Last seen: {ctx.last_activity_str}')
 
-        if not manager:
-            # Якщо забули прокинути менеджер в self, просто виконуємо
-            return func(self, *args, **kwargs)
+            # Перевіряємо час із ctx, а не з app.storage
+            if time.time() - ctx.last_activity > config.SESSION_TIMEOUT:
+                self.logger.warning(f"Session expired in thread for {ctx.user_login}")
+                return None
 
-        # Перевірка через ваш існуючий метод
-        if not manager.check_session():
-            # check_session вже має доступ до app.storage.user
-            # і оновить час, якщо все ок
-            return None
+                # Оновлюємо час у самому об'єкті контексту (локально для потоку)
+            ctx.last_activity = time.time()
 
         return func(self, *args, **kwargs)
 
     return wrapper
-
-def refresh_session(auth_manager: AuthManager):
-    """
-    Декоратор для методів контролера.
-    Явно використовує auth_manager для перевірки та оновлення сесії.
-    """
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            # 1. Перевірка авторизації через системний storage
-            if not app.storage.user.get('authenticated', False):
-                ui.notify('Сесія недійсна. Увійдіть знову', type='warning')
-                ui.navigate.to('/login')
-                return
-
-            # 2. Оновлення сесії через переданий менеджер
-            # check_session() оновить time.time() всередині storage.user
-            if not auth_manager.check_session():
-                ui.notify('Сесію завершено через неактивність', type='warning')
-                ui.navigate.to('/login')
-                return
-
-            # 3. Виконання самого методу
-            if asyncio.iscoroutinefunction(func):
-                return func(*args, **kwargs)
-            return func(*args, **kwargs)
-        return wrapper
-    return decorator
 
 def require_access(auth_manager, module_name, action=PERM_READ):
     """
@@ -113,7 +86,7 @@ def require_access(auth_manager, module_name, action=PERM_READ):
                 ui.navigate.to('/login')
                 return
             else:
-                if not auth_manager.check_session():
+                if not auth_manager.check_session(auth_manager.get_current_context()):
                     ui.notify('Сесію завершено через неактивність', type='warning')
                     ui.navigate.to('/login')
                     return

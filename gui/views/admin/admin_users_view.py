@@ -79,7 +79,7 @@ def render_users_page(auth_manager: AuthManager):
                 refresh_table()
                 return
 
-            auth_manager.update_user(user['id'], user['role'], user['full_name'], not user['is_active'])
+            auth_manager.update_user(user['id'], user['role'], user['full_name'], user['is_active'])
             ui.notify(f"Статус {user['username']} змінено!", type='info')
             refresh_table()
 
@@ -113,10 +113,10 @@ def render_users_page(auth_manager: AuthManager):
                 table.add_slot('body-cell-role', f'''
                     <q-td :props="props">
                         <q-select 
-                            v-model="props.row.role" 
+                            :model-value="props.row.role" 
                             :options="{AVAILABLE_ROLES}" 
                             dense options-dense borderless
-                            @update:model-value="$parent.$emit('role_changed', props.row)"
+                            @update:model-value="val => {{ props.row.role = val; $parent.$emit('role_changed', props.row) }}"
                         />
                     </q-td>
                 ''')
@@ -124,7 +124,11 @@ def render_users_page(auth_manager: AuthManager):
                 # Кастомний слот для статусу (перемикач Активний/Вимкнений)
                 table.add_slot('body-cell-status', '''
                     <q-td :props="props">
-                        <q-toggle v-model="props.row.is_active" color="green" @update:model-value="$parent.$emit('toggle_status', props.row)" />
+                        <q-toggle 
+                            :model-value="props.row.is_active" 
+                            color="green" 
+                            @update:model-value="val => { props.row.is_active = val; $parent.$emit('toggle_status', props.row) }" 
+                        />
                     </q-td>
                 ''')
 

@@ -2,14 +2,14 @@ from nicegui import ui, run
 
 import config
 from gui.controllers.notif_controller import NotifController
-from gui.services.request_context import RequestContext
+from gui.services.auth_manager import AuthManager
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
 from datetime import datetime
 from gui.tools.ui_components import date_input, fix_date, confirm_delete_dialog, ServerPagination
 from domain.document_filter import DocumentFilter
 
 
-def render_notif_drafts_list_page(notif_ctrl: NotifController, ctx: RequestContext):
+def render_notif_drafts_list_page(notif_ctrl: NotifController, auth_manager: AuthManager):
     ui.label('Список пакетів для відправки повідомлень').classes('w-full text-center text-3xl font-bold mb-8')
 
     # Стан фільтрів на UI
@@ -65,11 +65,11 @@ def render_notif_drafts_list_page(notif_ctrl: NotifController, ctx: RequestConte
                             offset=pager.offset
                         )
 
-                        total_count = await run.io_bound(notif_ctrl.count_search_docs, ctx, doc_filter)
+                        total_count = await auth_manager.execute(notif_ctrl.count_search_docs, auth_manager.get_current_context(), doc_filter)
                         pager.update_total(total_count)
 
                         # 2. Викликаємо контролер
-                        drafts = await run.io_bound(notif_ctrl.search_drafts, ctx, doc_filter)
+                        drafts = await auth_manager.execute(notif_ctrl.search_drafts, auth_manager.get_current_context(), doc_filter)
 
                         # 3. Форматуємо отримані об'єкти NotifDoc для таблиці
                         formatted_rows = []
@@ -157,7 +157,7 @@ def render_notif_drafts_list_page(notif_ctrl: NotifController, ctx: RequestConte
 
             if result:
                 try:
-                    await run.io_bound(notif_ctrl.delete_doc, ctx, draft_id)
+                    await auth_manager.execute(notif_ctrl.delete_doc, auth_manager.get_current_context(), draft_id)
                     table.rows = [row for row in table.rows if row['id'] != draft_id]
                     table.update()
                     ui.notify(f'Пакет №{draft_id} успішно видалено', type='info')

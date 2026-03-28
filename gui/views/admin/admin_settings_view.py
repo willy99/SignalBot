@@ -1,17 +1,16 @@
 from nicegui import ui, run
 import re
 from gui.controllers.config_controller import ConfigController
-from gui.services.request_context import RequestContext
+from gui.services.auth_manager import AuthManager
 
-
-def render_settings_page(config_ctrl: ConfigController, ctx: RequestContext):
+def render_settings_page(config_ctrl: ConfigController, auth_manager: AuthManager):
     with ui.row().classes('w-full justify-between items-center mb-6'):
         ui.label('⚙️ Налаштування системи').classes('text-3xl font-bold text-gray-800')
         save_btn = ui.button('ЗБЕРЕГТИ ЗМІНИ', icon='save', on_click=lambda: save_settings()) \
             .props('color="green" size="lg"').classes('shadow-md')
 
     try:
-        configs = config_ctrl.get_all_configs(ctx)
+        configs = config_ctrl.get_all_configs(auth_manager.get_current_context())
     except Exception as e:
         ui.notify(f'Помилка завантаження налаштувань: {e}', type='negative')
         return
@@ -47,9 +46,9 @@ def render_settings_page(config_ctrl: ConfigController, ctx: RequestContext):
                 else:
                     clean_val = str(raw_val).strip()
 
-                await run.io_bound(config_ctrl.update_config_value, ctx, conf.key_name, str(clean_val))
+                await auth_manager.execute(config_ctrl.update_config_value, auth_manager.get_current_context(), conf.key_name, str(clean_val))
 
-            await run.io_bound(config_ctrl.apply_configs_to_runtime, ctx)
+            await auth_manager.execute(config_ctrl.apply_configs_to_runtime, auth_manager.get_current_context())
             ui.notify('✅ Налаштування успішно збережено та застосовано!', type='positive')
         except Exception as e:
             ui.notify(f'❌ Помилка збереження: {e}', type='negative')

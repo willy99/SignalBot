@@ -1,9 +1,9 @@
-from nicegui import ui, run, background_tasks
+from nicegui import ui, run
 from datetime import datetime
 from dics.deserter_xls_dic import *
 from gui.controllers.person_controller import PersonController
 from gui.controllers.report_controller import ReportController
-from gui.services.request_context import RequestContext
+from gui.services.auth_manager import AuthManager
 from gui.controllers.task_controller import TaskController
 from service.constants import TASK_STATUS_IN_PROGRESS
 from domain.task import Task
@@ -22,7 +22,7 @@ def get_rank_category(title: str) -> str:
     return 'Солдати'
 
 
-def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskController, person_ctrl: PersonController, ctx: RequestContext):
+def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskController, person_ctrl: PersonController, auth_manager: AuthManager):
     ui.label('Щоденний звіт').classes('w-full text-center text-3xl font-bold mb-6')
     raw_place_options = person_ctrl.get_column_options().get(COLUMN_DESERTION_PLACE, [])
     place_options = [opt for opt in raw_place_options if str(opt).strip()]
@@ -43,8 +43,9 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
         export_word_btn.props('loading')
         try:
             target_date = date_filter
-            file_bytes, file_name = await run.io_bound(
+            file_bytes, file_name = await auth_manager.execute(
                 report_ctrl.generate_daily_report_word,
+                auth_manager.get_current_context(),
                 target_date.value,
                 data_A0224
             )
@@ -96,13 +97,14 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
         try:
             target_date = datetime.strptime(date_filter.value, '%d.%m.%Y').date()
 
-            cmd_summary = await run.io_bound(report_ctrl.get_brief_report, ctx)
+            cmd_summary = await auth_manager.execute(report_ctrl.get_brief_report, auth_manager.get_current_context())
             state['cmd_summary'] = cmd_summary
 
             # 1. СЗЧ
-            raw_data = await run.io_bound(report_ctrl.get_daily_added_records_report, ctx, target_date)
+            raw_data = await auth_manager.execute(report_ctrl.get_daily_added_records_report, auth_manager.get_current_context(), target_date)
 
             data = []
+            late_returns = []
             filter_active = under_3_days_cb.value
             allowed_places = state.get('selected_places', [])
 
@@ -114,26 +116,30 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
                     item_place = 'Не вказано'
 
                 if item_place not in allowed_places:
-                    keep = False
+                    continue
 
-                if keep and filter_active:
+                if item['category'] == 'standard_event' and filter_active:
                     des_date_val = item.get('des_date')
                     if des_date_val and hasattr(des_date_val, 'toordinal'):
                         days_diff = (target_date - des_date_val).days
                         if not (0 <= days_diff <= 2):
-                            keep = False
+                            continue
                     else:
-                        keep = False
+                        continue
 
-                if keep:
+                    # Форматуємо дати для відображення
+                for d_field in ['ins_date', 'des_date', 'ret_date', 'call_date']:
+                    val = item.get(d_field)
+                    if val and hasattr(val, 'strftime'):
+                        item[d_field] = val.strftime('%d.%m.%Y')
+
+                if item['category'] == 'late_return':
+                    late_returns.append(item)
+                else:
                     data.append(item)
 
             state['data'] = data
-            for item in data:
-                if hasattr(item.get('ins_date'), 'strftime'):
-                    item['ins_date'] = item['ins_date'].strftime('%d.%m.%Y')
-                if hasattr(item.get('des_date'), 'strftime'):
-                    item['des_date'] = item['des_date'].strftime('%d.%m.%Y')
+            state['late_returns'] = late_returns
 
             data_A0224 = [r for r in data if r.get('sheet_name') == 'А0224']
             data_A7018 = [r for r in data if r.get('sheet_name') == 'А7018']
@@ -143,10 +149,15 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
             # 💡 ОПТИМІЗАЦІЯ ПЕРФОРМАНСУ:
             # Запитуємо парсинг ВСІХ файлів з папки лише 1 РАЗ!
             # ==========================================
-            all_daily_files = await run.io_bound(report_ctrl.get_daily_archive_files, target_date, [])
+            all_daily_files = await auth_manager.execute(report_ctrl.get_daily_archive_files, auth_manager.get_current_context(), target_date, [])
 
             # 2. ПОВЕРНЕННЯ (передаємо сюди вже розпарсені файли)
-            return_data = await run.io_bound(report_ctrl.get_daily_added_files_report, ctx, target_date, [], all_daily_files)
+            return_data = await auth_manager.execute(report_ctrl.get_daily_added_files_report, auth_manager.get_current_context(), target_date, [], all_daily_files)
+            late_return_names = {r['name'].strip().lower() for r in late_returns if r.get('name')}
+            return_data = [
+                r for r in return_data
+                if r.get('name', '').strip().lower() not in late_return_names
+            ]
             state['returns'] = return_data
             returned_names = [item['name'] for item in return_data]
 
@@ -372,6 +383,23 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
                     else:
                         ui.label('Записів про повернення не знайдено.').classes('text-gray-500 italic p-4 text-center w-full')
 
+                    # ==========================================
+                    # НЕСВОЄЧАСНЕ ПОВЕРНЕННЯ
+                    # ==========================================
+                    if late_returns:
+                        with ui.row().classes('w-full bg-orange-50 p-3 border-b border-t items-center justify-between mt-4'):
+                            ui.label(f'🕒 Несвоєчасне повернення (СЗЧ + Повернення): {len(late_returns)}').classes('font-bold text-orange-900 text-lg')
+
+                        columns_late = [
+                            {'name': 'name', 'label': COLUMN_NAME, 'field': 'name', 'align': 'left', 'classes': 'font-bold'},
+                            {'name': 'title', 'label': 'Звання', 'field': 'title', 'align': 'left'},
+                            {'name': 'subunit', 'label': 'Підрозділ', 'field': 'subunit', 'align': 'left'},
+                            {'name': 'des_date', 'label': 'Дата вибуття', 'field': 'des_date', 'align': 'center', 'classes': 'text-red-700'},
+                            {'name': 'ret_date', 'label': 'Дата прибуття', 'field': 'ret_date', 'align': 'center', 'classes': 'text-green-700 font-bold'},
+                            {'name': 'term_absent', 'label': 'Діб відсутній', 'field': 'term_absent', 'align': 'center'},
+                        ]
+                        ui.table(columns=columns_late, rows=late_returns).classes('w-full').props('flat bordered dense')
+
                     # ==============================
                     # АРХІВ (Інші документи)
                     # ==============================
@@ -479,8 +507,8 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
             deadline = now.replace(hour=23, minute=59, second=59)
 
             task_model = Task(
-                created_by=ctx.user_id,
-                assignee=ctx.user_id,
+                created_by=auth_manager.get_current_context().user_id,
+                assignee=auth_manager.get_current_context().user_id,
                 task_status=TASK_STATUS_IN_PROGRESS,
                 task_type='Звіти',
                 task_subject=f'Звіт по СЗЧ за {target_date_str}',
@@ -488,7 +516,7 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
                 task_deadline=deadline
             )
 
-            await run.io_bound(task_ctrl.create_task, ctx, task_model)
+            data = await auth_manager.execute(task_ctrl.create_task, auth_manager.get_current_context(), task_model)
             ui.notify('Задачу успішно створено!', type='positive', icon='check_circle')
 
         except Exception as e:

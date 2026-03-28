@@ -1,5 +1,6 @@
 from nicegui import ui, run
 from dics.deserter_xls_dic import *
+from gui.services.auth_manager import AuthManager
 from gui.services.request_context import RequestContext
 
 import io
@@ -7,7 +8,7 @@ from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from domain.person_filter import PersonSearchFilter
 
-def search_page(report_ctrl, person_ctrl, ctx: RequestContext):
+def search_page(report_ctrl, person_ctrl, auth_manager: AuthManager):
     state = {'rows': [], 'columns': []}
 
     year_options = person_ctrl.get_column_options().get(COLUMN_INSERT_DATE, [])
@@ -92,7 +93,8 @@ def search_page(report_ctrl, person_ctrl, ctx: RequestContext):
             ui.label('Компайлінг звіту...').classes('text-grey')
 
         try:
-            data = await run.io_bound(report_ctrl.do_subunit_desertion_report,ctx, search_filter)
+            data = await auth_manager.execute(report_ctrl.do_subunit_desertion_report,auth_manager.get_current_context(), search_filter)
+            # data = await auth_manager.execute(report_ctrl.get_general_state_report, ctx, filt)
 
             # 3. Очищуємо спіннер після отримання даних
             results_container.clear()

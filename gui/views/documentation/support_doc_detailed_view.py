@@ -2,6 +2,7 @@ from nicegui import ui, run
 
 from dics.deserter_xls_dic import VALID_PATTERN_DOC_NUM
 from domain.person_filter import PersonSearchFilter
+from gui.services.auth_manager import AuthManager
 from gui.services.request_context import RequestContext
 from utils.utils import to_genitive_case, to_genitive_title
 from gui.tools.validation import is_valid_doc_number
@@ -20,7 +21,7 @@ DEF_MED, DEF_CARD, DEF_SET_DOCS, DEF_MOVE, DEF_OTHER = 1, 2, 2, 1, 0
 
 
 def render_document_page(controller: SupportController, person_controller: PersonController,
-                         file_cache_manager: FileCacheManager, ctx: RequestContext, draft_id: int = None):
+                         file_cache_manager: FileCacheManager, auth_manager: AuthManager, draft_id: int = None):
     state = {
         'status': DOC_STATUS_DRAFT,
         'out_date': '',
@@ -44,9 +45,9 @@ def render_document_page(controller: SupportController, person_controller: Perso
 
         save_draft_btn.disable()
         try:
-            draft_new_id = await run.io_bound(
+            draft_new_id = await auth_manager.execute(
                 controller.save_support_doc,
-                ctx,
+                auth_manager.get_current_context(),
                 city.value,
                 state.get('out_number', ''),
                 state.get('out_date', ''),
@@ -80,9 +81,9 @@ def render_document_page(controller: SupportController, person_controller: Perso
             generate_docs_btn.props('loading')
             ui.notify('⏳ Генеруємо документи...', type='info')
 
-            file_bytes, file_name = await run.io_bound(
+            file_bytes, file_name = await auth_manager.execute(
                 controller.generate_support_document,
-                ctx, city.value, supp_num, supp_date, state['buffer']
+                auth_manager.get_current_context(), city.value, supp_num, supp_date, state['buffer']
             )
             ui.download(file_bytes, file_name)
             ui.notify('Пакет успішно згенеровано!', type='positive')
@@ -97,17 +98,17 @@ def render_document_page(controller: SupportController, person_controller: Perso
             supp_date = state.get('out_date', '')
 
             generate_logs_btn.props('loading')
-            log_text = await run.io_bound(
+            log_text = await auth_manager.execute(
                 controller.generate_logs,
-                ctx, city.value, supp_num, supp_date, state['buffer']
+                auth_manager.get_current_context(), city.value, supp_num, supp_date, state['buffer']
             )
             file_name = f"Пакет_Супроводів_{supp_num}_{supp_date}.txt"
-            destination_path = f'{config.OUTBOX_DIR_PATH}{file_cache_manager.get_file_separator()}{ctx.user_login}{file_cache_manager.get_file_separator()}{file_name.replace("/", "_")}'
+            destination_path = f'{config.OUTBOX_DIR_PATH}{file_cache_manager.get_file_separator()}{auth_manager.get_current_context().user_login}{file_cache_manager.get_file_separator()}{file_name.replace("/", "_")}'
             log_buffer = io.BytesIO(log_text.encode('utf-8'))
 
             client = file_cache_manager.client
             with client:
-                await run.io_bound(client.save_file_from_buffer, destination_path, log_buffer)
+                await auth_manager.execute(client.save_file_from_buffer, auth_manager.get_current_context(), destination_path, log_buffer)
 
             ui.notify('Документ для СЕДО збережено в ' + str(destination_path), type="positive")
         except Exception as e:
@@ -139,12 +140,7 @@ def render_document_page(controller: SupportController, person_controller: Perso
         ui.notify('⏳ Оновлюємо дані в Excel, зачекайте...', type='info')
 
         try:
-            complete = await run.io_bound(
-                controller.mark_as_completed,
-                ctx,
-                person_controller,
-                current_id
-            )
+            complete = await auth_manager.execute(controller.mark_as_completed, auth_manager.get_current_context(), person_controller, current_id)
 
             if complete:
                 state['status'] = DOC_STATUS_COMPLETED
@@ -199,7 +195,7 @@ def render_document_page(controller: SupportController, person_controller: Perso
                     if not re.match(VALID_PATTERN_DOC_NUM, num):
                         supp_number_input.props('error error-message="Формат має бути 642/ХХХХX (до 5 цифр)"')
                         return True
-                    is_dup = await run.io_bound(controller.is_existing_num, ctx, num, state.get('current_support_doc_id'))
+                    is_dup = await auth_manager.execute(controller.is_existing_num, auth_manager.get_current_context(), num, state.get('current_support_doc_id'))
 
                     if is_dup:
                         supp_number_input.props('error error-message="Цей номер вже існує в базі!"')
@@ -286,7 +282,7 @@ def render_document_page(controller: SupportController, person_controller: Perso
                 search_btn.disable()
                 try:
                     search_filter = PersonSearchFilter(query=query)
-                    results = await run.io_bound(person_controller.search, ctx, search_filter)
+                    results = await auth_manager.execute(person_controller.search, auth_manager.get_current_context(), search_filter)
 
                     state['current_search_results'].clear()
                     options = {}
@@ -588,7 +584,7 @@ def render_document_page(controller: SupportController, person_controller: Perso
 
             def load_draft(d_id: int):
                 try:
-                    draft = controller.get_support_doc_by_id(ctx, d_id)
+                    draft = controller.get_support_doc_by_id(auth_manager.get_current_context(), d_id)
                     if not draft:
                         ui.notify(f'Помилка: Чернетку №{d_id} не знайдено в базі!', type='negative')
                         return

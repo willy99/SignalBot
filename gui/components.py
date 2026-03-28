@@ -13,7 +13,6 @@ if not hasattr(app, 'alarmed_tasks'):
 from nicegui import ui, app, run
 from gui.auth_routes import logout
 from datetime import datetime
-from gui.services.request_context import RequestContext
 import config
 
 
@@ -25,7 +24,7 @@ class AppMenu:
         self.inbox_ctrl = inbox_controller
         self.person_ctrl = person_controller
 
-    def render(self, ctx: RequestContext):
+    def render(self, auth_manager: AuthManager):
         """Цей метод викликається на кожній сторінці для малювання меню"""
         ui.add_head_html('<link rel="stylesheet" href="/static/style.css">')
         ui.add_head_html(
@@ -76,7 +75,7 @@ class AppMenu:
                         try:
                             # 2. Викликаємо важку операцію в окремому потоці, щоб не фрізити UI
                             # Припускаємо, що self.person_ctrl або інший контролер має метод sync
-                            success = await run.io_bound(self.person_ctrl.sync, ctx)
+                            success = await auth_manager.execute(self.person_ctrl.sync, auth_manager.get_current_context())
 
                             if success:
                                 ui.notify('Дані успішно синхронізовано!', color='positive', pos='bottom-right', icon='done')
@@ -85,7 +84,7 @@ class AppMenu:
 
                         except Exception as e:
                             ui.notify(f'Критична помилка: {str(e)}', color='negative')
-                            print(f"Sync error for {ctx.user_login}: {e}")
+                            print(f"Sync error for {auth_manager.get_current_context().user_login}: {e}")
 
                         finally:
                             # 3. Зупиняємо анімацію в будь-якому випадку
@@ -111,7 +110,7 @@ class AppMenu:
                     async def update_inbox():
                         try:
                             # Викликаємо контролер через self.inbox_ctrl
-                            inbox_data = await run.io_bound(self.inbox_ctrl.get_user_inbox_messages, ctx)
+                            inbox_data = await auth_manager.execute(self.inbox_ctrl.get_user_inbox_messages, auth_manager.get_current_context())
                             # inbox_data = {'personal_files': [], 'root_files':[]}
                             p_count = len(inbox_data['personal_files'])
                             r_count = len(inbox_data['root_files'])
@@ -130,7 +129,7 @@ class AppMenu:
 
                             inbox_btn.set_visibility(True) # p_count > 0 or r_count > 0)
                         except Exception as e:
-                            print(f"Помилка оновлення Inbox для {ctx.user_login}: {e}")
+                            print(f"Помилка оновлення Inbox для {auth_manager.get_current_context().user_login}: {e}")
 
                     # Таймери оновлення
                     ui.timer(config.CHECK_INBOX_EVERY_SEC, update_inbox)
@@ -160,7 +159,7 @@ class AppMenu:
                     async def update_my_tasks():
                         try:
                             # Робимо запит до БД в окремому потоці, щоб не блокувати UI
-                            new_count, prog_count = await run.io_bound(self.task_ctrl.get_my_task_counts, ctx)
+                            new_count, prog_count = await auth_manager.execute(self.task_ctrl.get_my_task_counts, auth_manager.get_current_context())
 
                             if new_count > 0:
                                 badge_new.set_text(str(new_count))
@@ -182,7 +181,7 @@ class AppMenu:
                             # ==========================================
                             # 2. ЛОГІКА БУДИЛЬНИКА (ALARM)
                             # ==========================================
-                            alarms = await run.io_bound(self.task_ctrl.get_my_alarms, ctx)
+                            alarms = await auth_manager.execute(self.task_ctrl.get_my_alarms, auth_manager.get_current_context())
 
                             for alarm in alarms:
                                 task_id = alarm['id']
@@ -204,7 +203,7 @@ class AppMenu:
                                     ui.run_javascript(
                                         "new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg').play().catch(e => console.log('Автовідтворення заблоковано браузером'));")
                         except Exception as e:
-                            print(f"Помилка оновлення задач для юзера {ctx.user_login}: {e}")
+                            print(f"Помилка оновлення задач для юзера {auth_manager.get_current_context().user_login}: {e}")
 
                     # Запускаємо таймер тільки для цієї сесії (наприклад, раз на 15 секунд)
                     ui.timer(config.CHECK_INBOX_EVERY_SEC, update_my_tasks)
@@ -273,6 +272,8 @@ class AppMenu:
                                 make_menu_item('Звіт по підрозділам', 'bar_chart', '/report_units')
                             if can_report_general:
                                 make_menu_item('Звіт по рокам', 'event_note', '/report_yearly')
+                            if can_report_general:
+                                make_menu_item('Загальний стан', 'fact_check', '/report_general_state')
                             if can_report_general:
                                 make_menu_item('Дублікати прізвищ', 'people_outline', '/report_name_dups')
                             if can_report_general:

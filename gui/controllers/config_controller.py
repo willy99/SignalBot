@@ -1,6 +1,5 @@
 from typing import List
 from domain.sys_config import SysConfig
-from gui.auth_routes import refresh_session, refresh_session_method
 from gui.services.auth_manager import AuthManager
 from service.config.ConfigService import ConfigService
 from gui.services.request_context import RequestContext

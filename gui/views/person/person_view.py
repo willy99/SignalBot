@@ -47,7 +47,7 @@ def is_delete_allowed(person: Person) -> bool:
 # 🪟 ВІКНА ДІАЛОГІВ
 # ==========================================
 
-def edit_person(person: Person, person_ctrl, ctx: RequestContext, auth_manager: AuthManager, on_close=None):
+def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close=None):
     ui_options = person_ctrl.get_column_options()
     can_edit = auth_manager.has_access(MODULE_PERSON, PERM_EDIT)
     can_delete = auth_manager.has_access(MODULE_PERSON, PERM_DELETE)
@@ -107,7 +107,7 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, auth_manager: 
         with ui.notification(message='Зберігаю дані...', spinner=True, timeout=0) as n:
             await asyncio.sleep(0.1)  # Даємо UI відмалювати спінер
 
-            success = await run.io_bound(person_ctrl.save_person, ctx, person, paint_color)
+            success = await auth_manager.execute(person_ctrl.save_person, auth_manager.get_current_context(), person, paint_color)
 
             if success:
                 n.message = 'Успішно збережено!'
@@ -129,13 +129,13 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, auth_manager: 
                 n.type = 'negative'
                 n.spinner = False
 
-    async def handle_delete(person, person_ctrl: PersonController, ctx: RequestContext, dialog, on_close=None):
+    async def handle_delete(person, person_ctrl: PersonController, dialog, on_close=None):
         result = await confirm_delete_dialog('Ви дійсно бажаєте видалити цей запис?')
         if not result: return
         with ui.notification(message='Видаляю дані...', spinner=True, timeout=0) as n:
             await asyncio.sleep(0.1)  # Даємо UI відмалювати спінер
 
-            success = await run.io_bound(person_ctrl.delete_record, ctx, person)
+            success = await auth_manager.execute(person_ctrl.delete_record, auth_manager.get_current_context(), person)
 
             if success:
                 n.message = 'Успішно видалено!'
@@ -305,7 +305,7 @@ def edit_person(person: Person, person_ctrl, ctx: RequestContext, auth_manager: 
 
                 if can_delete:
                     del_btn = ui.button('ВИДАЛИТИ', icon='delete',
-                                        on_click=lambda: handle_delete(person, person_ctrl, ctx, dialog, on_close=on_close)) \
+                                        on_click=lambda: handle_delete(person, person_ctrl, dialog, on_close=on_close)) \
                         .classes('bg-red-600 text-white px-8 h-12 text-lg font-bold shadow-md hover:bg-red-700 transition-colors').props('color="red"')
 
                     if getattr(person, 'id', None) is None:

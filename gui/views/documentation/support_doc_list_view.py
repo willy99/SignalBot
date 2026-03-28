@@ -2,14 +2,14 @@ from nicegui import ui, run
 
 import config
 from gui.controllers.support_controller import SupportController
-from gui.services.request_context import RequestContext
+from gui.services.auth_manager import AuthManager
 from service.constants import DOC_STATUS_COMPLETED, DOC_STATUS_DRAFT, DOC_PACKAGE_STANDART
 from datetime import datetime
 from gui.tools.ui_components import date_input, fix_date, confirm_delete_dialog, ServerPagination
 from domain.document_filter import DocumentFilter
 
 
-def render_drafts_list_page(controller: SupportController, ctx: RequestContext):
+def render_drafts_list_page(controller: SupportController, auth_manager: AuthManager):
     ui.label('Список пакетів супроводів').classes('w-full text-center text-3xl font-bold mb-8')
 
     # Стан фільтрів на UI
@@ -66,11 +66,11 @@ def render_drafts_list_page(controller: SupportController, ctx: RequestContext):
                             limit=pager.limit,
                             offset=pager.offset
                         )
-                        total_count = await run.io_bound(controller.count_search_docs, ctx, doc_filter)
+                        total_count = await auth_manager.execute(controller.count_search_docs, auth_manager.get_current_context(), doc_filter)
                         pager.update_total(total_count)
 
                         # Викликаємо контролер
-                        drafts = await run.io_bound(controller.search_drafts, ctx, doc_filter)
+                        drafts = await auth_manager.execute(controller.search_drafts, auth_manager.get_current_context(), doc_filter)
 
                         # Форматуємо результати
                         formatted_rows = []
@@ -178,7 +178,7 @@ def render_drafts_list_page(controller: SupportController, ctx: RequestContext):
             result = await confirm_delete_dialog(f'Ви дійсно хочете видалити пакет №{draft_id}?')
             if result:
                 try:
-                    await run.io_bound(controller.delete_draft, ctx, draft_id)
+                    await auth_manager.execute(controller.delete_draft, auth_manager.get_current_context(), draft_id)
                     table.rows = [row for row in table.rows if row['id'] != draft_id]
                     table.update()
                     ui.notify(f'Пакет супроводів №{draft_id} видалено', type='negative')

@@ -5,7 +5,7 @@ import config
 from collections import defaultdict
 from service.processing.DocumentProcessingService import DocumentProcessingService
 from service.storage.LoggerManager import LoggerManager
-from utils.utils import get_strint_fromfloat, get_year_safe
+from utils.utils import get_strint_fromfloat, get_year_safe, calculate_days_between
 from domain.person_filter import PersonSearchFilter
 from utils.regular_expressions import *
 
@@ -372,6 +372,127 @@ class ExcelReporter:
             traceback.print_exc()
             return []
 
+    def get_general_state_report(self, search_filter: PersonSearchFilter):
+        self.excelProcessor.switch_to_sheet(config.DESERTER_TAB_NAME)
+        try:
+            # 1. Визначаємо структуру одного рядка статистики
+            def get_row_template():
+                return {
+                    'total': 0,
+                    # Статуси з вашого REVIEW_STATUS_MAP
+                    REVIEW_STATUS_NOT_ASSIGNED: 0,
+                    REVIEW_STATUS_ASSIGNED: 0,
+                    REVIEW_STATUS_CLOSED: 0,
+                    # Терміни
+                    'term_under_10': 0,
+                    'term_10_30': 0,
+                    'term_over_30': 0,
+                }
+
+            # stats[місце_сзч] = template
+            stats = defaultdict(get_row_template)
+
+            # 2. Індекси (беремо потрібні)
+            place_idx = self.excelProcessor.header.get(COLUMN_DESERTION_PLACE) - 1
+            status_idx = self.excelProcessor.header.get(COLUMN_REVIEW_STATUS) - 1
+            des_date_idx = self.excelProcessor.header.get(COLUMN_DESERTION_DATE) - 1
+            ret_date_idx = self.excelProcessor.header.get(COLUMN_RETURN_DATE) - 1
+            res_ret_date_idx = self.excelProcessor.header.get(COLUMN_RETURN_TO_RESERVE_DATE) - 1
+
+            # Для фільтрації (якщо треба лишити базову фільтрацію по датах)
+            des_year_idx = des_date_idx  # використовуємо ту саму колонку для року
+
+            last_row = self.excelProcessor.get_last_row()
+            data = self.excelProcessor.sheet.range(f"A2:BB{last_row}").value
+
+            q_des_year = search_filter.des_year
+            q_des_date_from = date.fromisoformat(search_filter.des_date_from) if search_filter.des_date_from else None
+            q_des_date_to = date.fromisoformat(search_filter.des_date_to) if search_filter.des_date_to else None
+
+            if not data:
+                return {}
+
+            target_date = datetime.now()
+
+            for row in data:
+                des_date = row[des_date_idx] # mandatory field
+                des_date_year = get_year_safe(des_date)
+
+                match_des_year = True
+
+                if q_des_year:
+                    if isinstance(q_des_year, list):
+                        match_des_year = (des_date_year in q_des_year)
+                    else:
+                        match_des_year = (des_date_year == str(q_des_year))
+
+                match_des_year_from = True
+                match_des_year_to = True
+
+                if q_des_date_from or q_des_date_to:
+                    if des_date:
+                        if isinstance(des_date, datetime):
+                            row_des_date = des_date.date()
+                        elif isinstance(des_date, date):
+                            row_des_date = des_date
+                        else:
+                            row_des_date = None
+
+                        if row_des_date:
+                            if q_des_date_from:
+                                match_des_year_from = (row_des_date >= q_des_date_from)
+                            if q_des_date_to:
+                                match_des_year_to = (row_des_date <= q_des_date_to)
+                        else:
+                            match_des_year_from = False
+                            match_des_year_to = False  # Додано скидання для дати "До"
+                    else:
+                        match_des_year_from = False
+                        match_des_year_to = False
+                match_period = match_des_year and match_des_year_from and match_des_year_to
+
+                # --- Базова фільтрація (можна скопіювати твою логіку по роках/датах) ---
+                des_date = row[des_date_idx]
+                if not des_date: continue
+                if not match_period: continue
+
+                # --- Основна логіка збору ---
+                place = str(row[place_idx] or "Не вказано").strip()
+                status = str(row[status_idx] or REVIEW_STATUS_NOT_ASSIGNED).strip()
+                ret_date = row[ret_date_idx]
+                res_ret_date = row[res_ret_date_idx]
+
+                # Визначаємо термін СЗЧ
+                end_point_date = ret_date if ret_date else res_ret_date if res_ret_date else target_date
+
+                days = calculate_days_between(des_date, end_point_date)
+
+                # 3. Наповнюємо статистику для конкретного місця
+                current_row = stats[place]
+                current_row['total'] += 1
+
+                # Стовпці статусів (згідно твого REVIEW_STATUS_MAP)
+                if status in REVIEW_STATUS_MAP[REVIEW_STATUS_NOT_ASSIGNED]:
+                    current_row[REVIEW_STATUS_NOT_ASSIGNED] += 1
+                elif status in REVIEW_STATUS_MAP[REVIEW_STATUS_ASSIGNED]:
+                    current_row[REVIEW_STATUS_ASSIGNED] += 1
+                elif status in REVIEW_STATUS_MAP[REVIEW_STATUS_CLOSED]:
+                    current_row[REVIEW_STATUS_CLOSED] += 1
+
+                # Стовпці термінів
+                if days <= 10:
+                    current_row['term_under_10'] += 1
+                elif 10 < days <= 30:
+                    current_row['term_10_30'] += 1
+                else:
+                    current_row['term_over_30'] += 1
+
+            return stats
+
+        except Exception as e:
+            traceback.print_exc()
+            return {}
+
     def get_yearly_desertion_stats(self):
         """Збирає статистику виключно по роках (по року СЗЧ), без жодних фільтрів."""
         self.excelProcessor.switch_to_sheet(config.DESERTER_TAB_NAME)
@@ -675,17 +796,29 @@ class ExcelReporter:
                 des_locality = extract_locality(raw_conditions)
 
                 is_dual_event = 'сзч' not in des_type_clean
+                category = None
+
+                if des_date and ret_date:
+                    category = 'late_return'
+                elif ret_date is None or is_dual_event:
+                    category = 'standard_event'
 
                 if ins_date == target_date and (ret_date is None or is_dual_event):
+                    des_days = 0
+                    if category == 'late_return':
+                        des_days = calculate_days_between(raw_des, raw_ret)
                     results.append({
+                        'category': category,
                         'sheet_name': sheet_name,
                         'ins_date': ins_date,
                         'des_date': des_date,
+                        'ret_date': ret_date,
                         'name': row[name_idx] if len(row) > name_idx else 'Невідомо',
                         'title': row[title_idx] if len(row) > title_idx else 'Не вказано',
                         'subunit': row[subunit_idx] if len(row) > subunit_idx else 'Не вказано',
                         'call_date': call_date,
                         'term_days': get_strint_fromfloat(term_days),
+                        'term_absent' : get_strint_fromfloat(des_days),
                         'desertion_place': des_place_clean,
                         'desertion_region': des_region_clean,
                         'desertion_locality': des_locality,

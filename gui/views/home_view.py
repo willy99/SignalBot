@@ -1,6 +1,6 @@
 from nicegui import ui
 
-from dics.security_config import PERM_READ
+from dics.security_config import PERM_READ, PERM_EDIT
 
 
 # Якщо ви використовуєте menu() на головній сторінці, не забудьте його імпортувати
@@ -47,6 +47,7 @@ def render_home_page(auth_manager):
             if auth_manager.has_access('task', PERM_READ):
                 create_nav_card('Задачі', 'Щоденні, щомісячні та беклог', 'checklist_rtl', '/tasks', 'yellow')
                 create_nav_card('Inbox', 'Керування файлами в inbox', 'forward_to_inbox', '/inbox', 'yellow')
+                create_nav_card('Календар', 'Розклад задач на місяць', 'calendar_month', '/calendar', 'yellow')
 
         with ui.grid().classes(grid_classes):
             # --- АНАЛІТИКА ---
@@ -56,7 +57,7 @@ def render_home_page(auth_manager):
                 create_nav_card('По підрозділам', 'Статистика СЗЧ по підрозділах (Додаток 2)', 'bar_chart', '/report_units', 'purple')
                 create_nav_card('Чєкаємо на ЄРДР', 'Статистика по тим, хто чекає на ЄРДР', 'pending_actions', '/report_waiting_erdr', 'purple')
             if auth_manager.has_access('report_general', PERM_READ):
-                create_nav_card('Дублікати прізвищ', 'Звіт по прізвищам, які дублюються в системі', 'people_outline', '/report_name_dups', 'purple')
+                create_nav_card('Загальний стан', 'Стан справ, закриті, призначені та інш. ', 'fact_check', '/report_general_state', 'purple')
 
         with ui.grid().classes(grid_classes):
 
@@ -65,5 +66,21 @@ def render_home_page(auth_manager):
                 create_nav_card('Користувачі', 'Користувачі та їх ролі', 'supervisor_account', '/admin/users', 'slate')
                 create_nav_card('Доступи', 'Права доступу до модулів системи', 'admin_panel_settings', '/admin/permissions', 'slate')
                 create_nav_card('Системні логи', 'Живий моніторинг роботи системи', 'terminal', '/logs', 'slate')
-                # 💡 Наша нова сторінка
+            if auth_manager.has_access('admin_panel', PERM_EDIT):
+                create_nav_card('Індексація файлів', 'Просто подивись на ті графічки!', 'cached', '/admin/file_index', 'slate')
                 create_nav_card('Налаштування', 'Глобальні параметри системи', 'settings', '/admin/settings', 'slate')
+
+
+        ui.element('div').classes('flex-grow')
+
+        with ui.row().classes('w-full justify-center items-center py-6 border-t border-gray-200 mt-8'):
+            ui.icon('pets', size='2.5rem', color='slate').classes('mb-1')
+            ui.html('''
+                <div class="text-gray-400 text-sm">
+                    2026 (С) <a href="mailto:willy2005@gmail.com" 
+                                class="text-blue-400 hover:text-blue-600 transition-colors duration-200 font-medium"
+                                style="text-decoration: none;">
+                                Pashkinson
+                             </a>
+                </div>
+            ''')

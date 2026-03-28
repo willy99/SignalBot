@@ -7,6 +7,8 @@ from gui.services.request_context import RequestContext
 from service.connection.MyDataBase import MyDataBase
 from service.constants import DB_TABLE_NOTIF_DOC, DB_TABLE_SUPPORT_DOC, DB_TABLE_DBR_DOC, DB_TABLE_TASK
 from service.storage.LoggerManager import LoggerManager
+import time
+
 
 # Шлях до вашого порожнього шаблону
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "fixtures", "template.xlsx")
@@ -98,5 +100,5 @@ def mock_db():
 @pytest.fixture
 def mock_ctx():
     """Імітація контексту запиту користувача"""
-    ctx = RequestContext(user_login="test_user", user_id=1, user_name="test", user_role="Admin")
+    ctx = RequestContext(user_login="test_user", user_id=1, user_name="test", user_role="Admin", last_activity=time.time())
     return ctx

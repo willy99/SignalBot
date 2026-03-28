@@ -1,12 +1,13 @@
 from typing import Optional
 from domain.user import User
 from werkzeug.security import generate_password_hash
-from nicegui import app, ui
 from gui.services.request_context import RequestContext
 from dics.security_config import PERM_READ
 from service.users.AuthService import AuthService
 import time
+from datetime import datetime
 import config
+from nicegui import app, run
 
 class AuthManager:
     def __init__(self, db):
@@ -21,7 +22,7 @@ class AuthManager:
         pass_hash = generate_password_hash(password, method='pbkdf2:sha256')
 
         query = "INSERT INTO users (username, password_hash, role, full_name) VALUES (?, ?, ?, ?)"
-        user_id = self.db.__execute_insert__(query, (username, pass_hash, role, full_name))
+        user_id = self.db.__execute_query__(query, (username, pass_hash, role, full_name))
 
         if user_id:
             return True, "Користувача успішно створено"
@@ -29,33 +30,81 @@ class AuthManager:
 
     def authenticate(self, username: str, password: str) -> Optional[User]:
         user:User = self.auth_service.authenticate(username, password)
-        app.storage.user.update({
-            'authenticated': True,
-            'user_id': user.id,
-            'user_info': {
-                'username': user.username,
-                'role': user.role,
-                'full_name': user.full_name,
-                'id': user.id
-            },
-            'last_activity': time.time() # Початок відліку сесії
-        })
+        if user:
+            app.storage.user.update({
+                'authenticated': True,
+                'user_id': user.id,
+                'user_info': {
+                    'username': user.username,
+                    'role': user.role,
+                    'full_name': user.full_name,
+                    'id': user.id
+                },
+                'last_activity': time.time() # Початок відліку сесії
+            })
 
         return user
 
-    def check_session(self) -> bool:
+    def check_session(self, ctx: RequestContext) -> bool:
         """Перевірка, чи не застаріла сесія."""
         if not app.storage.user.get('authenticated'):
             return False
-        last_activity = app.storage.user.get('last_activity', 0)
-        print('>>> check sessions ' + str(last_activity))
+        print('1>> ' + str(datetime.fromtimestamp(  app.storage.user.get('last_activity') ).strftime('%H:%M:%S')))
+        print('2>> ' + str(datetime.fromtimestamp(  ctx.last_activity ).strftime('%H:%M:%S')))
+
+        storage_time = app.storage.user.get('last_activity', 0)
+        ctx_time = ctx.last_activity if ctx else 0
+
+        last_activity = max(storage_time, ctx_time)
+
+        time_str = datetime.fromtimestamp(last_activity).strftime('%H:%M:%S')
+        print(f'>>> check sessions (formatted): {time_str}')
+
         if time.time() - last_activity > config.SESSION_TIMEOUT:
             self.logout()
             return False
 
         # Якщо активний — оновлюємо час останньої активності
-        app.storage.user['last_activity'] = time.time()
+        new_now = time.time()
+        app.storage.user['last_activity'] = new_now
+        if ctx:
+            ctx.last_activity = new_now
+
+        # перевіряємо, що юзер все ще активний
+        user_info = app.storage.user.get('user_info', {})
+        user = self.auth_service.get_user_by_username(user_info.get('username'))
+        if not user or not user.is_active:
+            self.logout()
+            return False
         return True
+
+    async def execute(self, func, ctx: RequestContext, *args, **kwargs):
+        """
+        Централізований запуск важких функцій у фоновому потоці
+        з автоматичним менеджментом сесії.
+        """
+        # 1. Перед запуском: Перевіряємо чи жива сесія в UI
+        if not self.check_session(ctx):
+            return None  # Або raise PermissionError
+
+        try:
+            # 2. ЗАПУСК: Відправляємо функцію в потік через auth_manager.execute
+            # Передаємо ctx першим аргументом, як того очікує твій декоратор
+            result = await run.io_bound(func, ctx, *args, **kwargs)
+
+            # 3. ПІСЛЯ ЗАПУСКУ: Синхронізуємо час назад у браузер
+            # Оскільки ми повернулися з потоку, де ctx міг оновитися,
+            # ми фіксуємо це в глобальному сховищі користувача.
+            app.storage.user['last_activity'] = time.time()
+            if ctx:
+                ctx.last_activity = app.storage.user['last_activity']
+
+            return result
+
+        except Exception as e:
+            # Тут можна централізовано логувати помилки всіх звітів
+            print(f"❌ Помилка при виконанні {func.__name__}: {e}")
+            raise e
 
     def logout(self):
         """Очищення даних сесії."""
@@ -76,8 +125,8 @@ class AuthManager:
 
         return bool(module_perms.get(action, False))
 
-    def get_user(self, username: str) -> dict:
-        return self.auth_service.get_user(username)
+    def get_user(self, username: str) -> User:
+        return self.auth_service.get_user_by_username(username)
 
     def get_all_users(self) -> list:
         return self.auth_service.get_all_users()
@@ -98,6 +147,7 @@ class AuthManager:
             user_name=user_info.get('full_name') or user_info.get('username') or 'Гість',
             user_role=user_info.get('role'),
             user_id=user_info.get('id'),
-            user_login=user_info.get('username')
+            user_login=user_info.get('username'),
+            last_activity=app.storage.user.get('last_activity', time.time())
         )
         return ctx

@@ -2,7 +2,7 @@ from nicegui import ui, run
 
 from dics.deserter_xls_dic import VALID_PATTERN_DOC_NUM
 from domain.person_filter import PersonSearchFilter
-from gui.services.request_context import RequestContext
+from gui.services.auth_manager import AuthManager
 from utils.utils import to_genitive_case, to_genitive_title
 from gui.tools.validation import is_valid_doc_number
 import config
@@ -15,7 +15,7 @@ from service.constants import DOC_STATUS_COMPLETED, DOC_STATUS_DRAFT, DOC_PACKAG
 import re
 
 def render_support_standard_page(controller: SupportController, person_controller: PersonController,
-                                 file_cache_manager: FileCacheManager, ctx: RequestContext, draft_id: int = None):
+                                 file_cache_manager: FileCacheManager, auth_manager: AuthManager, draft_id: int = None):
     state = {
         'status': DOC_STATUS_DRAFT,
         'out_date': '',
@@ -43,9 +43,9 @@ def render_support_standard_page(controller: SupportController, person_controlle
         try:
             # 💡 ЗВЕРНІТЬ УВАГУ: Вам потрібно буде додати параметр package_type='STANDARD'
             # у ваш метод controller.save_support_doc на бекенді!
-            draft_new_id = await run.io_bound(
+            draft_new_id = await auth_manager.execute(
                 controller.save_support_doc,
-                ctx,
+                auth_manager.get_current_context(),
                 city.value,
                 state.get('out_number', ''),
                 state.get('out_date', ''),
@@ -79,9 +79,9 @@ def render_support_standard_page(controller: SupportController, person_controlle
             generate_docs_btn.props('loading')
             ui.notify('⏳ Генеруємо документи...', type='info')
 
-            file_bytes, file_name = await run.io_bound(
+            file_bytes, file_name = await auth_manager.execute(
                 controller.generate_standard_support_document,
-                ctx, city.value, supp_number_input.value, supp_date_input.value, state['buffer']
+                auth_manager.get_current_context(), city.value, supp_number_input.value, supp_date_input.value, state['buffer']
             )
             ui.download(file_bytes, file_name)
             ui.notify('Пакет успішно згенеровано!', type='positive')
@@ -93,17 +93,17 @@ def render_support_standard_page(controller: SupportController, person_controlle
     async def on_generate_logs_click():
         try:
             generate_logs_btn.props('loading')
-            log_text = await run.io_bound(
+            log_text = await auth_manager.execute(
                 controller.generate_logs,
-                ctx, city.value, supp_number_input.value, supp_date_input.value, state['buffer']
+                auth_manager.get_current_context(), city.value, supp_number_input.value, supp_date_input.value, state['buffer']
             )
             file_name = f"Пакет_Супроводів_{supp_number_input.value}_{supp_date_input.value}.txt"
-            destination_path = f'{config.OUTBOX_DIR_PATH}{file_cache_manager.get_file_separator()}{ctx.user_login}{file_cache_manager.get_file_separator()}{file_name.replace("/","_")}'
+            destination_path = f'{config.OUTBOX_DIR_PATH}{file_cache_manager.get_file_separator()}{auth_manager.get_current_context().user_login}{file_cache_manager.get_file_separator()}{file_name.replace("/","_")}'
             log_buffer = io.BytesIO(log_text.encode('utf-8'))
 
             client = file_cache_manager.client
             with client:
-                await run.io_bound(client.save_file_from_buffer, destination_path, log_buffer)
+                await auth_manager.execute(client.save_file_from_buffer, auth_manager.get_current_context(), destination_path, log_buffer)
 
             ui.notify('Документ для СЕДО збережено в ' + str(destination_path), type="positive")
         except Exception as e:
@@ -135,9 +135,9 @@ def render_support_standard_page(controller: SupportController, person_controlle
         ui.notify('⏳ Оновлюємо дані в Excel, зачекайте...', type='info')
 
         try:
-            complete = await run.io_bound(
+            complete = await auth_manager.execute(
                 controller.mark_as_completed,
-                ctx,
+                auth_manager.get_current_context(),
                 person_controller,
                 current_id
             )
@@ -202,7 +202,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                     if not re.match(VALID_PATTERN_DOC_NUM, num):
                         supp_number_input.props('error error-message="Формат має бути 642/ХХХХX (до 5 цифр)"')
                         return True
-                    is_dup = await run.io_bound(controller.is_existing_num, ctx, num, state.get('current_support_doc_id'))
+                    is_dup = await auth_manager.execute(controller.is_existing_num, auth_manager.get_current_context(), num, state.get('current_support_doc_id'))
 
                     if is_dup:
                         supp_number_input.props('error error-message="Цей номер вже існує в базі!"')
@@ -289,7 +289,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                 search_btn.disable()
                 try:
                     search_filter = PersonSearchFilter(query=query)
-                    results = await run.io_bound(person_controller.search, ctx, search_filter)
+                    results = await auth_manager.execute(person_controller.search, auth_manager.get_current_context(), search_filter)
 
                     state['current_search_results'].clear()
                     options = {}

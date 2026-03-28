@@ -96,7 +96,7 @@ def get_file_name(file_path):
 
     return name_without_ext
 
-def format_ukr_date(date_val):
+def format_ukr_date(date_val) -> str:
     if not date_val or str(date_val).lower() in ["none", "nan", ""]:
         return ""
 
@@ -116,20 +116,26 @@ def format_ukr_date(date_val):
     return date_str
 
 def calculate_days_between(date_from_str, date_to_str):
-        if date_from_str == NA or date_to_str == NA:
-            return 0
-        try:
-            def parse_date(d_str):
-                return datetime.strptime(d_str, config.EXCEL_DATE_FORMAT)
+    # print('>> date from ' + str(date_from_str) + ' to ' + str(date_to_str))
+    date_from_str = format_to_excel_date(date_from_str)
+    date_to_str = format_to_excel_date(date_to_str)
 
-            dt_start = parse_date(date_from_str)
-            dt_end = parse_date(date_to_str)
+    if date_from_str == NA or date_to_str == NA:
+        return 0
+    try:
+        def parse_date(d_str):
+            return datetime.strptime(d_str, config.EXCEL_DATE_FORMAT)
 
-            delta = dt_end - dt_start
-            days = delta.days
-            return days
-        except Exception as e:
-            return 0
+        dt_start = parse_date(date_from_str)
+        dt_end = parse_date(date_to_str)
+
+        delta = dt_end - dt_start
+        days = delta.days
+        # print('> days ' + str(days))
+        return days
+    except Exception as e:
+        print(str(e))
+        return 0
 
 def get_typed_value(value):
         if isinstance(value, str):

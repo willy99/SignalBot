@@ -5,8 +5,8 @@ from dics.deserter_xls_dic import COLUMN_ORDER_ASSIGNMENT_NUMBER, COLUMN_ORDER_A
     COLUMN_DBR_DATE, VALID_PATTERN_DOC_NUM, VALID_PATTERN_DOC_NUM_FULL
 from gui.controllers.dbr_controller import DbrController
 from gui.controllers.person_controller import PersonController
+from gui.services.auth_manager import AuthManager
 from service.storage.FileCacher import FileCacheManager
-from gui.services.request_context import RequestContext
 from domain.person_filter import PersonSearchFilter
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
 from gui.tools.validation import is_number, is_valid_doc_number
@@ -16,7 +16,7 @@ import re
 
 
 def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file_cache_manager: FileCacheManager,
-                    ctx: RequestContext, dbr_doc_id: int = None):
+                    auth_manager: AuthManager, dbr_doc_id: int = None):
 
     state = {
         'status': DOC_STATUS_DRAFT,
@@ -45,9 +45,9 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
 
         save_draft_btn.disable()
         try:
-            dbr_doc_id = await run.io_bound(
+            dbr_doc_id = await auth_manager.execute(
                 dbr_ctrl.save_dbr_doc,
-                ctx,
+                auth_manager.get_current_context(),
                 state.get('out_number', ''),
                 state.get('out_date', ''),
                 state['buffer'],
@@ -72,9 +72,9 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
         ui.notify('⏳ Оновлюємо дані в Excel, зачекайте...', type='info')
 
         try:
-            success = await run.io_bound(
+            success = await auth_manager.execute(
                 dbr_ctrl.mark_as_completed,
-                ctx,
+                auth_manager.get_current_context(),
                 state['dbr_doc_id'],
                 state['buffer'],
                 state.get('out_number', ''),
@@ -137,7 +137,7 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                 if not re.match(VALID_PATTERN_DOC_NUM, num):
                     out_number_input.props('error error-message="Формат має бути 642/ХХХХX (до 5 цифр)"')
                     return True
-                is_dup = await run.io_bound(dbr_ctrl.is_existing_num, ctx, num, state.get('dbr_doc_id'))
+                is_dup = await auth_manager.execute(dbr_ctrl.is_existing_num, auth_manager.get_current_context(), num, state.get('dbr_doc_id'))
 
                 if is_dup:
                     out_number_input.props('error error-message="Цей номер вже існує в базі!"')
@@ -244,7 +244,8 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                         search_filter = PersonSearchFilter(o_ass_num=query)
                     else:
                         search_filter = PersonSearchFilter(query=query)
-                    results = await run.io_bound(person_ctrl.search, ctx, search_filter)
+
+                    results = await auth_manager.execute(person_ctrl.search, auth_manager.get_current_context(), search_filter)
 
                     state['current_search_results'].clear()
                     options = {}
@@ -493,7 +494,7 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
 
             def load_draft(d_id: int):
                 try:
-                    draft = dbr_ctrl.get_dbr_doc_by_id(ctx, d_id)
+                    draft = dbr_ctrl.get_dbr_doc_by_id(auth_manager.get_current_context(), d_id)
                     if draft:
                         out_num = draft.get('out_number', '')
                         out_date = draft.get('out_date', '')

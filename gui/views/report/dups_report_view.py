@@ -1,7 +1,8 @@
 from nicegui import ui, run
-from gui.services.request_context import RequestContext
 
-def render_duplicates_report_page(report_ctrl, ctx: RequestContext):
+from gui.services.auth_manager import AuthManager
+
+def render_duplicates_report_page(report_ctrl, auth_manager: AuthManager):
 
     with ui.column().classes('w-full items-center p-4'):
         ui.label('Звіт: Співпадіння ПІБ (Різні ІПН)').classes('text-h4 mb-2')
@@ -22,7 +23,7 @@ def render_duplicates_report_page(report_ctrl, ctx: RequestContext):
             ui.label('Аналіз бази даних (може зайняти кілька секунд)...').classes('text-grey')
 
         try:
-            duplicates_data = await run.io_bound(report_ctrl.get_dupp_names_report, ctx)
+            duplicates_data = await auth_manager.execute(report_ctrl.get_dupp_names_report, auth_manager.get_current_context())
 
             results_container.clear()
 

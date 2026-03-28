@@ -70,25 +70,11 @@ class MyDataBase:
             print(f"❌ Помилка читання БД (fetchall): {e}")
             return []
 
-    def __execute_insert__(self, query, params=None):
-        conn = self.connect()
-        try:
-            with closing(conn.cursor()) as cursor:
-                cursor.execute(query, params or ())
-                conn.commit()
-                return cursor.lastrowid
-        except sqlite3.Error as e:
-            print(f"❌ Помилка запису в БД: {e}")
-            conn.rollback()
-            return None
-
     def insert_record(self, table: str, data: dict) -> int:
         columns = ', '.join(data.keys())
         placeholders = ', '.join(['?'] * len(data))
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
-
-        # __execute_insert__ повертає lastrowid, що нам і треба
-        return self.__execute_insert__(query, tuple(data.values()))
+        return self.__execute_query__(query, tuple(data.values()))
 
     def insert_records_batch(self, table: str, data_list: list) -> bool:
         """Масовий запис списку словників (для оптимізації)."""
@@ -117,19 +103,31 @@ class MyDataBase:
         query = f"UPDATE {table} SET {set_clause} WHERE id = ?"
 
         values = tuple(data.values()) + (record_id,)
-        self.__execute_insert__(query, values)
+        self.__execute_query__(query, values)
         return record_id
 
     def delete_record(self, table: str, record_id: int):
         query = f"DELETE FROM {table} WHERE id = ?"
-        self.__execute_insert__(query, (record_id,))
+        self.__execute_query__(query, (record_id,))
         return True
 
     def delete_children(self, table: str, field: str, value):
         """Універсальне видалення записів за вказаним полем (наприклад, task_id)."""
         query = f"DELETE FROM {table} WHERE {field} = ?"
-        self.__execute_insert__(query, (value,))
+        self.__execute_query__(query, (value,))
         return True
+
+    def __execute_query__(self, query, params=None):
+        conn = self.connect()
+        try:
+            with closing(conn.cursor()) as cursor:
+                cursor.execute(query, params or ())
+                conn.commit()
+                return cursor.lastrowid
+        except sqlite3.Error as e:
+            print(f"❌ Помилка запису в БД: {e}")
+            conn.rollback()
+            return None
 
     def __execute_sql__(self, sql):
         conn = self.connect()

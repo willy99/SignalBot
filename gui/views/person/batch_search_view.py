@@ -1,13 +1,14 @@
 import re
 from nicegui import ui, run
 from dics.deserter_xls_dic import PATTERN_NAME_WITH_CASE
-from domain.person_filter import PersonSearchFilter
+from gui.services.auth_manager import AuthManager
+
 
 # Переконайтеся, що імпортували ваші класи та константи:
 # from gui.services.request_context import RequestContext
 # from domain.filters import PersonSearchFilter
 
-def render_bulk_search_page(person_ctrl, ctx):
+def render_bulk_search_page(person_ctrl, auth_manager: AuthManager):
     ui.label('Масовий пошук осіб').classes('w-full text-center text-3xl font-bold mb-6')
 
     with ui.card().classes('w-full max-w-4xl mx-auto p-6 shadow-md'):
@@ -67,7 +68,7 @@ def render_bulk_search_page(person_ctrl, ctx):
         try:
             # 1. Виконуємо МАСОВИЙ пошук ОДНИМ запитом
             # Припускаю, що person_ctrl має метод-обгортку batch_search_names, який смикає ExcelProcessor
-            search_results = await run.io_bound(person_ctrl.batch_search_names, ctx, unique_names)
+            search_results = await auth_manager.execute(person_ctrl.batch_search_names, auth_manager.get_current_context(), unique_names)
 
             with results_container:
                 # Рахуємо статистику

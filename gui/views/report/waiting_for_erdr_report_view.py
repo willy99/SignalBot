@@ -1,6 +1,6 @@
 from nicegui import ui, run
 from dics.deserter_xls_dic import *
-from gui.services.request_context import RequestContext
+from gui.services.auth_manager import AuthManager
 
 import io
 from openpyxl import Workbook
@@ -9,7 +9,7 @@ from openpyxl.utils import get_column_letter
 from domain.person_filter import PersonSearchFilter
 
 
-def render_dbr_details_report_page(report_ctrl, person_ctrl, ctx: RequestContext):
+def render_dbr_details_report_page(report_ctrl, person_ctrl, auth_manager: AuthManager):
     state = {'rows': [], 'columns': [], 'selected_year': None}
 
     year_options = person_ctrl.get_column_options().get(COLUMN_INSERT_DATE, [])
@@ -83,7 +83,7 @@ def render_dbr_details_report_page(report_ctrl, person_ctrl, ctx: RequestContext
 
         try:
             # Виклик методу вашого контролера. Змініть назву, якщо потрібно.
-            data = await run.io_bound(report_ctrl.get_waiting_for_erdr_report, ctx, search_filter)
+            data = await auth_manager.execute(report_ctrl.get_waiting_for_erdr_report, auth_manager.get_current_context(), search_filter)
 
             results_container.clear()
 

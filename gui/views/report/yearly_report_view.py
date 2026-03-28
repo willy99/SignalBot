@@ -1,5 +1,6 @@
 from nicegui import ui, run
-from gui.services.request_context import RequestContext
+
+from gui.services.auth_manager import AuthManager
 from domain.person_filter import PersonSearchFilter
 from dics.deserter_xls_dic import REVIEW_STATUS_NOT_ASSIGNED, REVIEW_STATUS_EXECUTING, REVIEW_STATUS_CLOSED
 
@@ -9,7 +10,7 @@ from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from openpyxl.utils import get_column_letter
 import random
 
-def render_yearly_report_page(report_ctrl, ctx: RequestContext):
+def render_yearly_report_page(report_ctrl, auth_manager: AuthManager):
     state = {'rows': [], 'columns': []}
     lie_slider = None
 
@@ -51,7 +52,7 @@ def render_yearly_report_page(report_ctrl, ctx: RequestContext):
         try:
             # Передаємо порожній фільтр, бо нам потрібні всі роки
             empty_filter = PersonSearchFilter()
-            data = await run.io_bound(report_ctrl.get_yearly_desertion_report, ctx, empty_filter)
+            data = await auth_manager.execute(report_ctrl.get_yearly_desertion_report, auth_manager.get_current_context(), empty_filter)
 
             results_container.clear()
 

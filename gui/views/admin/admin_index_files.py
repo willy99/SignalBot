@@ -3,10 +3,11 @@ import asyncio
 import config
 import time
 
+from gui.services.auth_manager import AuthManager
 from service.storage.FileCacher import FileCacheManager
 
 
-async def render_indexing_page(manager: FileCacheManager):
+async def render_indexing_page(manager: FileCacheManager, auth_manager: AuthManager):
     chart_options = {
         'title': {'text': 'Прогрес індексації за роками та папками'},
         'tooltip': {'trigger': 'axis', 'axisPointer': {'type': 'shadow'}},
@@ -83,7 +84,7 @@ async def render_indexing_page(manager: FileCacheManager):
         status_text.set_text('Йде сканування...')
 
         # Запускаємо процес
-        asyncio.create_task(run.io_bound(manager.build_cache, config.DOCUMENT_STORAGE_PATH))
+        asyncio.create_task(auth_manager.execute(manager.build_cache, auth_manager.get_current_context(), config.DOCUMENT_STORAGE_PATH))
 
     # --- ВИПРАВЛЕННЯ 3: Використовуємо ui.timer замість нескінченного циклу ---
     # Він автоматично зупиниться, коли ви підете зі сторінки

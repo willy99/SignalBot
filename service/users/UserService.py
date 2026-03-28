@@ -22,7 +22,7 @@ class UserService:
                 current_state = excluded.current_state,
                 last_update = CURRENT_TIMESTAMP
         '''
-        return self.db.__execute_insert__(query, (phone_number, state))
+        return self.db.__execute_query__(query, (phone_number, state))
 
     def reset_user(self, phone_number: str) -> int:
         """Скидає стан користувача до початкового."""

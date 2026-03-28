@@ -1,5 +1,6 @@
 from nicegui import ui, run
 from gui.controllers.notif_controller import NotifController
+from gui.services.auth_manager import AuthManager
 from gui.services.request_context import RequestContext
 from gui.controllers.person_controller import PersonController
 from domain.person_filter import PersonSearchFilter, YES
@@ -13,7 +14,7 @@ from gui.tools.ui_components import date_input, fix_date, mark_clean, mark_dirty
 
 
 def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController,
-                      ctx: RequestContext, notif_doc_id: int = None):
+                      auth_manager: AuthManager, notif_doc_id: int = None):
     state = {
         'status': DOC_STATUS_DRAFT,
         'out_date': None,
@@ -47,9 +48,9 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
             doc['kpp_num'] = current_out_num
             doc['kpp_date'] = current_out_date
         try:
-            notif_doc_id = await run.io_bound(
+            notif_doc_id = await auth_manager.execute(
                 notif_ctrl.save_doc,
-                ctx,
+                auth_manager.get_current_context(),
                 current_region,
                 current_out_num,
                 current_out_date,
@@ -79,10 +80,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
         generate_docs_btn.props('loading')
         ui.notify('⏳ Генеруємо повідомлення...', type='info')
         try:
-            file_bytes, file_name = await run.io_bound(
-                notif_ctrl.generate_document,
-                ctx, region, out_num, state['out_date'], state['buffer']
-            )
+            file_bytes, file_name = await auth_manager.execute(notif_ctrl.generate_document, auth_manager.get_current_context(), region, out_num, state['out_date'], state['buffer'])
             ui.download(file_bytes, file_name)
             ui.notify('✅ Документ успішно згенеровано!', type='positive')
         except Exception as e:
@@ -106,10 +104,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
         generate_indiv_docs_btn.props('loading')
         ui.notify('⏳ Формуємо архів з документами...', type='info')
         try:
-            file_bytes, file_name = await run.io_bound(
-                notif_ctrl.generate_individual_documents,  # 💡 Виклик нового методу контролера
-                ctx, region, out_num, state['out_date'], state['buffer']
-            )
+            file_bytes, file_name = await auth_manager.execute(notif_ctrl.generate_individual_documents, auth_manager.get_current_context(), region, out_num, state['out_date'], state['buffer'])
             ui.download(file_bytes, file_name)
             ui.notify('✅ Архів успішно згенеровано!', type='positive')
         except Exception as e:
@@ -130,11 +125,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
         ui.notify('⏳ Оновлюємо дані в Excel, зачекайте...', type='info')
 
         try:
-            success = await run.io_bound(
-                notif_ctrl.mark_as_completed,
-                ctx, state['notif_doc_id'], state['buffer'],
-                state['out_number'], state['out_date'], person_ctrl
-            )
+            success = await auth_manager.execute(notif_ctrl.mark_as_completed, auth_manager.get_current_context(), state['notif_doc_id'], state['buffer'], state['out_number'], state['out_date'], person_ctrl)
             if success:
                 state['status'] = DOC_STATUS_COMPLETED
                 refresh_status_ui()
@@ -193,7 +184,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                     if not re.match(VALID_PATTERN_DOC_NUM, num):
                         out_number_input.props('error error-message="Формат має бути 642/ХХХХX (до 5 цифр)"')
                         return True
-                    is_dup = await run.io_bound(notif_ctrl.is_existing_num, ctx, num, state.get('notif_doc_id'))
+                    is_dup = await auth_manager.execute(notif_ctrl.is_existing_num, auth_manager.get_current_context(), num, state.get('notif_doc_id'))
 
                     if is_dup:
                         out_number_input.props('error error-message="Цей номер вже існує в базі!"')
@@ -270,7 +261,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
                         include_402=False
                     )
 
-                    results = await run.io_bound(person_ctrl.search, ctx, filter_obj)
+                    results = await auth_manager.execute(person_ctrl.search, auth_manager.get_current_context(), filter_obj)
                     if results and len(results) > 50:
                         ui.notify(f'Знайдено {len(results)} осіб. Показано перші 50.', type='warning')
                         results = results[:50]
@@ -509,7 +500,7 @@ def render_notif_page(notif_ctrl: NotifController, person_ctrl: PersonController
 
             def load_draft(d_id: int):
                 try:
-                    draft = notif_ctrl.get_doc_by_id(ctx, d_id)
+                    draft = notif_ctrl.get_doc_by_id(auth_manager.get_current_context(), d_id)
                     if draft:
                         state['out_number'] = draft.get('out_number', '')
                         state['out_date'] = draft.get('out_date', '')

@@ -4,7 +4,6 @@ from dics.security_config import PERM_DELETE
 from gui.controllers.inbox_controller import InboxController
 from gui.controllers.task_controller import TaskController
 from gui.services.auth_manager import AuthManager
-from gui.services.request_context import RequestContext
 import config
 from gui.tools.ui_components import confirm_delete_dialog
 from service.processing.parsers.ParserFactory import ParserFactory
@@ -12,7 +11,7 @@ from domain.person import Person
 from gui.controllers.person_controller import PersonController
 from gui.views.person.person_view import edit_person
 
-def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, person_ctrl:PersonController, auth_manager:AuthManager, ctx: RequestContext):
+def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, person_ctrl:PersonController, auth_manager:AuthManager):
     can_assign = auth_manager.has_access('task', PERM_DELETE)
     users_list = task_ctrl.get_available_users()
     user_options = {u['username']: u.get('full_name') or u['username'] for u in users_list if 'username' in u}
@@ -55,33 +54,24 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
                 atype = action['type']
 
                 try:
-                    '''
-                    if atype == 'excel':
-                        ui.notify(f'⏳ Ексель: обробка {fname}...', type='info')
-                        process_messages = await run.io_bound(inbox_ctrl.process_file_to_excel, ctx, fname)
-                        if len(process_messages) > 0:
-                            ui.notify(f'⚠️ ' + str(process_messages), type='warning')
-                            ui.notify(f'✅ {fname} занесено в Ексель!', type='positive')
-                        await run.io_bound(inbox_ctrl.delete_file, ctx, None, folder, fname)
-                    '''
                     if atype == 'archive':
                         ui.notify(f'⏳ Архів: збереження {fname}...', type='info')
-                        success = await run.io_bound(inbox_ctrl.archive_file, ctx, fname)
+                        success = await auth_manager.execute(inbox_ctrl.archive_file, auth_manager.get_current_context(), fname)
                         if success:
                             ui.notify(f'✅ {fname} архівовано!', type='positive')
-                            await run.io_bound(inbox_ctrl.delete_file, ctx, None, folder, fname)
+                            await auth_manager.execute(inbox_ctrl.delete_file, auth_manager.get_current_context(), None, folder, fname)
                         else:
                             ui.notify(f'❌ Помилка архівації {fname}', type='negative')
 
                     elif atype == 'delete':
-                        u_login = ctx.user_login if action.get('is_personal') else None
-                        await run.io_bound(inbox_ctrl.delete_file, ctx, u_login, folder, fname)
+                        u_login = auth_manager.get_current_context().user_login if action.get('is_personal') else None
+                        await auth_manager.execute(inbox_ctrl.delete_file, auth_manager.get_current_context(), u_login, folder, fname)
                         ui.notify(f'🗑️ {fname} успішно видалено', type='positive')
 
                     elif atype == 'assign':
                         target = action['target']
                         is_pers = action.get('is_personal', False)
-                        await run.io_bound(inbox_ctrl.assign_file, ctx, fname, is_pers, target)
+                        await auth_manager.execute(inbox_ctrl.assign_file, auth_manager.get_current_context(), fname, is_pers, target)
                         ui.notify(f'👤 {fname} передано користувачу {target}', type='positive')
 
                 except Exception as ex:
@@ -121,7 +111,7 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
         try:
             filename = e.file.name
             file_data = await e.file.read()
-            await run.io_bound(inbox_ctrl.upload_root_file, ctx, filename, file_data)
+            await auth_manager.execute(inbox_ctrl.upload_root_file, auth_manager.get_current_context(), filename, file_data)
             ui.notify(f'Файл "{filename}" завантажено!', type='positive')
             e.sender.reset()
             await load_data()
@@ -130,7 +120,7 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
 
     async def load_data():
         try:
-            data = await run.io_bound(inbox_ctrl.get_user_inbox_messages, ctx)
+            data = await auth_manager.execute(inbox_ctrl.get_user_inbox_messages, auth_manager.get_current_context())
             state['personal_files'] = data.get('personal_files', [])
             state['root_files'] = data.get('root_files', [])
             state['outbox_files'] = data.get('outbox_files', [])
@@ -170,9 +160,9 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
     async def load_file_content(filename: str, f_type: str):
         try:
             if f_type == 'inbox_personal':
-                file_path = f"{config.INBOX_LOCAL_DIR_PATH}/{ctx.user_login}/{filename}"
+                file_path = f"{config.INBOX_LOCAL_DIR_PATH}/{auth_manager.get_current_context().user_login}/{filename}"
             elif f_type == 'outbox_personal':
-                file_path = f"{config.OUTBOX_LOCAL_DIR_PATH}/{ctx.user_login}/{filename}"
+                file_path = f"{config.OUTBOX_LOCAL_DIR_PATH}/{auth_manager.get_current_context().user_login}/{filename}"
             else:
                 file_path = f"{config.INBOX_LOCAL_DIR_PATH}/{filename}"
 
@@ -180,7 +170,7 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
                 engine = ParserFactory.get_parser(file_path, inbox_ctrl.log_manager)
                 return engine.get_full_text()
 
-            text = await run.io_bound(extract)
+            text = await auth_manager.execute(extract, auth_manager.get_current_context())
             state['file_content'] = text
         except Exception as e:
             state['file_content'] = f"❌ Неможливо відобразити вміст файлу.\nПомилка: {e}"
@@ -254,7 +244,7 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
     async def on_process_excel_click(filename: str):
         ui.notify('⏳ Розпізнаю документ...', type='info')
         try:
-            parsed_data_list, messages = await run.io_bound(inbox_ctrl.parse_file_for_review, ctx, filename)
+            parsed_data_list, messages = await auth_manager.execute(inbox_ctrl.parse_file_for_review, auth_manager.get_current_context(), filename)
 
             if messages:
                 for msg in messages:
@@ -272,7 +262,6 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
                 dialog = edit_person(
                     person=new_person,
                     person_ctrl=person_ctrl,
-                    ctx=ctx,
                     auth_manager=auth_manager,
                     on_close=None
                 )
@@ -372,12 +361,12 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
         try:
             if f_type == 'inbox_personal':
                 # Для персональних вхідних/вихідних
-                file_buffer = await run.io_bound(inbox_ctrl.download_file, ctx, filename, config.INBOX_DIR_PATH, True)
+                file_buffer = await auth_manager.execute(inbox_ctrl.download_file, auth_manager.get_current_context(), filename, config.INBOX_DIR_PATH, True)
             elif f_type == 'outbox_personal':
-                file_buffer = await run.io_bound(inbox_ctrl.download_file, ctx, filename, config.OUTBOX_DIR_PATH, True)
+                file_buffer = await auth_manager.execute(inbox_ctrl.download_file, auth_manager.get_current_context(), filename, config.OUTBOX_DIR_PATH, True)
             else:
                 # Для спільних (root) файлів
-                file_buffer = await run.io_bound(inbox_ctrl.download_file, ctx, filename, config.INBOX_DIR_PATH, False)
+                file_buffer = await auth_manager.execute(inbox_ctrl.download_file, auth_manager.get_current_context(), filename, config.INBOX_DIR_PATH, False)
             if file_buffer:
                 ui.download(file_buffer.getvalue(), filename)
                 ui.notify(f'Завантаження {filename} почалося.', type='positive')

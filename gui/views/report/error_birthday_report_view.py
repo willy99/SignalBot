@@ -2,13 +2,13 @@ from dics.deserter_xls_dic import COLUMN_NAME, COLUMN_ID_NUMBER, COLUMN_INCREMEN
 from domain.person_filter import PersonSearchFilter
 from gui.controllers.report_controller import ReportController
 from gui.controllers.person_controller import PersonController  # Додав імпорт
-from gui.services.request_context import RequestContext
+from gui.services.auth_manager import AuthManager
 from domain.person import Person  # Імпорт моделі
 from nicegui import ui, run
 from datetime import datetime
 
 
-def render_inn_mismatch_page(report_ctrl: ReportController, person_ctrl: PersonController, ctx: RequestContext):
+def render_inn_mismatch_page(report_ctrl: ReportController, person_ctrl: PersonController, auth_manager: AuthManager):
     # Стейт для зберігання чернеток виправлень
     pending_updates = {}
 
@@ -56,9 +56,9 @@ def render_inn_mismatch_page(report_ctrl: ReportController, person_ctrl: PersonC
 
         try:
             # Викликаємо ваш метод збереження
-            success = await run.io_bound(
+            success = await auth_manager.execute(
                 person_ctrl.save_persons,
-                ctx,
+                auth_manager.get_current_context(),
                 persons_to_update,
                 partial_update=True
             )
@@ -105,9 +105,9 @@ def render_inn_mismatch_page(report_ctrl: ReportController, person_ctrl: PersonC
         try:
             # Передаємо фільтри в контролер (переконайтеся, що метод їх приймає)
             search_filter = PersonSearchFilter(mil_unit=selected_unit, ins_year=selected_year)
-            mismatches = await run.io_bound(
+            mismatches = await auth_manager.execute(
                 report_ctrl.get_error_birthday_report,
-                ctx,
+                auth_manager.get_current_context(),
                 search_filter
             )
             results_container.clear()

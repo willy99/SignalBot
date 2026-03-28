@@ -2,14 +2,14 @@ from nicegui import ui, run
 
 import config
 from gui.controllers.dbr_controller import DbrController
-from gui.services.request_context import RequestContext
+from gui.services.auth_manager import AuthManager
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
 from datetime import datetime
 from gui.tools.ui_components import date_input, fix_date, confirm_delete_dialog, ServerPagination
 from domain.document_filter import DocumentFilter  # 💡 Імпортуємо наш новий фільтр
 
 
-def render_dbr_drafts_list_page(dbr_ctrl: DbrController, ctx: RequestContext):
+def render_dbr_drafts_list_page(dbr_ctrl: DbrController, auth_manager: AuthManager):
     ui.label('Список пакетів для відправки на ДБР').classes('w-full text-center text-3xl font-bold mb-8')
 
     # Стан фільтрів на UI
@@ -64,11 +64,11 @@ def render_dbr_drafts_list_page(dbr_ctrl: DbrController, ctx: RequestContext):
                             offset=pager.offset
                         )
 
-                        total_count = await run.io_bound(dbr_ctrl.count_search_docs, ctx, doc_filter)
+                        total_count = await auth_manager.execute(dbr_ctrl.count_search_docs, auth_manager.get_current_context(), doc_filter)
                         pager.update_total(total_count)
 
                         # 2. Викликаємо контролер (виконується в окремому потоці, щоб не блокувати UI)
-                        drafts = await run.io_bound(dbr_ctrl.search_drafts, ctx, doc_filter)
+                        drafts = await auth_manager.execute(dbr_ctrl.search_drafts, auth_manager.get_current_context(), doc_filter)
 
                         # 3. Форматуємо отримані сирі дані для таблиці
                         formatted_rows = []
@@ -153,7 +153,7 @@ def render_dbr_drafts_list_page(dbr_ctrl: DbrController, ctx: RequestContext):
 
             if result:
                 try:
-                    await run.io_bound(dbr_ctrl.delete_dbr_doc, ctx, draft_id)
+                    await auth_manager.execute(dbr_ctrl.delete_dbr_doc, auth_manager.get_current_context(), draft_id)
                     table.rows = [row for row in table.rows if row['id'] != draft_id]
                     table.update()
                     ui.notify(f'Пакет №{draft_id} успішно видалено', type='info')

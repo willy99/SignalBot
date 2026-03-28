@@ -1,10 +1,10 @@
 from nicegui import ui, run
 import config
-from gui.services.request_context import RequestContext
+from gui.services.auth_manager import AuthManager
 from service.storage.FileCacher import FileCacheManager
 import re
 
-def render_file_search_page(file_cache_manager: FileCacheManager, ctx: RequestContext):
+def render_file_search_page(file_cache_manager: FileCacheManager, auth_manager: AuthManager):
     file_cache_manager.load_cache()
 
     with ui.column().classes('w-full items-center px-8 py-4'):
@@ -38,11 +38,11 @@ def render_file_search_page(file_cache_manager: FileCacheManager, ctx: RequestCo
             source_path = get_full_source_path(row_data)
             filename = row_data['name']
 
-            destination_path = config.OUTBOX_DIR_PATH + file_cache_manager.get_file_separator() + ctx.user_login + file_cache_manager.get_file_separator() + filename
+            destination_path = config.OUTBOX_DIR_PATH + file_cache_manager.get_file_separator() + auth_manager.get_current_context().user_login + file_cache_manager.get_file_separator() + filename
 
             with ui.notification(message=f'Копіювання {filename}...', spinner=True, timeout=0) as n:
                 try:
-                    await run.io_bound(file_cache_manager.copy_to_local, source_path, destination_path)
+                    await auth_manager.execute(file_cache_manager.copy_to_local, auth_manager.get_current_context(), source_path, destination_path)
                     n.message = 'Файл успішно скопійовано в Outbox!'
                     n.type = 'positive'
                     n.icon = 'check_circle'
@@ -63,7 +63,7 @@ def render_file_search_page(file_cache_manager: FileCacheManager, ctx: RequestCo
             with ui.notification(message=f'Підготовка до завантаження {filename}...', spinner=True, timeout=0) as n:
                 try:
                     # Читаємо файл у буфер через клієнт (IO-bound операція)
-                    file_buffer = await run.io_bound(file_cache_manager.client.get_file_buffer, source_path)
+                    file_buffer = await auth_manager.execute(file_cache_manager.client.get_file_buffer, auth_manager.get_current_context(), source_path)
 
                     # Відправляємо файл клієнту
                     ui.download(file_buffer.read(), filename)

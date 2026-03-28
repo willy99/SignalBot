@@ -78,7 +78,7 @@ def results_ui(data, person_ctrl, ctx: RequestContext, auth_manager: AuthManager
     with ui.row().classes('w-full justify-end mt-2 px-2'):
         ui.label(f'Всього знайдено записів: {len(data)}').classes('text-gray-600 font-bold')
 
-def search_page(person_ctrl, ctx: RequestContext, auth_manager: AuthManager):
+def search_page(person_ctrl, auth_manager: AuthManager):
     state = {
         'last_query': None, 'last_title2': None, 'last_service': None,
         'last_des_year': None, 'last_des_from': None, 'last_des_to': None, 'last_ins_year': None
@@ -155,7 +155,7 @@ def search_page(person_ctrl, ctx: RequestContext, auth_manager: AuthManager):
                 query=query if query else None, des_year=des_year_val, ins_year=ins_year_val,
                 des_date_from=date_from_val, des_date_to=date_to_val, title2=title2_val, service_type=service_val, mil_unit=mil_unit
             )
-            data = await run.io_bound(person_ctrl.search, ctx, search_filter)
+            data = await auth_manager.execute(person_ctrl.search, auth_manager.get_current_context(), search_filter)
             results_container.clear()
 
             if not data:

@@ -95,4 +95,4 @@ SIGNAL_ATTACHMENTS_DIR : Final = os.path.expanduser("~/.local/share/signal-cli/a
 TMP_DIR: Final = os.path.expanduser("~/tmp/")
 
 
-SESSION_TIMEOUT = 60 * 60  # 30 хвилин у секундах
+SESSION_TIMEOUT = 60 * 60  # хвилини у секундах
