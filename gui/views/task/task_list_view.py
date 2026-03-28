@@ -1,5 +1,6 @@
 from nicegui import ui, app
-from gui.services.request_context import RequestContext
+
+from gui.services.auth_manager import AuthManager
 from domain.task import *
 from gui.controllers.task_controller import TaskController
 from datetime import timedelta
@@ -31,30 +32,30 @@ def get_card_colors(task, current_user_id: int) -> str:
     return 'bg-blue-50 border-blue-500 text-blue-900'
 
 
-async def delete_task_with_confirm(task_id: int, controller: TaskController, ctx: RequestContext, refresh_callback):
+async def delete_task_with_confirm(task_id: int, controller: TaskController, auth_manager: AuthManager, refresh_callback):
     """Викликає вікно підтвердження і видаляє задачу, якщо користувач згоден"""
     result = await confirm_delete_dialog('Ви дійсно хочете назавжди видалити цю задачу?')
     if result:  # Якщо натиснув "Видалити" (повернулося True)
         try:
-            controller.delete_task(ctx, task_id)
+            controller.delete_task(auth_manager.get_current_context(), task_id)
             ui.notify('Задачу успішно видалено', type='warning', icon='delete')
             refresh_callback()  # Перемальовуємо дошку
         except Exception as e:
             ui.notify(f'Помилка видалення: {e}', type='negative')
 
-def render_tasks_today(controller: TaskController, ctx: RequestContext):
+def render_tasks_today(controller: TaskController, auth_manager: AuthManager):
     override_state = {
         'search_query': '',
-        'assignee_id': ctx.user_id,
+        'assignee_id': auth_manager.get_current_context().user_id,
         'task_type_filter': 'all',
         'period_filter': 'today',
         'created_year': None,
         'created_from': None,
         'created_to': None,
     }
-    render_task_list_page(controller, ctx, override_state=override_state)
+    render_task_list_page(controller, auth_manager, override_state=override_state)
 
-def render_tasks_all(controller: TaskController, ctx: RequestContext):
+def render_tasks_all(controller: TaskController, auth_manager: AuthManager):
     override_state = {
         'search_query': '',
         'assignee_id': None,
@@ -64,9 +65,9 @@ def render_tasks_all(controller: TaskController, ctx: RequestContext):
         'created_from': None,
         'created_to': None,
     }
-    render_task_list_page(controller, ctx, override_state=override_state)
+    render_task_list_page(controller, auth_manager, override_state=override_state)
 
-def render_task_list_page(controller: TaskController, ctx: RequestContext, override_state=None):
+def render_task_list_page(controller: TaskController, auth_manager: AuthManager, override_state=None):
     # Отримуємо список юзерів і робимо зручний словник {id: "Ім'я"}
     users_list = controller.get_available_users()
     users_map = {}
@@ -74,13 +75,13 @@ def render_task_list_page(controller: TaskController, ctx: RequestContext, overr
     assignee_options = {
         'unassigned': 'Непризначені',
         'all': 'Всі задачі',
-        ctx.user_id: 'Мої задачі',
+        auth_manager.get_current_context().user_id: 'Мої задачі',
     }
 
     for u in users_list:
         name = u.get('full_name') or u.get('username') or f"User {u['id']}"
         users_map[u['id']] = name
-        if u['id'] != ctx.user_id:
+        if u['id'] != auth_manager.get_current_context().user_id:
             assignee_options[u['id']] = name
 
     # Типи задач
@@ -102,7 +103,7 @@ def render_task_list_page(controller: TaskController, ctx: RequestContext, overr
 
     default_state = {
         'search_query': '',
-        'assignee_id': ctx.user_id,
+        'assignee_id': auth_manager.get_current_context().user_id,
         'task_type_filter': 'all',
         'period_filter': 'today',
         'created_year': None,
@@ -117,13 +118,13 @@ def render_task_list_page(controller: TaskController, ctx: RequestContext, overr
 
     # Захист: якщо збереженого юзера раптом видалили з бази
     if state.get('assignee_id') not in assignee_options:
-        state['assignee_id'] = ctx.user_id
+        state['assignee_id'] = auth_manager.get_current_context().user_id
 
     # === СТВОРЮЄМО ОНОВЛЮВАНУ ДОШКУ (Але поки не малюємо) ===
     @ui.refreshable
     def task_board():
         # Тепер ми передаємо весь словник state прямо в контролер
-        tasks = controller.get_all_tasks(ctx, search_filter=state)
+        tasks = controller.get_all_tasks(auth_manager.get_current_context(), search_filter=state)
         # ДОДАТКОВИЙ PYTHON-ФІЛЬТР ДЛЯ КИРИЛИЦІ
         if state.get('search_query', ''):
             search_query = state.get('search_query', '').strip().lower()
@@ -146,21 +147,21 @@ def render_task_list_page(controller: TaskController, ctx: RequestContext, overr
                 ui.label(f'НОВІ ({len(new_tasks)})').classes(
                     'font-bold text-gray-500 text-sm mb-4 text-center w-full uppercase tracking-wider')
                 for t in new_tasks:
-                    render_task_card(t, controller, ctx, task_board.refresh, users_map)
+                    render_task_card(t, controller, auth_manager, task_board.refresh, users_map)
 
             # СТОВПЧИК 2: IN PROGRESS
             with ui.column().classes('flex-1 p-4 min-h-[70vh] border-r border-gray-200'):
                 ui.label(f'В РОБОТІ ({len(in_progress_tasks)})').classes(
                     'font-bold text-blue-500 text-sm mb-4 text-center w-full uppercase tracking-wider')
                 for t in in_progress_tasks:
-                    render_task_card(t, controller, ctx, task_board.refresh, users_map)
+                    render_task_card(t, controller, auth_manager, task_board.refresh, users_map)
 
             # СТОВПЧИК 3: COMPLETED
             with ui.column().classes('flex-1 p-4 min-h-[70vh]'):
                 ui.label(f'ЗАВЕРШЕНІ ({len(completed_tasks)})').classes(
                     'font-bold text-green-600 text-sm mb-4 text-center w-full uppercase tracking-wider')
                 for t in completed_tasks:
-                    render_task_card(t, controller, ctx, task_board.refresh, users_map)
+                    render_task_card(t, controller, auth_manager, task_board.refresh, users_map)
 
     # === ОБРОБНИКИ ПОДІЙ ===
     def on_filter_change(e=None):
@@ -192,7 +193,7 @@ def render_task_list_page(controller: TaskController, ctx: RequestContext, overr
 
             filter_select.add_slot('option', f'''
                     <q-item v-bind="props.itemProps" 
-                            :class="props.opt.value == {ctx.user_id} ? 'bg-orange-50 text-orange-900 font-bold border-l-4 border-orange-200' : ''">
+                            :class="props.opt.value == {auth_manager.get_current_context().user_id} ? 'bg-orange-50 text-orange-900 font-bold border-l-4 border-orange-200' : ''">
                         <q-item-section>
                             <q-item-label v-html="props.opt.label"></q-item-label>
                         </q-item-section>
@@ -231,9 +232,9 @@ def render_task_list_page(controller: TaskController, ctx: RequestContext, overr
     task_board()  # Викликаємо функцію, щоб вона намалювала дошку на екрані
 
 
-def render_task_card(task, controller: TaskController, ctx: RequestContext, refresh_callback, users_map: dict):
+def render_task_card(task, controller: TaskController, auth_manager: AuthManager, refresh_callback, users_map: dict):
     """Малює компактну картку задачі"""
-    color_classes = get_card_colors(task, ctx.user_id)
+    color_classes = get_card_colors(task, auth_manager.get_current_context().user_id)
 
     # Компактна картка: менші відступи (p-2), щільніший геп (gap-1)
     with ui.card().classes(f'w-full mb-2 p-2 border-l-4 {color_classes} shadow-sm hover:shadow transition-all'):
@@ -255,37 +256,37 @@ def render_task_card(task, controller: TaskController, ctx: RequestContext, refr
                 'flat dense size=sm color="grey-7"').classes('px-1 min-w-[24px]')
 
             # Показуємо тільки якщо задача належить поточному юзеру І статус NEW або COMPLETED
-            if task.assignee == ctx.user_id and task.task_status in [TASK_STATUS_NEW, TASK_STATUS_COMPLETED]:
+            if task.assignee == auth_manager.get_current_context().user_id and task.task_status in [TASK_STATUS_NEW, TASK_STATUS_COMPLETED]:
                 ui.button(
                     icon='delete',
-                    on_click=lambda: delete_task_with_confirm(task.id, controller, ctx, refresh_callback)
+                    on_click=lambda: delete_task_with_confirm(task.id, controller, auth_manager, refresh_callback)
                 ).props('flat dense size=sm color="red-4"').classes('px-1 min-w-[24px]').tooltip('Видалити задачу')
 
             # Кнопка "Наступний статус"
             if task.task_status == TASK_STATUS_NEW:
                 ui.button(icon='arrow_forward',
-                          on_click=lambda: change_and_refresh(task.id, TASK_STATUS_IN_PROGRESS, controller, ctx,
+                          on_click=lambda: change_and_refresh(task.id, TASK_STATUS_IN_PROGRESS, controller, auth_manager,
                                                               refresh_callback)).props(
                     'flat dense size=sm color="primary"').classes('px-1 min-w-[24px]').tooltip('В роботу')
             elif task.task_status == TASK_STATUS_IN_PROGRESS:
                 # Кнопка 1: Повернути в "Нові" (Відкласти)
                 ui.button(icon='arrow_back',
                           on_click=lambda:
-                          change_and_refresh(task.id, TASK_STATUS_NEW, controller, ctx, refresh_callback)
+                          change_and_refresh(task.id, TASK_STATUS_NEW, controller, auth_manager, refresh_callback)
                           ).props('flat dense size=sm color="orange"').classes('px-1 min-w-[24px]').tooltip(
                     'Відкласти в ящик')
 
                 # Кнопка 2: Завершити
                 ui.button(icon='done',
                           on_click=lambda:
-                          change_and_refresh(task.id, TASK_STATUS_COMPLETED, controller, ctx, refresh_callback)
+                          change_and_refresh(task.id, TASK_STATUS_COMPLETED, controller, auth_manager, refresh_callback)
                           ).props('flat dense size=sm color="green"').classes('px-1 min-w-[24px]').tooltip(
                     'Завершити')
 
             elif task.task_status == TASK_STATUS_COMPLETED:
                 ui.button(icon='settings_backup_restore',
                           on_click=lambda:
-                          change_and_refresh(task.id, TASK_STATUS_IN_PROGRESS, controller, ctx, refresh_callback)
+                          change_and_refresh(task.id, TASK_STATUS_IN_PROGRESS, controller, auth_manager, refresh_callback)
                           ).props('flat dense size=sm color="orange"').classes('px-1 min-w-[24px]').tooltip(
                     'Повернути в роботу')
 
@@ -317,9 +318,9 @@ def render_task_card(task, controller: TaskController, ctx: RequestContext, refr
                 ui.label(assignee_name).classes('truncate max-w-[120px]').tooltip(assignee_name)
 
 
-def change_and_refresh(task_id: int, new_status: str, controller: TaskController, ctx: RequestContext,
+def change_and_refresh(task_id: int, new_status: str, controller: TaskController, auth_manager: AuthManager,
                        refresh_callback):
     """Оновлює статус у базі і миттєво перемальовує дошку"""
-    controller.update_task_status(ctx, task_id, new_status)
+    controller.update_task_status(auth_manager.get_current_context(), task_id, new_status)
     ui.notify('Статус оновлено!', type='positive', position='top-right')
     refresh_callback()

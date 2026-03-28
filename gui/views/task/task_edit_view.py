@@ -1,9 +1,6 @@
 from nicegui import ui
 from datetime import datetime
-
-from nicegui.dependencies import register_esm
-
-from gui.services.request_context import RequestContext
+from gui.services.auth_manager import AuthManager
 from domain.task import Task, Subtask
 from gui.controllers.task_controller import TaskController
 from gui.tools.ui_components import confirm_delete_dialog
@@ -11,7 +8,7 @@ from service.constants import TASK_STATUS_NEW, TASK_STATUS_COMPLETED, TASK_STATU
 from dics.deserter_xls_dic import TASK_TYPES
 
 
-def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_id: int = None):
+def render_task_edit_page(controller: TaskController, auth_manager: AuthManager, task_id: int = None):
     is_new = task_id is None
     page_title = 'Створення нової задачі' if is_new else f'Редагування задачі №{task_id}'
 
@@ -21,7 +18,7 @@ def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_
         'task_subject': '',
         'task_details': '',
         'task_type': 'Документація',
-        'assignee': ctx.user_id,
+        'assignee': auth_manager.get_current_context().user_id,
         'task_deadline': '',
         'task_status': TASK_STATUS_NEW,
         'subtasks': []
@@ -34,7 +31,7 @@ def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_
             continue
         user_id = u['id']
         display_name = u.get('full_name') or u.get('username') or f"Користувач {user_id}"
-        if user_id == ctx.user_id:
+        if user_id == auth_manager.get_current_context().user_id:
             users_options[user_id] = f"{display_name} (Ви)"
         else:
             users_options[user_id] = display_name
@@ -42,7 +39,7 @@ def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_
 
     # --- ЗАВАНТАЖЕННЯ ДАНИХ (Якщо це редагування) ---
     if not is_new:
-        existing_task = controller.get_task_by_id(ctx, task_id)
+        existing_task = controller.get_task_by_id(auth_manager.get_current_context(), task_id)
         if existing_task:
             state['task_subject'] = existing_task.task_subject
             state['task_details'] = existing_task.task_details or ''
@@ -79,7 +76,7 @@ def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_
 
         task_model = Task(
             id=state['id'],
-            created_by=ctx.user_id,
+            created_by=auth_manager.get_current_context().user_id,
             assignee=state['assignee'],
             task_status=state['task_status'],
             task_type=state['task_type'],
@@ -90,7 +87,7 @@ def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_
         )
 
         try:
-            saved_id = controller.save_task(ctx, task_model)
+            saved_id = controller.save_task(auth_manager.get_current_context(), task_model)
             ui.notify(f'Задачу №{saved_id} успішно збережено!', type='positive')
             ui.navigate.to('/tasks')
         except Exception as e:
@@ -101,7 +98,7 @@ def render_task_edit_page(controller: TaskController, ctx: RequestContext, task_
 
         if result:
             try:
-                controller.delete_task(ctx, task_id)
+                controller.delete_task(auth_manager.get_current_context(), task_id)
                 ui.notify('Задачу видалено', type='positive')
                 ui.navigate.to('/tasks')
             except Exception as e:

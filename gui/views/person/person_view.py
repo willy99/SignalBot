@@ -99,7 +99,7 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
     date_rules = {date_logic_error: lambda _: validate_date_sequence(person)}
     id_mismatch_err = '⚠️ РНОКПП не збігається з датою народження!'
 
-    async def handle_save(person, person_ctrl: PersonController, ctx: RequestContext, dialog, on_close=None, paint_color=None):
+    async def handle_save(person, person_ctrl: PersonController, dialog, on_close=None, paint_color=None):
         if not enlist_inp.validate() or not desert_inp.validate() or not rnokpp_inp.validate() or not birthday_inp.validate():
             ui.notify('Виправте помилки в датах перед збереженням!', type='negative')
             return
@@ -300,7 +300,7 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
             if person_ctrl.auth_manager.has_access('person', 'write'):
                 if can_edit:
                     ui.button('ЗБЕРЕГТИ ДАНІ', icon='save',
-                              on_click=lambda: handle_save(person, person_ctrl, ctx, dialog, on_close=on_close,paint_color=None)) \
+                              on_click=lambda: handle_save(person, person_ctrl, dialog, on_close=on_close,paint_color=None)) \
                         .classes('bg-green-600 text-white px-8 h-12 text-lg font-bold shadow-md hover:bg-green-700 transition-colors')
 
                 if can_delete:

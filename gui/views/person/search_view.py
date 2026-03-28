@@ -3,7 +3,6 @@ from dics.deserter_xls_dic import *
 from domain.person import Person
 from gui.services.auth_manager import AuthManager
 from gui.views.person.person_view import edit_person
-from nicegui import run
 from domain.person_filter import PersonSearchFilter
 from gui.services.request_context import RequestContext
 import config
@@ -21,7 +20,7 @@ ui.add_css('''
     }
 ''', shared=True)
 
-def results_ui(data, person_ctrl, ctx: RequestContext, auth_manager: AuthManager, refresh_callback):
+def results_ui(data, person_ctrl, auth_manager: AuthManager, refresh_callback):
     if not data:
         return
     can_edit = auth_manager.has_access(MODULE_PERSON, PERM_EDIT)
@@ -70,7 +69,6 @@ def results_ui(data, person_ctrl, ctx: RequestContext, auth_manager: AuthManager
     table.on('editAction', lambda e: edit_person(
         Person(**e.args),
         person_ctrl,
-        ctx=ctx,
         auth_manager=auth_manager,
         on_close=refresh_callback
     ))
@@ -166,7 +164,7 @@ def search_page(person_ctrl, auth_manager: AuthManager):
             # ТУТ lambda працює нормально, бо ui.timer очікує звичайну функцію (не async)
             refresh_cb = lambda: ui.timer(0, lambda: do_search(auto_open=False, force_refresh=True), once=True)
             if len(data) == 1 and auto_open:
-                edit_person(data[0], person_ctrl, ctx=ctx, auth_manager=auth_manager, on_close=refresh_cb)
+                edit_person(data[0], person_ctrl, auth_manager=auth_manager, on_close=refresh_cb)
             if len(data) > config.MAX_QUERY_RESULTS:
                 ui.notify(
                     f'⚠️ Знайдено занадто багато результатів ({len(data)}). Показано перші {config.MAX_QUERY_RESULTS}. Будь ласка, уточніть параметри пошуку',
@@ -175,7 +173,7 @@ def search_page(person_ctrl, auth_manager: AuthManager):
                 )
                 data = data[:config.MAX_QUERY_RESULTS]  # Відсікаємо все зайве
             with results_container:
-                results_ui(data, person_ctrl, ctx, auth_manager=auth_manager, refresh_callback=refresh_cb)
+                results_ui(data, person_ctrl, auth_manager=auth_manager, refresh_callback=refresh_cb)
 
         except Exception as e:
             results_container.clear()

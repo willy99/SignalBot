@@ -52,7 +52,7 @@ class ReportController:
         return self.reporter.get_daily_returns_report(target_date, exclude_names, pre_fetched_archive)
 
     @refresh_session_method
-    def get_daily_archive_files(self, target_date, known_names: list):
+    def get_daily_archive_files(self, ctx: RequestContext, target_date, known_names: list):
         dservice = DocumentProcessingService(self.log_manager)
         return dservice.get_daily_archive_files(target_date, known_names)
 

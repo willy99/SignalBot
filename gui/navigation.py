@@ -173,7 +173,6 @@ def init_nicegui(workflow_obj):
     @ui.page('/doc_notif/edit/{draft_id}')
     @require_access(auth_manager, 'doc_notif', PERM_EDIT)
     def notif_doc_edit(draft_id: int = None):
-        ctx = auth_manager.get_current_context()
         app_menu.render(auth_manager)
         notif_doc_edit_view.render_notif_page(notif_ctrl, person_ctrl, auth_manager, draft_id)
 
@@ -181,32 +180,28 @@ def init_nicegui(workflow_obj):
     @ui.page('/tasks')
     @require_access(auth_manager, 'task', PERM_READ)
     def task_list():
-        ctx = auth_manager.get_current_context()
         app_menu.render(auth_manager)
-        task_list_view.render_task_list_page(task_ctrl, ctx)
+        task_list_view.render_task_list_page(task_ctrl, auth_manager)
 
     @ui.page('/tasks/today')
     @require_access(auth_manager, 'task', PERM_READ)
     def task_list():
-        ctx = auth_manager.get_current_context()
         app_menu.render(auth_manager)
-        task_list_view.render_tasks_today(task_ctrl, ctx)
+        task_list_view.render_tasks_today(task_ctrl, auth_manager)
 
     @ui.page('/tasks/all')
     @require_access(auth_manager, 'task', PERM_READ)
     def task_list():
-        ctx = auth_manager.get_current_context()
         app_menu.render(auth_manager)
-        task_list_view.render_tasks_all(task_ctrl, ctx)
+        task_list_view.render_tasks_all(task_ctrl, auth_manager)
 
 
     @ui.page('/tasks/edit/{task_id}')
     @require_access(auth_manager, 'task', PERM_EDIT)
     def edit_task_page(task_id: str = 'new'):
-        ctx = auth_manager.get_current_context()
         actual_id = None if task_id == 'new' else int(task_id)
         app_menu.render(auth_manager)
-        task_edit_view.render_task_edit_page(task_ctrl, ctx, actual_id)
+        task_edit_view.render_task_edit_page(task_ctrl, auth_manager, actual_id)
 
     @ui.page('/inbox')
     @require_access(auth_manager, 'task', PERM_READ)

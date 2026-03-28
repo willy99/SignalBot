@@ -48,6 +48,7 @@ class ExcelReporter:
                     REVIEW_STATUS_NOT_ASSIGNED: 0,
                     REVIEW_STATUS_EXECUTING: 0,
                     REVIEW_STATUS_CLOSED: 0,
+                    REVIEW_STATUS_ASSIGNED: 0,
                     REPORT_REVIEW_STATUS_NON_ERDR: 0,
                     REPORT_REVIEW_STATUS_ERDR: 0,
                     REPORT_REVIEW_STATUS_NON_EVIL: 0,
@@ -501,7 +502,7 @@ class ExcelReporter:
                 return {
                     'under_3': 0, 'over_3': 0, 'ret_mu': 0, 'ret_res': 0,
                     REVIEW_STATUS_NOT_ASSIGNED: 0, REVIEW_STATUS_EXECUTING: 0, REVIEW_STATUS_CLOSED: 0,
-                    REPORT_REVIEW_STATUS_NON_ERDR: 0, REPORT_REVIEW_STATUS_ERDR: 0, REPORT_REVIEW_STATUS_NON_EVIL: 0,
+                    REPORT_REVIEW_STATUS_NON_ERDR: 0, REPORT_REVIEW_STATUS_ERDR: 0, REPORT_REVIEW_STATUS_NON_EVIL: 0, REVIEW_STATUS_ASSIGNED: 0,
                     'dupl': 0, 'un_des': 0, 'un_ret': 0,
                     'st_term': 0, 'st_call': 0, 'st_contr': 0,
                     'pl_ppd': 0, 'pl_rvbz': 0, 'pl_other': 0,
