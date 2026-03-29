@@ -243,9 +243,10 @@ PATTERN_MIL_UNIT: Final = r'\b[А-ЯA-Z]\d{4}\b'
 
 VALID_PATTERN_DOC_NUM = r'^642/\d{1,5}$'
 VALID_PATTERN_DOC_NUM_FULL = r'^642/\d{1,5}/\d{1,2}$'
-VALID_PATTERN_PHONE= r'^0\d{9}$'
+VALID_PATTERN_PHONE= r'^(?:\+380|380|0)\d{9}$'
 VALID_PATTERN_ID_NUMBER= r'^\d{10}$'
 VALID_PATTERN_DATE = r'^(?:0[1-9]|[12]\d|3[01])\.(?:0[1-9]|1[0-2])\.(?:19[6-9]\d|[2-9]\d{3})$'
+VALID_PATTERN_EMAIL = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
 
 # Маркери, що вказують на процес перевірки
 # Маркери, що вказують на сам факт відсутності

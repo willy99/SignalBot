@@ -10,6 +10,7 @@ from gui.controllers.notif_controller import NotifController
 from gui.controllers.task_controller import TaskController
 from gui.controllers.inbox_controller import InboxController
 from gui.controllers.config_controller import ConfigController
+from gui.controllers.user_controller import UserController
 
 from gui.views.person import search_view
 from gui.views.person import batch_search_view
@@ -31,6 +32,7 @@ from gui.views.admin.admin_users_view import render_users_page
 from gui.views.admin.admin_settings_view import render_settings_page
 from gui.views import in_progress_view
 from gui.views.admin.admin_index_files import render_indexing_page
+from gui.views.admin.user_setting_form import render_user_settings_2fa, render_profile_settings
 from gui.auth_routes import create_login_page, require_access
 from gui.views.documentation.file_search_view import render_file_search_page
 from pathlib import Path
@@ -51,7 +53,6 @@ def init_nicegui(workflow_obj):
     support_templates_dir = current_dir / '../resources/templates'
     doc_templator = DocTemplator(support_templates_dir)
     auth_manager = AuthManager(workflow_obj.db)
-    create_login_page(auth_manager, workflow_obj.log_manager)
 
     support_ctrl = SupportController(doc_templator, workflow_obj, auth_manager)
     person_ctrl = PersonController(workflow_obj, auth_manager)
@@ -61,12 +62,14 @@ def init_nicegui(workflow_obj):
     inbox_ctrl = InboxController(workflow_obj, auth_manager)
     notif_ctrl = NotifController(doc_templator, workflow_obj, auth_manager)
     config_ctrl = ConfigController(workflow_obj, auth_manager)
+    user_ctrl = UserController(workflow_obj, auth_manager)
 
     app_menu = AppMenu(auth_manager, task_ctrl, inbox_ctrl, person_ctrl)
 
-    create_login_page(auth_manager, workflow_obj.log_manager)
+    create_login_page(auth_manager, user_ctrl, workflow_obj.log_manager)
 
     @ui.page('/')
+    @ui.page('/home')
     def index():
         render_home_page(auth_manager)
 
@@ -249,7 +252,19 @@ def init_nicegui(workflow_obj):
     @require_access(auth_manager,'admin_panel', PERM_EDIT)
     async def admin_file_index():
         app_menu.render(auth_manager)
-        await render_indexing_page(file_manager, auth_manager)  # Тепер await працюватиме правильно
+        await render_indexing_page(file_manager, auth_manager)
+
+    @ui.page('/user_settings_2fa')
+    @require_access(auth_manager,'admin_panel', PERM_EDIT)
+    async def user_settings_2fa():
+        app_menu.render(auth_manager)
+        render_user_settings_2fa(user_ctrl, auth_manager)
+
+    @ui.page('/user_settings')
+    @require_access(auth_manager,'admin_panel', PERM_EDIT)
+    async def user_settings():
+        app_menu.render(auth_manager)
+        render_profile_settings(user_ctrl, auth_manager)
 
     @ui.page('/doc_files')
     @require_access(auth_manager, 'search', PERM_READ)

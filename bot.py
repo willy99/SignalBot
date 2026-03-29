@@ -29,10 +29,10 @@ def bot_worker(workflow):
     if not config.SIGNAL_BOT:
         return
     try:
-        workflow.client.host = config.TCP_HOST
-        workflow.client.port = config.TCP_PORT
-        workflow.client.connect()
-        file_handle = workflow.client.read()
+        workflow.signalClient.host = config.TCP_HOST
+        workflow.signalClient.port = config.TCP_PORT
+        workflow.signalClient.connect()
+        file_handle = workflow.signalClient.read()
         for line in file_handle:
             if not line.strip(): continue
             data = json.loads(line)
@@ -81,7 +81,7 @@ def main():
         print("🧹 Очищення ресурсів...")
 
         if hasattr(workflow, 'client'):
-            workflow.client.close()
+            workflow.signalClient.close()
 
         if hasattr(workflow, 'excelProcessor'):
             if config.SAVE_EXCEL_AT_CLOSE:

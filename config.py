@@ -11,6 +11,10 @@ NET_USERNAME = os.getenv("NET_USERNAME")
 NET_PASSWORD = os.getenv("NET_PASSWORD")
 UI_SECRET_KEY = os.getenv("UI_SECRET_KEY")
 
+EMAIL_SMTP_SERVER = os.getenv("EMAIL_SMTP_SERVER")
+EMAIL_SMTP_PORT = os.getenv("EMAIL_SMTP_PORT")
+EMAIL_SENDER = os.getenv("EMAIL_SENDER")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 
 if IS_DEV:
     UI_PORT=8081
@@ -25,7 +29,7 @@ else:
 PROCESS_DOC : Final = True   # copy doc file from signal to date-folder
 PROCESS_XLS : Final = True # immediate process doc to excel. if false, batch can be applied later on
 DAILY_BACKUPS: Final = True # do daily backups of excel db
-SIGNAL_BOT: Final = False # connect to signal and process attachments
+SIGNAL_BOT: Final = True # connect to signal and process attachments
 SAVE_EXCEL_AT_CLOSE = False # по закриттю зберігати всі зміни в ексельчику
 
 
@@ -95,4 +99,6 @@ SIGNAL_ATTACHMENTS_DIR : Final = os.path.expanduser("~/.local/share/signal-cli/a
 TMP_DIR: Final = os.path.expanduser("~/tmp/")
 
 
-SESSION_TIMEOUT = 60 * 60  # хвилини у секундах
+SECURITY_SESSION_TIMEOUT = 60 * 60  # хвилини у секундах
+SECURITY_MAX_ATTEMPTS = 5
+SECURITY_LOCKOUT_DURATION_MINS = 15

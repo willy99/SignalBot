@@ -28,6 +28,45 @@ class AuthManager:
             return True, "Користувача успішно створено"
         return False, "Помилка бази даних при створенні користувача"
 
+    async def authenticate(self, username: str, password: str) -> Optional[dict]:
+        user: User = self.auth_service.authenticate(username, password)
+        if not user:
+            return None
+
+        # Початкові дані сесії (поки без 'authenticated': True)
+        session_data = {
+            'user_id': user.id,
+            'user_info': {
+                'username': user.username,
+                'role': user.role,
+                'full_name': user.full_name,
+                'id': user.id,
+                'session_token': user.session_token
+            },
+            'last_activity': time.time()
+        }
+
+        if user.use_2fa:
+            contact_info = user.phone or user.email
+            contact_type = 'Signal' if user.phone else 'Email'
+            if not contact_info:
+                # Якщо 2FA увімкнено, а контактів нема — це помилка конфігурації
+                raise ValueError("2FA увімкнено, але не знайдено підтвердженого контакту (Signal/Email)")
+            app.storage.user.update(session_data)
+            app.storage.user['authenticated'] = False
+            return {
+                "status": "2fa_required",
+                "user": user,
+                "send_to": contact_info,
+                "send_type": contact_type
+            }
+
+        # 2FA ВИМКНЕНА — пускаємо відразу
+        session_data['authenticated'] = True
+        app.storage.user.update(session_data)
+        return {"status": "success", "user": user}
+
+    '''
     def authenticate(self, username: str, password: str) -> Optional[User]:
         user:User = self.auth_service.authenticate(username, password)
         if user:
@@ -38,29 +77,30 @@ class AuthManager:
                     'username': user.username,
                     'role': user.role,
                     'full_name': user.full_name,
-                    'id': user.id
+                    'id': user.id,
+                    'session_token': user.session_token
                 },
                 'last_activity': time.time() # Початок відліку сесії
             })
 
         return user
+    '''
 
     def check_session(self, ctx: RequestContext) -> bool:
         """Перевірка, чи не застаріла сесія."""
         if not app.storage.user.get('authenticated'):
             return False
-        # print('1>> ' + str(datetime.fromtimestamp(  app.storage.user.get('last_activity') ).strftime('%H:%M:%S')))
-        # print('2>> ' + str(datetime.fromtimestamp(  ctx.last_activity ).strftime('%H:%M:%S')))
-
         storage_time = app.storage.user.get('last_activity', 0)
         ctx_time = ctx.last_activity if ctx else 0
 
         last_activity = max(storage_time, ctx_time)
+        user_info = app.storage.user.get('user_info', {})
+        client_token = user_info.get('session_token')
 
         time_str = datetime.fromtimestamp(last_activity).strftime('%H:%M:%S')
         # print(f'>>> check sessions (formatted): {time_str}')
 
-        if time.time() - last_activity > config.SESSION_TIMEOUT:
+        if time.time() - last_activity > config.SECURITY_SESSION_TIMEOUT:
             self.logout()
             return False
 
@@ -71,14 +111,20 @@ class AuthManager:
             ctx.last_activity = new_now
 
         # перевіряємо, що юзер все ще активний
-        user_info = app.storage.user.get('user_info', {})
         user = self.auth_service.get_user_by_username(user_info.get('username'))
+
+        if not user or user.session_token != client_token:
+            # self.logger.warning(f"SECURITY ALERT: Token mismatch for user {user.username}!")
+            self.logout()  # Токени не збігаються — негайний вихід
+            return False
+
         if not user or not user.is_active:
             self.logout()
             return False
         return True
 
     async def execute(self, func, ctx: RequestContext, *args, **kwargs):
+
         """
         Централізований запуск важких функцій у фоновому потоці
         з автоматичним менеджментом сесії.
@@ -142,6 +188,7 @@ class AuthManager:
             user_role=user_info.get('role'),
             user_id=user_info.get('id'),
             user_login=user_info.get('username'),
-            last_activity=app.storage.user.get('last_activity', time.time())
+            last_activity=app.storage.user.get('last_activity', time.time()),
+            session_token=user_info.get('session_token')
         )
         return ctx

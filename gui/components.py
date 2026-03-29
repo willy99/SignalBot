@@ -109,8 +109,12 @@ class AppMenu:
                     # Асинхронна функція оновлення Інбоксу для конкретного юзера
                     async def update_inbox():
                         try:
+                            if not app.storage.user.get('authenticated'):
+                                return  # Виходимо, якщо юзер не ввійшов
                             # Викликаємо контролер через self.inbox_ctrl
                             inbox_data = await auth_manager.execute(self.inbox_ctrl.get_user_inbox_messages, auth_manager.get_current_context())
+                            if inbox_data is None:
+                                return
                             # inbox_data = {'personal_files': [], 'root_files':[]}
                             p_count = len(inbox_data['personal_files'])
                             r_count = len(inbox_data['root_files'])
@@ -159,7 +163,14 @@ class AppMenu:
                     async def update_my_tasks():
                         try:
                             # Робимо запит до БД в окремому потоці, щоб не блокувати UI
+                            if not app.storage.user.get('authenticated'):
+                                return
+                            if not auth_manager.get_current_context() or not auth_manager.get_current_context().user_id:
+                                return
+
                             new_count, prog_count = await auth_manager.execute(self.task_ctrl.get_my_task_counts, auth_manager.get_current_context())
+                            if new_count is None:
+                                return
 
                             if new_count > 0:
                                 badge_new.set_text(str(new_count))
@@ -299,11 +310,31 @@ class AppMenu:
                 user_info = app.storage.user.get('user_info', {})
                 user_name = user_info.get('full_name') or user_info.get('username') or 'Гість'
 
-                with ui.row().classes('items-center gap-2 mr-2'):
-                    ui.icon('account_circle', color='gray-300', size='sm')
-                    ui.label(user_name).classes('text-white font-medium')
+                # Групуємо профіль у кнопку з меню
+                with ui.button(icon='account_circle').props('flat text-white no-caps icon-right="expand_more"').classes('mr-2') as profile_btn:
+                    ui.label(user_name).classes('ml-2 font-medium')
 
-                ui.button(icon='logout', on_click=lambda: logout(self.auth_manager)).props('flat round color="red-400"').tooltip('Вийти з системи')
+                    with ui.menu().classes('w-64'):
+                        # Пункт 1: Загальні налаштування
+                        with ui.menu_item(on_click=lambda: ui.navigate.to('/user_settings')):
+                            with ui.row().classes('items-center gap-3'):
+                                ui.icon('manage_accounts', color='primary')
+                                ui.label('Налаштування профілю')
+
+                        # Пункт 2: 2FA
+                        with ui.menu_item(on_click=lambda: ui.navigate.to('/user_settings_2fa')):
+                            with ui.row().classes('items-center gap-3'):
+                                ui.icon('security', color='warning')
+                                ui.label('Двофакторна автентифікація')
+
+                        ui.separator()
+
+                        # Пункт 3: Вихід (переніс сюди для компактності, або залиш окрему кнопку як була)
+                        with ui.menu_item(on_click=lambda: logout(self.auth_manager)):
+                            with ui.row().classes('items-center gap-3'):
+                                ui.icon('logout', color='negative')
+                                ui.label('Вийти з системи')
+
 
         inject_watermark()
 

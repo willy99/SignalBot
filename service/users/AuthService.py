@@ -1,11 +1,11 @@
-import time
 from typing import Optional, Tuple, Dict, List
-from nicegui import app, ui
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from dics.security_config import PERM_READ, PERM_EDIT, PERM_DELETE
 from domain.user import User
-
+import uuid
+from datetime import datetime, timedelta
+import config
 
 class AuthService:
 
@@ -17,12 +17,31 @@ class AuthService:
         # Використовуємо SELECT *, або чітко перелічуємо поля
         query = "SELECT * FROM users WHERE username = ? AND is_active = 1"
         row = self.db.__execute_fetch__(query, (username,))
+        if not row:
+            return None
+        user_id = row['id']
+
+        if row['lockout_until']:
+            lockout_time = datetime.fromisoformat(row['lockout_until'])
+            if datetime.now() < lockout_time:
+                remaining = int((lockout_time - datetime.now()).total_seconds() / 60)
+                raise PermissionError(f"Акаунт заблоковано. Спробуйте через {remaining} хв.")
+
 
         if row and check_password_hash(row['password_hash'], password):
             user = self._map_to_user(row)
             if user:
+                # УСПІХ: Скидаємо лічильник помилок
+                self.reset_failed_attempts(user_id)
+
                 user.permissions = self.get_user_permissions(user.role)
-            return user
+                new_token = str(uuid.uuid4())
+                update_query = "UPDATE users SET session_token = ? WHERE id = ?"
+                self.db.__execute_query__(update_query, (new_token, row['id']))
+                user.session_token = new_token
+                return user
+        else:
+            self.register_failed_attempt(user_id)
         return None
 
     def get_user_permissions(self, role: str) -> Dict[str, Dict[str, bool]]:
@@ -58,10 +77,12 @@ class AuthService:
         row = self.db.__execute_fetch__(query, (username,))
         return self._map_to_user(row)
 
-    def get_user_with_hash(self, username: str) -> tuple | None:
-        """Повертає дані користувача разом з хешем пароля для перевірки."""
-        query = "SELECT id, username, password_hash, role, full_name, is_active FROM users WHERE username = ? AND is_active = 1"
-        return self.db.__execute_fetch__(query, (username,))
+    def get_user_by_id(self, user_id: int) -> Optional[User]:
+        """Отримує повні дані користувача за ID."""
+        query = "SELECT * FROM users WHERE id = ?"
+        row = self.db.__execute_fetch__(query, (user_id,))
+        return self._map_to_user(row)
+
 
     def _map_to_user(self, row) -> Optional[User]:
         """Єдине місце, де ми створюємо об'єкт User з даних БД."""
@@ -73,7 +94,14 @@ class AuthService:
             username=row['username'],
             role=row['role'],
             full_name=row['full_name'],
-            is_active=bool(row['is_active'])
+            is_active=bool(row['is_active']),
+            session_token=row['session_token'],
+            lockout_until=row['lockout_until'],
+            failed_login_attempts=row['failed_login_attempts'],
+            use_2fa = row['use_2fa'],
+            email = row['email'],
+            phone = row['phone'],
+            verification_code = row['verification_code']
         )
         return user
 
@@ -132,3 +160,25 @@ class AuthService:
                 can_delete = excluded.can_delete
         '''
         return self.db.__execute_query__(query, (role, module_name, can_read, can_write, can_delete))
+
+
+    def register_failed_attempt(self, user_id: int):
+        """Збільшує лічильник помилок та блокує юзера, якщо ліміт вичерпано."""
+        user:User = self.get_user_by_id(user_id)
+        new_attempts = (user.failed_login_attempts or 0) + 1
+        lockout_until = None
+
+        if new_attempts >= config.SECURITY_MAX_ATTEMPTS:
+            lockout_until = (datetime.now() + timedelta(minutes=config.SECURITY_LOCKOUT_DURATION_MINS)).isoformat()
+            print(f"SECURITY: User ID {user_id} locked out until {lockout_until}")
+
+        self.db.__execute_query__(
+            "UPDATE users SET failed_login_attempts = ?, lockout_until = ? WHERE id = ?",
+            (new_attempts, lockout_until, user_id)
+        )
+
+        return new_attempts, lockout_until
+
+    def reset_failed_attempts(self, user_id: int):
+        query = "UPDATE users SET failed_login_attempts = 0, lockout_until = NULL WHERE id = ?"
+        self.db.__execute_query__(query, (user_id,))

@@ -207,7 +207,7 @@ class DocTemplator:
         doc.save(byte_io)
         byte_io.seek(0)
 
-        file_name = f"Пакет_Повідомлень_{region}_{len(formatted_docs)}шт.docx"
+        file_name = f"Пакет_Повідомлень_{region}_{notif_number.replace('/', '_')}_({notif_date.replace('.', '_')})_{len(formatted_docs)}шт.docx"
         return byte_io.getvalue(), file_name
 
     def generate_notif_zip_archive(self, region: str, out_num: str, out_date: str, buffer: list) -> tuple[bytes, str]:

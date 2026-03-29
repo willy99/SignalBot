@@ -12,7 +12,17 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL,
     full_name TEXT,
-    is_active INTEGER DEFAULT 1
+    is_active INTEGER DEFAULT 1,
+    session_token VARCHAR(50) DEFAULT '',
+    failed_login_attempts INTEGER DEFAULT 0,
+    lockout_until DATETIME,
+    email TEXT,
+    phone TEXT,
+    pending_contact TEXT,
+    pending_type TEXT,
+    verification_code TEXT,
+    verification_expiry TEXT,
+    use_2fa INTEGER NOT NULL DEFAULT 0
 );
 
 -- Таблиця прав доступу для ролей

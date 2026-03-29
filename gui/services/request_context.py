@@ -12,6 +12,7 @@ class RequestContext:
     user_role: str
     ip_address: str = "unknown"
     last_activity: float = field(default_factory=time.time)
+    session_token: str = field(default_factory=str)
 
     @property
     def last_activity_str(self) -> str:

@@ -1,4 +1,6 @@
+from service.connection.EmailClient import EmailClient
 from service.connection.SignalClient import SignalClient
+from service.processing.processors.DocProcessor import DocProcessor
 from service.processing.processors.ExcelProcessor import ExcelProcessor
 from service.processing.AttachmentHandler import AttachmentHandler
 from service.connection.MyDataBase import MyDataBase
@@ -17,19 +19,21 @@ class MyWorkFlow:
         "привіт": "Привіт! Що треба? 🤖",
         "як справи": "Сракопад жахливий! 🚀",
         "хто ти": "Я бот-ботяра-саботяра, повний шаїчечки та багів",
-        "паляниця": "Укрзалізниця! 🇺🇦"
+        "паляниця": "Укрзалізниця! 🇺🇦",
+        "слава України": "Героям Слава!"
     }
 
     def __init__(self):
         self.log_manager = LoggerManager()
         self.logger = self.log_manager.get_logger()
 
-        self.excelProcessor = None
-        self.wordProcessor = None
-        self.reporter = None
-        self.attachmentHandler = None
-        self.client = SignalClient()
-        self.db = MyDataBase()
+        self.excelProcessor:ExcelProcessor = None
+        self.wordProcessor:DocProcessor = None
+        self.reporter:ExcelReporter = None
+        self.attachmentHandler:AttachmentHandler = None
+        self.signalClient:SignalClient = SignalClient()
+        self.emailClient:EmailClient = EmailClient()
+        self.db:MyDataBase = MyDataBase()
         self.excelFilePath = None
 
         self.backuper = BackupData(self.log_manager)
@@ -70,7 +74,7 @@ class MyWorkFlow:
                         self.logger.debug(f"📎 Отримано файл: {filename} (ID: {att_id})")
                         self.attachmentHandler = AttachmentHandler(self)
                         file_process_messages = self.attachmentHandler.handle_attachment(att_id, filename)
-                        self.client.send_reaction(
+                        self.signalClient.send_reaction(
                             group_id,
                             recipient,
                             "➕" if len(file_process_messages) == 0 else "⚠️",
@@ -89,7 +93,7 @@ class MyWorkFlow:
                         response = self.getResponseAndMove(source, message_text)
                     self.logger.debug(f"🤖 Відповідаю: {response}")
                     if group_id is None:
-                        self.client.send_message(source, response)
+                        self.signalClient.send_message(source, response)
 
                     # return f"📥 ВХІДНЕ від {source}: {message_text}"
             # 2. Обробка синхронізації (ви написали з телефону комусь)
@@ -112,7 +116,7 @@ class MyWorkFlow:
         return None
 
     def getResponseAndMove(self, user_id, text):
-        user_service = UserService(self.db)
+        user_service = UserService(self.db, self.signalClient, self.emailClient)
         current_state = user_service.get_user_state(user_id)
         text = text.lower().strip()
 

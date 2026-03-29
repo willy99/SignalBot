@@ -532,7 +532,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
 
             def load_draft(d_id: int):
                 try:
-                    draft = controller.get_support_doc_by_id(ctx, d_id)
+                    draft = controller.get_support_doc_by_id(auth_manager.get_current_context(), d_id)
                     if not draft:
                         ui.notify(f'Помилка: Чернетку №{d_id} не знайдено в базі!', type='negative')
                         return

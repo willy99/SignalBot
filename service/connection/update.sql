@@ -43,4 +43,3 @@ WHERE out_number IS NOT NULL AND out_number != '' AND deleted = 0;
 CREATE UNIQUE INDEX IF NOT EXISTS udx_notif_out_number
 ON notif_docs(out_number)
 WHERE out_number IS NOT NULL AND out_number != '' AND deleted = 0;
-

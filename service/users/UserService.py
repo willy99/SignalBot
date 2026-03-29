@@ -1,9 +1,24 @@
 # from service.connection.MyDataBase import MyDataBase
-from gui.services.request_context import RequestContext
+from datetime import datetime
+from typing import Optional
+
+import config
+import smtplib
+from email.mime.text import MIMEText
+
+from domain.user import User
+from service.connection.EmailClient import EmailClient
+from service.connection.MyDataBase import MyDataBase
+from service.connection.SignalClient import SignalClient
+from service.users.AuthService import AuthService
+
 
 class UserService:
-    def __init__(self, db):
+    def __init__(self, db:MyDataBase, signal_client: SignalClient, email_client: EmailClient):
         self.db = db
+        self.signal_client = signal_client
+        self.email_client = email_client
+        self.auth_service = AuthService(self.db)
 
     def get_user_state(self, phone_number: str) -> str:
         """Отримує стан користувача (повертає 'START', якщо не знайдено)."""
@@ -27,3 +42,68 @@ class UserService:
     def reset_user(self, phone_number: str) -> int:
         """Скидає стан користувача до початкового."""
         return self.set_user_state(phone_number, "START")
+
+    def update_user_pending_contact(self, user_id, contact, contact_type, code, expiry):
+        """Зберігає тимчасові дані для підтвердження."""
+        query = '''
+            UPDATE users SET 
+                pending_contact = ?, 
+                pending_type = ?, 
+                verification_code = ?, 
+                verification_expiry = ? 
+            WHERE id = ?
+        '''
+        return self.db.__execute_query__(query, (contact, contact_type, code, expiry.isoformat(), user_id))
+
+    def get_pending_info(self, user_id):
+        """Отримує дані, що чекають підтвердження."""
+        query = "SELECT pending_contact, pending_type, verification_code, verification_expiry FROM users WHERE id = ?"
+        row = self.db.__execute_fetch__(query, (user_id,))
+        if row:
+            return {
+                'contact': row[0],
+                'type': row[1],
+                'code': row[2],
+                'expiry': datetime.fromisoformat(row[3]) if row[3] else None
+            }
+        return None
+
+    def update_user_email(self, user_id, email):
+        return self.db.__execute_query__("UPDATE users SET email = ? WHERE id = ?", (email, user_id))
+
+    def update_user_phone(self, user_id, phone):
+        return self.db.__execute_query__("UPDATE users SET phone = ? WHERE id = ?", (phone, user_id))
+
+    def clear_pending(self, user_id):
+        return self.db.__execute_query__(
+            "UPDATE users SET pending_contact=NULL, pending_type=NULL, verification_code=NULL, verification_expiry=NULL WHERE id = ?",
+            (user_id,)
+        )
+
+    def get_user_by_id(self, user_id: int) -> Optional[User]:
+        return self.auth_service.get_user_by_id(user_id)
+
+    def update_user_profile(self, user_id: int, full_name: str, use_2fa: bool) -> bool:
+        """Оновлює профіль користувача."""
+        query = '''
+            UPDATE users 
+            SET full_name = ?, 
+                use_2fa = ? 
+            WHERE id = ?
+        '''
+        self.db.__execute_query__(query, (full_name, int(use_2fa), user_id))
+        return True
+
+    def send_code(self, email: str, code: str):
+        """Проксі-метод для відправки через EmailClient"""
+        return self.email_client.send_verification_code(email, code)
+
+    def send_message(self, phone: str, message: str):
+        """Відправка через твій SignalClient (JSON-RPC)."""
+        try:
+            print('>>> sending message ' + str(message) + ' to ' + phone)
+            self.signal_client.send_message(phone, message)
+            return True
+        except Exception as e:
+            print(f"❌ Помилка Signal RPC: {e}")
+            raise e
