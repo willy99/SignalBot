@@ -9,6 +9,7 @@ from gui.services.auth_manager import AuthManager
 from service.processing.DocumentProcessingService import DocumentProcessingService
 from service.processing.MyWorkFlow import MyWorkFlow
 from service.processing.processors.DocTemplator import DocTemplator
+from service.processing.processors.ErdrKramProcessor import ErdrKramProcessor, ErdrKramRow
 from service.processing.processors.ExcelReport import ExcelReporter
 from service.storage.LoggerManager import LoggerManager
 from service.storage.StorageFactory import StorageFactory
@@ -22,6 +23,7 @@ class ReportController:
         self.auth_manager:AuthManager = auth_manager
         self.log_manager:LoggerManager = worklow.log_manager
         self.logger = worklow.log_manager.get_logger()
+        self.workflow = worklow
 
     @refresh_session_method
     def do_subunit_desertion_report(self, ctx: RequestContext, search_filter: PersonSearchFilter):
@@ -78,6 +80,27 @@ class ReportController:
     def get_brief_report(self, ctx: RequestContext):
         return self.reporter.get_brief_summary()
 
+    @refresh_session_method
+    def process_kram_file(self, ctx: RequestContext, file_bytes: bytes) -> list[ErdrKramRow]:
+        """Парсить файл КРАМ і звіряє кожен запис з основною базою."""
+        self.logger.info(f"UI:{ctx.user_name}: запуск звірки ЄРДР КРАМ, розмір файлу: {len(file_bytes)} байт")
+
+        processor = ErdrKramProcessor(
+            excel_processor=self.workflow.excelProcessor,
+            log_manager=self.log_manager,
+        )
+        results = processor.process_file(file_bytes)
+
+        found = sum(1 for r in results if r.found_in_db)
+        erdr_exists = sum(1 for r in results if r.found_in_db and r.db_erdr_date and r.db_erdr_date != 'н/д')
+        erdr_not_found = sum(1 for r in results if not r.found_in_db)
+
+        self.logger.info(
+            f"UI:{ctx.user_name}: КРАМ — оброблено {len(results)} рядків. "
+            f"Знайдено в базі: {found}, є ЄРДР: {erdr_exists}, не знайдено: {erdr_not_found}"
+        )
+        return results
+
     def is_admin(self):
         return self.auth_manager.has_access(MODULE_ADMIN, PERM_READ)
 
@@ -87,7 +110,7 @@ class ReportController:
         try:
             client = StorageFactory.create_client(config.REPORT_DAILY_DESERTION, self.log_manager)
             with client:
-                destination_path = f"{config.REPORT_DAILY_DESERTION}{client.separator}{file_name}"
+                destination_path = f"{config.REPORT_DAILY_DESERTION}{client.get_separator()}{file_name}"
                 buffer = io.BytesIO(file_bytes)
                 client.save_file_from_buffer(destination_path, buffer)
                 self.log_manager.get_logger().info(f"✅ Звіт СЗЧ успішно збережено в архів: {destination_path}")

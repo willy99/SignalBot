@@ -11,7 +11,7 @@ from service.processing.processors.ExcelReport import ExcelReporter
 from service.processing.converter.ColumnConverter import ColumnConverter
 from service.storage.BackupData import BackupData
 from service.users.UserService import UserService
-
+import threading
 
 class MyWorkFlow:
 
@@ -20,10 +20,10 @@ class MyWorkFlow:
         "як справи": "Сракопад жахливий! 🚀",
         "хто ти": "Я бот-ботяра-саботяра, повний шаїчечки та багів",
         "паляниця": "Укрзалізниця! 🇺🇦",
-        "слава України": "Героям Слава!"
+        "слава Україні": "Героям Слава!"
     }
 
-    def __init__(self):
+    def __init__(self, db: MyDataBase = None):
         self.log_manager = LoggerManager()
         self.logger = self.log_manager.get_logger()
 
@@ -33,8 +33,9 @@ class MyWorkFlow:
         self.attachmentHandler:AttachmentHandler = None
         self.signalClient:SignalClient = SignalClient()
         self.emailClient:EmailClient = EmailClient()
-        self.db:MyDataBase = MyDataBase()
+        self.db: MyDataBase = db if db is not None else MyDataBase()
         self.excelFilePath = None
+        self._excel_lock = threading.Lock()
 
         self.backuper = BackupData(self.log_manager)
 
@@ -43,121 +44,117 @@ class MyWorkFlow:
         self.reporter = ExcelReporter(self.excelProcessor, log_manager=self.log_manager,)
         self.excelFilePath = excelFilePath
 
-    def parseSignalData(self, data):
-        """Витягує текст повідомлення та номер відправника з JSON-RPC пакету."""
+    def parseSignalData(self, data: dict):
+        """Розбирає JSON-RPC пакет від Signal та запускає відповідну логіку."""
         try:
             params = data.get("params", {})
             envelope = params.get("envelope", {})
 
-            # self.logger.debug(str(data))
-            # 1. Обробка вхідного повідомлення від когось іншого
             if "dataMessage" in envelope:
                 msg = envelope["dataMessage"]
-                source = envelope.get("source") or envelope.get("sourceNumber") or "Невідомий"
-                source_uuid = envelope.get("sourceUuid")  # Важливо для реакцій!
+                source = (envelope.get("source")
+                          or envelope.get("sourceNumber")
+                          or "Невідомий")
+                source_uuid = envelope.get("sourceUuid")
                 timestamp = msg.get("timestamp")
                 group_info = msg.get("groupInfo")
-                recipient = source
                 group_id = group_info.get("groupId") if group_info else None
-
                 message_text = msg.get("message", "")
-
                 attachments = msg.get("attachments", [])
 
-                # process attachments
-                if len(attachments) > 0:
-                    self.logger.debug('--------------------------🔓 BEGIN ------------------------------------------ ')
+                if attachments:
+                    self.logger.debug("--- ПОЧАТОК ОБРОБКИ ВКЛАДЕНЬ ---")
                     for att in attachments:
                         att_id = att.get("id")
                         filename = att.get("filename")
-
                         self.logger.debug(f"📎 Отримано файл: {filename} (ID: {att_id})")
+
                         self.attachmentHandler = AttachmentHandler(self)
                         file_process_messages = self.attachmentHandler.handle_attachment(att_id, filename)
-                        self.signalClient.send_reaction(
-                            group_id,
-                            recipient,
-                            "➕" if len(file_process_messages) == 0 else "⚠️",
-                            source_uuid,
-                            timestamp
-                        )
-                    self.logger.debug('--------------------------🔓 END -------------------------------------------- ')
 
+                        emoji = "➕" if len(file_process_messages) == 0 else "⚠️"
+                        self.signalClient.send_reaction(group_id, source, emoji, source_uuid, timestamp)
+                    self.logger.debug("--- КІНЕЦЬ ОБРОБКИ ВКЛАДЕНЬ ---")
 
                 elif message_text:
-                    response = ''
-                    self.logger.debug('Check is message in answers' + str(message_text) + ' ' + str(message_text in self.ANSWERS))
-                    if message_text.lower() in self.ANSWERS:
-                        response = self.ANSWERS[message_text.lower()]
-                    else:
-                        response = self.getResponseAndMove(source, message_text)
+                    response = self._get_text_response(source, message_text)
                     self.logger.debug(f"🤖 Відповідаю: {response}")
                     if group_id is None:
                         self.signalClient.send_message(source, response)
 
-                    # return f"📥 ВХІДНЕ від {source}: {message_text}"
-            # 2. Обробка синхронізації (ви написали з телефону комусь)
             elif "syncMessage" in envelope:
                 sync_msg = envelope["syncMessage"]
                 if "sentMessage" in sync_msg:
                     sent = sync_msg["sentMessage"]
-                    dest = sent.get("destinationNumber") or sent.get("destinationUuid") or "когось"
+                    dest = (sent.get("destinationNumber")
+                            or sent.get("destinationUuid")
+                            or "когось")
                     text = sent.get("message", "")
                     if text:
                         return f"📤 ВИ НАПИСАЛИ до {dest}: {text}"
 
         except Exception as e:
-            stack_trace = traceback.format_exc()
-
-            self.logger.debug("--- FULL STACK TRACE ---")
-            self.logger.debug(stack_trace)
+            self.logger.debug("--- ПОВНИЙ СТЕК ПОМИЛКИ ---")
+            self.logger.debug(traceback.format_exc())
             return f"❌ Помилка парсингу: {e}"
 
         return None
 
-    def getResponseAndMove(self, user_id, text):
-        user_service = UserService(self.db, self.signalClient, self.emailClient)
+    def _get_text_response(self, user_id: str, text: str) -> str:
+        """Повертає відповідь на текстове повідомлення (меню або стандартна відповідь)."""
+        normalized = text.lower().strip()
+
+        if normalized in self.ANSWERS:
+            return self.ANSWERS[normalized]
+
+        return self._handle_menu(user_id, normalized)
+
+    def _handle_menu(self, user_id: str, text: str) -> str:
+        """Обробляє стан-машину текстового меню."""
+        # UserService — легкий, можна зберігати як поле, а не створювати щоразу
+        if not hasattr(self, '_user_service'):
+            self._user_service = UserService(self.db, self.signalClient, self.emailClient)
+
+        user_service = self._user_service
         current_state = user_service.get_user_state(user_id)
-        text = text.lower().strip()
 
-        self.logger.debug(f"DEBUG: User={user_id}, State={current_state}, Text='{text}'")
-        main_menu = "Ви у Головному меню:\n1. Різна обробка\n2. Статистика\n3. Вихід"
-        process_menu = "ОБРОБКА MENU:\n1. Batch обробка файлів\n2. Конвертація полів\n3. Вихід"
-        stat_menu = ":\n1. Статистика і звіти \n0. Вихід"
-        menu_prompt = "Напишіть 'меню' для початку роботи."
+        self.logger.debug(f"МЕНЮ: юзер={user_id}, стан={current_state}, текст='{text}'")
 
-        if text == "меню" or text == "start" or text == "menu":
+        MAIN_MENU = "Ви у Головному меню:\n1. Різна обробка\n2. Статистика\n3. Вихід"
+        PROCESS_MENU = "ОБРОБКА MENU:\n1. Batch обробка файлів\n2. Конвертація полів\n0. Вихід"
+        MENU_PROMPT = "Напишіть 'меню' для початку роботи."
+
+        if text in ("меню", "start", "menu"):
             user_service.set_user_state(user_id, "MAIN_MENU")
-            return main_menu
+            return MAIN_MENU
 
         if current_state == "MAIN_MENU":
             if text == "1":
                 user_service.set_user_state(user_id, "PROCESS")
-                return process_menu
-            elif text == "4" or text == "вихід":
+                return PROCESS_MENU
+            if text in ("4", "вихід"):
                 user_service.set_user_state(user_id, "START")
-                return menu_prompt
-            elif text == "0":
-                return main_menu
+                return MENU_PROMPT
+            if text == "0":
+                return MAIN_MENU
 
-        elif current_state == 'PROCESS':
+        elif current_state == "PROCESS":
             if text == "0":
                 user_service.set_user_state(user_id, "MAIN_MENU")
-                return main_menu
-            if text == "1" or text == 'batch':
-                batch_processor = BatchProcessor(self.log_manager, self.excelFilePath)
-                batch_processor.start_processing(0)
+                return MAIN_MENU
+            if text in ("1", "batch"):
+                with self._excel_lock:
+                    BatchProcessor(self.log_manager, self.excelFilePath).start_processing(0)
                 return "OK"
-            if text == "2" or text == 'convert':
-                column_converter = ColumnConverter(self.excelFilePath, self.log_manager)
-                column_converter.convert()
+            if text in ("2", "convert"):
+                with self._excel_lock:
+                    ColumnConverter(self.excelFilePath, self.log_manager).convert()
                 return "OK"
+
         elif current_state == "STAT":
             if text == "0":
                 user_service.set_user_state(user_id, "MAIN_MENU")
-                return main_menu
-            else:
-                return "Фігня-цифра"
+                return MAIN_MENU
+            return "Фігня-цифра"
 
-        # Якщо стан невідомий або START
-        return menu_prompt
+        return MENU_PROMPT

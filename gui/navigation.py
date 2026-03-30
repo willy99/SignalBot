@@ -22,9 +22,11 @@ from gui.views.report import yearly_report_view
 from gui.views.report import dups_report_view
 from gui.views.report import error_birthday_report_view
 from gui.views.report import waiting_for_erdr_report_view
+from gui.views.report.erdr_kram_report_view import render_erdr_kram_page
 from gui.views.report.logs_view import render_logs_page
 from gui.views.report import daily_report_view
 from gui.views.report import general_state_report
+from gui.views.report import erdr_kram_report_view
 from gui.views.inbox import inbox_triage_view
 from gui.views.task import task_list_view, task_edit_view
 from gui.views.calendar import calendar_view
@@ -103,7 +105,7 @@ def init_nicegui(workflow_obj):
 
     @ui.page('/report_general_state')
     @require_access(auth_manager, MODULE_REPORT_GENERAL, PERM_READ)
-    def report_yearly():
+    def report_general_state():
         app_menu.render(auth_manager)
         general_state_report.render_place_report_page(report_ctrl, person_ctrl, auth_manager)
 
@@ -131,6 +133,14 @@ def init_nicegui(workflow_obj):
     def report_daily():
         app_menu.render(auth_manager)
         daily_report_view.render_daily_report_page(report_ctrl, task_ctrl, person_ctrl, auth_manager)
+
+
+    @ui.page('/report_erdr_kram')
+    @require_access(auth_manager, MODULE_REPORT_GENERAL, PERM_READ)
+    def erdr_kram_route():
+        app_menu.render(auth_manager)
+        render_erdr_kram_page(report_ctrl, auth_manager)
+
 
     @ui.page('/doc_dbr')
     @require_access(auth_manager, MODULE_DOC_DBR, PERM_READ)
@@ -162,7 +172,7 @@ def init_nicegui(workflow_obj):
     @ui.page('/doc_support/s_create')
     @ui.page('/doc_support/s_edit/{draft_id}')
     @require_access(auth_manager, MODULE_DOC_SUPPORT, PERM_READ)
-    def support_doc_edit(draft_id: int = None):
+    def support_doc_edit_standart(draft_id: int = None):
         app_menu.render(auth_manager)
         support_doc_standart_view.render_support_standard_page(support_ctrl, person_ctrl, file_manager, auth_manager, draft_id)
 
@@ -188,13 +198,13 @@ def init_nicegui(workflow_obj):
 
     @ui.page('/tasks/today')
     @require_access(auth_manager, MODULE_TASK, PERM_READ)
-    def task_list():
+    def task_list_today():
         app_menu.render(auth_manager)
         task_list_view.render_tasks_today(task_ctrl, auth_manager)
 
     @ui.page('/tasks/all')
     @require_access(auth_manager, MODULE_TASK, PERM_READ)
-    def task_list():
+    def task_list_all():
         app_menu.render(auth_manager)
         task_list_view.render_tasks_all(task_ctrl, auth_manager)
 
@@ -277,4 +287,3 @@ def init_nicegui(workflow_obj):
     # native=False дозволяє працювати як веб-сервер
     # reload=False обов'язково, бо ми в потоці
     ui.run(port=config.UI_PORT, title='A0224 Втікачі', reload=config.UI_RELOAD, show=False, storage_secret=config.UI_SECRET_KEY)
-

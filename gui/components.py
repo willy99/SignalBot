@@ -291,6 +291,8 @@ class AppMenu:
                                 make_menu_item('Чекаємо на ЄРДР', 'pending_actions', '/report_waiting_erdr')
                             if can_report_general_edit:
                                 make_menu_item('РНОКПП!=Дата Народження', 'free_cancellation', '/report_error_birthday')
+                            if can_report_general_edit:
+                                make_menu_item('ЄРДР КРАМ', 'library_books', '/report_erdr_kram')
 
                 # 5. Адмінка
                 if self.auth_manager.has_access(MODULE_ADMIN, PERM_READ):

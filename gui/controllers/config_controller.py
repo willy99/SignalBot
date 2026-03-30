@@ -11,13 +11,12 @@ class ConfigController:
         self.log_manager = workflow.log_manager
         self.logger = self.log_manager.get_logger()
         self.auth_manager = auth_manager
-        self.cfg_service = ConfigService()
+        self.cfg_service = ConfigService(workflow.db)
 
     def get_all_configs(self, ctx: RequestContext) -> List[SysConfig]:
         """Отримує всі налаштування з бази"""
         # 💡 Тут можна додати перевірку: if not ctx.is_admin: raise Exception(...)
         self.logger.debug(f"UI:{ctx.user_name}: Запит системних налаштувань.")
-
         return self.cfg_service.get_all()
 
     def update_config_value(self, ctx: RequestContext, key_name: str, new_value: str) -> bool:
