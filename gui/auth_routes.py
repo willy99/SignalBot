@@ -40,10 +40,9 @@ def create_login_page(auth_manager, user_ctrl, log_manager):
                         if not u or not p: return
 
                         try:
-                            res = await auth_manager.authenticate(u, p)  # Тепер це async через execute
+                            res = await auth_manager.authenticate(u, p)
                             if res and res['status'] == '2fa_required':
                                 state['username'] = u
-                                print(str(res))
                                 temp_ctx = RequestContext(
                                     user_id=res['user'].id,
                                     user_login=res['user'].username,
@@ -62,9 +61,11 @@ def create_login_page(auth_manager, user_ctrl, log_manager):
                                 ui.notify('Введіть код підтвердження', type='info')
 
                             elif res and res['status'] == 'success':
+                                logger.debug('Успішна авторизація ' + str(res['user'].username))
                                 ui.navigate.to('/')
                         except Exception as e:
                             ui.notify(str(e), type='negative')
+                            logger.debug('Провальна авторизація ' + str(username.value))
 
                     ui.button('УВІЙТИ', on_click=try_login).classes('w-full bg-blue-600 text-white')
 
@@ -103,7 +104,7 @@ def refresh_session_method(func):
         ctx: RequestContext = next((a for a in args if isinstance(a, RequestContext)), kwargs.get('ctx'))
 
         if ctx:
-            print(f'>>> [THREAD CHECK] User: {ctx.user_login}, Last seen: {ctx.last_activity_str}')
+            self.logger.info(f'>>> [THREAD CHECK] User: {ctx.user_login}, Last seen: {ctx.last_activity_str}')
 
             # Перевіряємо час із ctx, а не з app.storage
             if time.time() - ctx.last_activity > config.SECURITY_SESSION_TIMEOUT:

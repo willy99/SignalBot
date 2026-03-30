@@ -44,11 +44,9 @@ class BaseDocumentService(Generic[T]):
         if doc_data.get('created_date') and isinstance(doc_data['created_date'], datetime):
             doc_data['created_date'] = doc_data['created_date'].strftime(DB_DATETIME_FORMAT)
 
-        print('>>> id:' + str(getattr(doc, 'id', None)))
         if getattr(doc, 'id', None) is None:
             doc_data['created_by'] = self.ctx.user_id
             doc_data['created_date'] = datetime.now().strftime(DB_DATETIME_FORMAT)
-            print('>>> doc_data:' + str(doc_data))
             return self.db.insert_record(self.table_name, doc_data)
         else:
             doc_data.pop('created_by', None)

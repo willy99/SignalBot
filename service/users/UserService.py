@@ -1,11 +1,5 @@
-# from service.connection.MyDataBase import MyDataBase
 from datetime import datetime
 from typing import Optional
-
-import config
-import smtplib
-from email.mime.text import MIMEText
-
 from domain.user import User
 from service.connection.EmailClient import EmailClient
 from service.connection.MyDataBase import MyDataBase

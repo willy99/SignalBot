@@ -1,6 +1,7 @@
 from nicegui import ui, app
 
-from dics.security_config import PERM_READ, PERM_EDIT
+from dics.security_config import PERM_READ, PERM_EDIT, MODULE_SEARCH, MODULE_ADMIN, MODULE_REPORT_UNITS, MODULE_REPORT_GENERAL, MODULE_DOC_DBR, MODULE_DOC_SUPPORT, \
+    MODULE_DOC_NOTIF, MODULE_TASK
 from gui.components import AppMenu
 from gui.controllers.person_controller import PersonController
 from gui.controllers.report_controller import ReportController
@@ -52,7 +53,7 @@ def init_nicegui(workflow_obj):
     app.add_static_files('/templates', str(templates_form))
     support_templates_dir = current_dir / '../resources/templates'
     doc_templator = DocTemplator(support_templates_dir)
-    auth_manager = AuthManager(workflow_obj.db)
+    auth_manager = AuthManager(workflow_obj)
 
     support_ctrl = SupportController(doc_templator, workflow_obj, auth_manager)
     person_ctrl = PersonController(workflow_obj, auth_manager)
@@ -75,13 +76,13 @@ def init_nicegui(workflow_obj):
 
     # Визначаємо сторінки
     @ui.page('/search')
-    @require_access(auth_manager, 'search', PERM_READ)  # Наприклад, головна - це пошук
+    @require_access(auth_manager, MODULE_SEARCH, PERM_READ)  # Наприклад, головна - це пошук
     def search():
         app_menu.render(auth_manager)
         search_view.search_page(person_ctrl, auth_manager)
 
     @ui.page('/batch_search')
-    @require_access(auth_manager, 'search', PERM_READ)  # Наприклад, головна - це пошук
+    @require_access(auth_manager, MODULE_SEARCH, PERM_READ)  # Наприклад, головна - це пошук
     def batch_search():
         app_menu.render(auth_manager)
         batch_search_view.render_bulk_search_page(person_ctrl, auth_manager)
@@ -89,131 +90,131 @@ def init_nicegui(workflow_obj):
 
 
     @ui.page('/report_units')
-    @require_access(auth_manager, 'report_units', PERM_READ)
+    @require_access(auth_manager, MODULE_REPORT_UNITS, PERM_READ)
     def report_units():
         app_menu.render(auth_manager)
         subunits_report_view.search_page(report_ctrl, person_ctrl, auth_manager)
 
     @ui.page('/report_yearly')
-    @require_access(auth_manager, 'report_general', PERM_READ)
+    @require_access(auth_manager, MODULE_REPORT_GENERAL, PERM_READ)
     def report_yearly():
         app_menu.render(auth_manager)
         yearly_report_view.render_yearly_report_page(report_ctrl, auth_manager)
 
     @ui.page('/report_general_state')
-    @require_access(auth_manager, 'report_general', PERM_READ)
+    @require_access(auth_manager, MODULE_REPORT_GENERAL, PERM_READ)
     def report_yearly():
         app_menu.render(auth_manager)
         general_state_report.render_place_report_page(report_ctrl, person_ctrl, auth_manager)
 
     @ui.page('/report_name_dups')
-    @require_access(auth_manager, 'report_general', PERM_READ)
+    @require_access(auth_manager, MODULE_REPORT_GENERAL, PERM_READ)
     def report_name_dups():
         app_menu.render(auth_manager)
         dups_report_view.render_duplicates_report_page(report_ctrl, auth_manager)
 
     @ui.page('/report_error_birthday')
-    @require_access(auth_manager, 'report_general', PERM_READ)
+    @require_access(auth_manager, MODULE_REPORT_GENERAL, PERM_READ)
     def report_error_birthday():
         app_menu.render(auth_manager)
         error_birthday_report_view.render_inn_mismatch_page(report_ctrl, person_ctrl, auth_manager)
 
 
     @ui.page('/report_waiting_erdr')
-    @require_access(auth_manager, 'report_general', PERM_READ)
+    @require_access(auth_manager, MODULE_REPORT_GENERAL, PERM_READ)
     def report_waiting_for_erdr_report_view():
         app_menu.render(auth_manager)
         waiting_for_erdr_report_view.render_dbr_details_report_page(report_ctrl, person_ctrl, auth_manager)
 
     @ui.page('/report_daily')
-    @require_access(auth_manager, 'report_general', PERM_READ)
+    @require_access(auth_manager, MODULE_REPORT_GENERAL, PERM_READ)
     def report_daily():
         app_menu.render(auth_manager)
         daily_report_view.render_daily_report_page(report_ctrl, task_ctrl, person_ctrl, auth_manager)
 
     @ui.page('/doc_dbr')
-    @require_access(auth_manager, 'doc_dbr', PERM_READ)
+    @require_access(auth_manager, MODULE_DOC_DBR, PERM_READ)
     def doc_dbr_list():
         app_menu.render(auth_manager)
         dbr_doc_list_view.render_dbr_drafts_list_page(dbr_ctrl, auth_manager)
 
     @ui.page('/doc_dbr/create')
     @ui.page('/doc_dbr/edit/{draft_id}')
-    @require_access(auth_manager, 'doc_dbr', PERM_READ)
+    @require_access(auth_manager, MODULE_DOC_DBR, PERM_READ)
     def doc_dbr_edit(draft_id: int = None):
         app_menu.render(auth_manager)
         dbr_doc_edit_view.render_dbr_page(dbr_ctrl, person_ctrl, file_manager, auth_manager, draft_id)
 
 
     @ui.page('/doc_support')
-    @require_access(auth_manager, 'doc_support', PERM_READ)
+    @require_access(auth_manager, MODULE_DOC_SUPPORT, PERM_READ)
     def support_doc_list():
         app_menu.render(auth_manager)
         support_doc_list_view.render_drafts_list_page(support_ctrl, auth_manager)
 
     @ui.page('/doc_support/d_create')
     @ui.page('/doc_support/d_edit/{draft_id}')
-    @require_access(auth_manager, 'doc_support', PERM_READ)
+    @require_access(auth_manager, MODULE_DOC_SUPPORT, PERM_READ)
     def support_doc_edit(draft_id: int = None):
         app_menu.render(auth_manager)
         support_doc_detailed_view.render_document_page(support_ctrl, person_ctrl, file_manager, auth_manager, draft_id)
 
     @ui.page('/doc_support/s_create')
     @ui.page('/doc_support/s_edit/{draft_id}')
-    @require_access(auth_manager, 'doc_support', PERM_READ)
+    @require_access(auth_manager, MODULE_DOC_SUPPORT, PERM_READ)
     def support_doc_edit(draft_id: int = None):
         app_menu.render(auth_manager)
         support_doc_standart_view.render_support_standard_page(support_ctrl, person_ctrl, file_manager, auth_manager, draft_id)
 
     @ui.page('/doc_notif')
-    @require_access(auth_manager, 'doc_notif', PERM_READ)
+    @require_access(auth_manager, MODULE_DOC_NOTIF, PERM_READ)
     def notif_doc_list():
         app_menu.render(auth_manager)
         notif_doc_list_view.render_notif_drafts_list_page(notif_ctrl, auth_manager)
 
     @ui.page('/doc_notif/create')
     @ui.page('/doc_notif/edit/{draft_id}')
-    @require_access(auth_manager, 'doc_notif', PERM_READ)
+    @require_access(auth_manager, MODULE_DOC_NOTIF, PERM_READ)
     def notif_doc_edit(draft_id: int = None):
         app_menu.render(auth_manager)
         notif_doc_edit_view.render_notif_page(notif_ctrl, person_ctrl, auth_manager, draft_id)
 
 
     @ui.page('/tasks')
-    @require_access(auth_manager, 'task', PERM_READ)
+    @require_access(auth_manager, MODULE_TASK, PERM_READ)
     def task_list():
         app_menu.render(auth_manager)
         task_list_view.render_task_list_page(task_ctrl, auth_manager)
 
     @ui.page('/tasks/today')
-    @require_access(auth_manager, 'task', PERM_READ)
+    @require_access(auth_manager, MODULE_TASK, PERM_READ)
     def task_list():
         app_menu.render(auth_manager)
         task_list_view.render_tasks_today(task_ctrl, auth_manager)
 
     @ui.page('/tasks/all')
-    @require_access(auth_manager, 'task', PERM_READ)
+    @require_access(auth_manager, MODULE_TASK, PERM_READ)
     def task_list():
         app_menu.render(auth_manager)
         task_list_view.render_tasks_all(task_ctrl, auth_manager)
 
 
     @ui.page('/tasks/edit/{task_id}')
-    @require_access(auth_manager, 'task', PERM_EDIT)
+    @require_access(auth_manager, MODULE_TASK, PERM_EDIT)
     def edit_task_page(task_id: str = 'new'):
         actual_id = None if task_id == 'new' else int(task_id)
         app_menu.render(auth_manager)
         task_edit_view.render_task_edit_page(task_ctrl, auth_manager, actual_id)
 
     @ui.page('/inbox')
-    @require_access(auth_manager, 'task', PERM_READ)
+    @require_access(auth_manager, MODULE_TASK, PERM_READ)
     def inbox_page():
         ctx = auth_manager.get_current_context()
         app_menu.render(auth_manager)
         inbox_triage_view.render_inbox_page(inbox_ctrl, task_ctrl, person_ctrl, auth_manager)
 
     @ui.page('/calendar')
-    @require_access(auth_manager, 'task', PERM_READ)
+    @require_access(auth_manager, MODULE_TASK, PERM_READ)
     def calendar_general():
         ctx = auth_manager.get_current_context()
         app_menu.render(auth_manager)
@@ -223,13 +224,13 @@ def init_nicegui(workflow_obj):
     # Доступ ТІЛЬКИ для адмінів!
 
     @ui.page('/admin/settings')
-    @require_access(auth_manager, 'admin_panel', PERM_EDIT)
+    @require_access(auth_manager, MODULE_ADMIN, PERM_EDIT)
     def settings_doc():
         app_menu.render(auth_manager)
         render_settings_page(config_ctrl, auth_manager)
 
     @ui.page('/logs')
-    @require_access(auth_manager, 'admin_panel', PERM_READ)
+    @require_access(auth_manager, MODULE_ADMIN, PERM_READ)
     def system_logs():
         app_menu.render(auth_manager)
         log_dir = "logs"
@@ -237,37 +238,37 @@ def init_nicegui(workflow_obj):
         render_logs_page(log_file)
 
     @ui.page('/admin/permissions')
-    @require_access(auth_manager, 'admin_panel', PERM_EDIT)
+    @require_access(auth_manager, MODULE_ADMIN, PERM_EDIT)
     def admin_permissions_route():
         app_menu.render(auth_manager)
         render_permissions_page(auth_manager)
 
     @ui.page('/admin/users')
-    @require_access(auth_manager, 'admin_panel', PERM_EDIT)  # Доступ ТІЛЬКИ для адмінів!
+    @require_access(auth_manager, MODULE_ADMIN, PERM_EDIT)  # Доступ ТІЛЬКИ для адмінів!
     def admin_users_route():
         app_menu.render(auth_manager)
         render_users_page(auth_manager)
 
     @ui.page('/admin/file_index')
-    @require_access(auth_manager,'admin_panel', PERM_EDIT)
+    @require_access(auth_manager, MODULE_ADMIN, PERM_EDIT)
     async def admin_file_index():
         app_menu.render(auth_manager)
         await render_indexing_page(file_manager, auth_manager)
 
     @ui.page('/user_settings_2fa')
-    @require_access(auth_manager,'admin_panel', PERM_EDIT)
+    @require_access(auth_manager,MODULE_SEARCH, PERM_READ)
     async def user_settings_2fa():
         app_menu.render(auth_manager)
         render_user_settings_2fa(user_ctrl, auth_manager)
 
     @ui.page('/user_settings')
-    @require_access(auth_manager,'admin_panel', PERM_EDIT)
+    @require_access(auth_manager,MODULE_SEARCH, PERM_READ)
     async def user_settings():
         app_menu.render(auth_manager)
         render_profile_settings(user_ctrl, auth_manager)
 
     @ui.page('/doc_files')
-    @require_access(auth_manager, 'search', PERM_READ)
+    @require_access(auth_manager, MODULE_SEARCH, PERM_READ)
     def file_search_route():
         app_menu.render(auth_manager)
         render_file_search_page(file_manager, auth_manager)

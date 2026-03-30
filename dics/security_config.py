@@ -18,7 +18,7 @@ MODULE_REPORT_GENERAL:Final[str] = 'report_general'
 MODULE_ADMIN:Final[str] = 'admin_panel'
 
 AVAILABLE_MODULES:Final[dict[str, str]] = {
-    MODULE_SEARCH: 'Пошук (Головна)',
+    MODULE_SEARCH: 'Загальний доступ',
     MODULE_PERSON: 'База СЗЧ',
     MODULE_TASK: 'Менеджер задач',
     MODULE_DOC_SUPPORT: 'Документація: Супроводи',

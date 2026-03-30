@@ -1,7 +1,7 @@
 from typing import Optional, Tuple, Dict, List
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from dics.security_config import PERM_READ, PERM_EDIT, PERM_DELETE
+from dics.security_config import PERM_READ, PERM_EDIT, PERM_DELETE, MODULE_ADMIN, MODULE_SEARCH, MODULE_PERSON
 from domain.user import User
 import uuid
 from datetime import datetime, timedelta
@@ -139,7 +139,7 @@ class AuthService:
             self.create_user('admin', 'admin123', 'admin', 'Адміністратор')
 
             # Надаємо максимальні права на існуючі модулі
-            modules = ['search', 'erdr', 'support_doc', 'admin_panel']
+            modules = [MODULE_SEARCH, MODULE_PERSON, MODULE_ADMIN]
             for mod in modules:
                 self.set_permissions('admin', mod, can_read=1, can_write=1, can_delete=1)
 

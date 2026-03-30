@@ -31,6 +31,7 @@ class NotifController:
 
     def save_doc(self, ctx: RequestContext, region: str, out_number: str, out_date: str, payload: list,
                  doc_id: int = None) -> int:
+        self.logger.debug('UI:' + ctx.user_name + ': Зберігаємо повідомлення: ' + str(region) + ', number:' + out_number)
         service = NotifService(self.db, ctx)
 
         doc_model = NotifDoc(
@@ -44,7 +45,7 @@ class NotifController:
         return service.save_doc(doc_model)
 
     def delete_doc(self, ctx: RequestContext, doc_id: int):
-        self.logger.debug('UI:' + ctx.user_name + ': Видаляємо пакет супроводів: ' + str(doc_id))
+        self.logger.debug('UI:' + ctx.user_name + ': Видаляємо пакет повідомлень: ' + str(doc_id))
         dservice = NotifService(self.db, ctx)
         return dservice.delete_doc(doc_id)
 
@@ -56,7 +57,7 @@ class NotifController:
         return None
 
     def generate_document(self, ctx: RequestContext, region: str, out_number: str, out_date: str, buffer_data: list) -> tuple[bytes, str]:
-        self.logger.debug('UI:' + ctx.user_name + ': Генеруємо доповідь: ' + str(region) + ', number:' + out_number + ':' + str(buffer_data))
+        self.logger.debug('UI:' + ctx.user_name + ': Генеруємо документ повідомлень: ' + str(region) + ', number:' + out_number + ':' + str(buffer_data))
 
         if not buffer_data:
             raise ValueError("Буфер порожній. Додайте хоча б один запис.")
@@ -78,7 +79,7 @@ class NotifController:
 
     def mark_as_completed(self, ctx: RequestContext, doc_id: int, payload: list, out_number: str, out_date: str, person_controller=None) -> bool:
 
-        self.logger.debug(f'UI:{ctx.user_name}: Помічаємо комплект документів як COMPLETED: {doc_id}')
+        self.logger.debug(f'UI:{ctx.user_name}: Помічаємо комплект повідомлень як COMPLETED: {doc_id}')
 
         draft = self.get_doc_by_id(ctx, doc_id)
         if not draft:

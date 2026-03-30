@@ -10,7 +10,6 @@ import config
 from service.processing.MyWorkFlow import MyWorkFlow
 from service.users.UserService import UserService
 
-
 class UserController:
     def __init__(self, workflow: MyWorkFlow, auth_manager: AuthManager):
         self.db = workflow.db
@@ -20,7 +19,7 @@ class UserController:
 
     def request_verification(self, ctx: RequestContext, contact_info: str, contact_type: str):
         """Етап 1: Працює в окремому потоці (через io_bound)"""
-        print('>>> request_verification ' + str(contact_info) + ' / ' + str(contact_type))
+        self.logger.debug('>>> Запрос на верифікацію: ' + str(contact_info) + ' / ' + str(contact_type))
 
         pending = self.user_service.get_pending_info(ctx.user_id)
         now = datetime.now()
@@ -38,7 +37,6 @@ class UserController:
                     raise ValueError("Зачекайте хвилину перед наступною спробою")
 
                 code = pending['code']
-                print(f">>> Re-sending existing code: {code}")
             else:
                 # Якщо старий код прострочений — генеруємо новий
                 code = ''.join(random.choices(string.digits, k=6))
@@ -57,13 +55,14 @@ class UserController:
                 self.user_service.send_message(contact_info, f"Ваш код підтвердження: {code}")
             return True
         except Exception as e:
-            self.logger.error(f"Failed to send verification code: {e}")
+            self.logger.error(f"Помилка при відправці повідомлення: {e}")
             raise ValueError("Помилка при відправці повідомлення")
 
     def confirm_verification(self, ctx: RequestContext, entered_code: str):
         # 1. Перевіряємо, чи юзер вже не заблокований (на всяк випадок)
         user = self.user_service.get_user_by_id(ctx.user_id)
         if user.lockout_until and datetime.now() < datetime.fromisoformat(user.lockout_until):
+            self.logger.error(f"Акаунт тимчасово заблоковано до {user.lockout_until}")
             raise ValueError(f"Акаунт тимчасово заблоковано до {user.lockout_until}")
 
         pending = self.user_service.get_pending_info(ctx.user_id)
@@ -107,7 +106,7 @@ class UserController:
         """Метод, який викликається кнопкою 'Зберегти'."""
         # Можна додати додаткову валідацію тут
         if len(full_name) > 100:
-            raise ValueError("ПІБ занадто довге")
+            raise ValueError("ПІБ занадто довге. До 100 символів, без фанатизму!")
 
         # Якщо користувач намагається ввімкнути 2FA, перевіряємо ще раз, чи є куди слати код
         if use_2fa:

@@ -3,6 +3,9 @@ from contextlib import closing
 import config
 import os
 
+from service.constants import DB_ALLOWED_TABLES
+
+
 class MyDataBase:
     def __init__(self, db_name=config.DB_NAME):
         self.db_name = db_name
@@ -71,6 +74,8 @@ class MyDataBase:
             return []
 
     def insert_record(self, table: str, data: dict) -> int:
+        if table not in DB_ALLOWED_TABLES:
+            raise ValueError(f"Unknown table: {table}")
         columns = ', '.join(data.keys())
         placeholders = ', '.join(['?'] * len(data))
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
@@ -80,6 +85,8 @@ class MyDataBase:
         """Масовий запис списку словників (для оптимізації)."""
         if not data_list:
             return True
+        if table not in DB_ALLOWED_TABLES:
+            raise ValueError(f"Unknown table: {table}")
 
         columns = ', '.join(data_list[0].keys())
         placeholders = ', '.join(['?'] * len(data_list[0]))
@@ -99,6 +106,9 @@ class MyDataBase:
             return False
 
     def update_record(self, table: str, record_id: int, data: dict):
+        if table not in DB_ALLOWED_TABLES:
+            raise ValueError(f"Unknown table: {table}")
+
         set_clause = ', '.join([f"{k} = ?" for k in data.keys()])
         query = f"UPDATE {table} SET {set_clause} WHERE id = ?"
 
@@ -107,12 +117,18 @@ class MyDataBase:
         return record_id
 
     def delete_record(self, table: str, record_id: int):
+        if table not in DB_ALLOWED_TABLES:
+            raise ValueError(f"Unknown table: {table}")
+
         query = f"DELETE FROM {table} WHERE id = ?"
         self.__execute_query__(query, (record_id,))
         return True
 
     def delete_children(self, table: str, field: str, value):
         """Універсальне видалення записів за вказаним полем (наприклад, task_id)."""
+        if table not in DB_ALLOWED_TABLES:
+            raise ValueError(f"Unknown table: {table}")
+
         query = f"DELETE FROM {table} WHERE {field} = ?"
         self.__execute_query__(query, (value,))
         return True

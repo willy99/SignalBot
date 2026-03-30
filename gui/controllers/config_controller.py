@@ -8,7 +8,6 @@ from service.storage.LoggerManager import LoggerManager
 
 class ConfigController:
     def __init__(self, workflow: MyWorkFlow, auth_manager: AuthManager):
-        # self.config_service = config_service
         self.log_manager = workflow.log_manager
         self.logger = self.log_manager.get_logger()
         self.auth_manager = auth_manager

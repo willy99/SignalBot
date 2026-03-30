@@ -1,6 +1,7 @@
 from nicegui import ui
 
-from dics.security_config import PERM_READ, PERM_EDIT
+from dics.security_config import PERM_READ, PERM_EDIT, MODULE_PERSON, MODULE_SEARCH, MODULE_DOC_NOTIF, MODULE_DOC_SUPPORT, MODULE_DOC_DBR, MODULE_TASK, MODULE_REPORT_UNITS, \
+    MODULE_REPORT_GENERAL, MODULE_ADMIN
 from gui.auth_routes import logout
 
 
@@ -19,7 +20,7 @@ def create_nav_card(title: str, description: str, icon_name: str, route: str, co
 
 def render_home_page(auth_manager):
     # menu(auth_manager) # Розкоментуйте, якщо головна сторінка також містить верхнє меню
-    can_search = auth_manager.has_access('search', PERM_READ)
+    can_search = auth_manager.has_access(MODULE_SEARCH, PERM_READ)
     if not can_search:
         logout(auth_manager)
 
@@ -31,46 +32,46 @@ def render_home_page(auth_manager):
         with ui.grid().classes(grid_classes):
 
             # --- ПОШУК ТА ДАНІ ---
-            if auth_manager.has_access('person', PERM_READ):
+            if auth_manager.has_access(MODULE_PERSON, PERM_READ):
                 create_nav_card('Пошук О/С', 'Глобальний пошук по базі військовослужбовців', 'search', '/search', 'blue')
-            if auth_manager.has_access('search', PERM_READ):
+            if auth_manager.has_access(MODULE_SEARCH, PERM_READ):
                 create_nav_card('Пошук Документів', 'Файловий пошук довідок по папцям в мережі', 'find_in_page', '/doc_files', 'blue')
-            if auth_manager.has_access('search', PERM_READ) and auth_manager.has_access('person', PERM_READ):
+            if auth_manager.has_access(MODULE_SEARCH, PERM_READ) and auth_manager.has_access('person', PERM_READ):
                 create_nav_card('Батч Пошук', 'Глобальний батч-пошук по списку прізвищ', 'manage_search', '/batch_search', 'blue')
 
         with ui.grid().classes(grid_classes):
             # --- ДОКУМЕНТООБІГ ---
-            if auth_manager.has_access('doc_notif', PERM_READ):
+            if auth_manager.has_access(MODULE_DOC_NOTIF, PERM_READ):
                 create_nav_card('Повідомлення', 'Формування повідомлень та витягів', 'description', '/doc_notif', 'green')
-            if auth_manager.has_access('doc_support', PERM_READ):
+            if auth_manager.has_access(MODULE_DOC_SUPPORT, PERM_READ):
                 create_nav_card('Супровідні листи', 'Масова генерація пакетів супровідних документів', 'mark_email_unread', '/doc_support', 'green')
-            if auth_manager.has_access('doc_dbr', PERM_READ):
+            if auth_manager.has_access(MODULE_DOC_DBR, PERM_READ):
                 create_nav_card('На ДБР', 'Відправка справ на ДБР і очікування ЄРДР', 'gavel', '/doc_dbr', 'orange')
 
         with ui.grid().classes(grid_classes):
-            if auth_manager.has_access('task', PERM_READ):
+            if auth_manager.has_access(MODULE_TASK, PERM_READ):
                 create_nav_card('Задачі', 'Щоденні, щомісячні та беклог', 'checklist_rtl', '/tasks', 'yellow')
                 create_nav_card('Inbox', 'Керування файлами в inbox', 'forward_to_inbox', '/inbox', 'yellow')
                 create_nav_card('Календар', 'Розклад задач на місяць', 'calendar_month', '/calendar', 'yellow')
 
         with ui.grid().classes(grid_classes):
             # --- АНАЛІТИКА ---
-            if auth_manager.has_access('report_units', PERM_READ):
+            if auth_manager.has_access(MODULE_REPORT_UNITS, PERM_READ):
                 create_nav_card('Щоденний звіт', 'Детальна статистика СЗЧ та повернень за день', 'event_available', '/report_daily', 'purple')
                 create_nav_card('Звіт по рокам', 'Статистика СЗЧ, загальна по роках', 'calendar_today', '/report_yearly', 'purple')
                 create_nav_card('По підрозділам', 'Статистика СЗЧ по підрозділах (Додаток 2)', 'bar_chart', '/report_units', 'purple')
                 create_nav_card('Чєкаємо на ЄРДР', 'Статистика по тим, хто чекає на ЄРДР', 'pending_actions', '/report_waiting_erdr', 'purple')
-            if auth_manager.has_access('report_general', PERM_READ):
+            if auth_manager.has_access(MODULE_REPORT_GENERAL, PERM_READ):
                 create_nav_card('Загальний стан', 'Стан справ, закриті, призначені та інш. ', 'fact_check', '/report_general_state', 'purple')
 
         with ui.grid().classes(grid_classes):
 
             # --- СИСТЕМА ---
-            if auth_manager.has_access('admin_panel', PERM_READ):
+            if auth_manager.has_access(MODULE_ADMIN, PERM_READ):
                 create_nav_card('Користувачі', 'Користувачі та їх ролі', 'supervisor_account', '/admin/users', 'slate')
                 create_nav_card('Доступи', 'Права доступу до модулів системи', 'admin_panel_settings', '/admin/permissions', 'slate')
                 create_nav_card('Системні логи', 'Живий моніторинг роботи системи', 'terminal', '/logs', 'slate')
-            if auth_manager.has_access('admin_panel', PERM_EDIT):
+            if auth_manager.has_access(MODULE_ADMIN, PERM_EDIT):
                 create_nav_card('Індексація файлів', 'Просто подивись на ті графічки!', 'cached', '/admin/file_index', 'slate')
                 create_nav_card('Налаштування', 'Глобальні параметри системи', 'settings', '/admin/settings', 'slate')
 

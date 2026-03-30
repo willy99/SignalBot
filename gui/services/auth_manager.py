@@ -3,6 +3,7 @@ from domain.user import User
 from werkzeug.security import generate_password_hash
 from gui.services.request_context import RequestContext
 from dics.security_config import PERM_READ
+from service.processing.MyWorkFlow import MyWorkFlow
 from service.users.AuthService import AuthService
 import time
 from datetime import datetime
@@ -10,10 +11,11 @@ import config
 from nicegui import app, run
 
 class AuthManager:
-    def __init__(self, db):
-        self.db = db
+    def __init__(self, workflow:MyWorkFlow):
+        self.db = workflow.db
         self.auth_service = AuthService(self.db)
         self.auth_service.init_default_admin()
+        self.logger = workflow.log_manager.get_logger()
 
     def create_user(self, username: str, password: str, role: str, full_name: str):
         if self.get_user(username):
@@ -66,26 +68,6 @@ class AuthManager:
         app.storage.user.update(session_data)
         return {"status": "success", "user": user}
 
-    '''
-    def authenticate(self, username: str, password: str) -> Optional[User]:
-        user:User = self.auth_service.authenticate(username, password)
-        if user:
-            app.storage.user.update({
-                'authenticated': True,
-                'user_id': user.id,
-                'user_info': {
-                    'username': user.username,
-                    'role': user.role,
-                    'full_name': user.full_name,
-                    'id': user.id,
-                    'session_token': user.session_token
-                },
-                'last_activity': time.time() # Початок відліку сесії
-            })
-
-        return user
-    '''
-
     def check_session(self, ctx: RequestContext) -> bool:
         """Перевірка, чи не застаріла сесія."""
         if not app.storage.user.get('authenticated'):
@@ -97,7 +79,7 @@ class AuthManager:
         user_info = app.storage.user.get('user_info', {})
         client_token = user_info.get('session_token')
 
-        time_str = datetime.fromtimestamp(last_activity).strftime('%H:%M:%S')
+        # time_str = datetime.fromtimestamp(last_activity).strftime('%H:%M:%S')
         # print(f'>>> check sessions (formatted): {time_str}')
 
         if time.time() - last_activity > config.SECURITY_SESSION_TIMEOUT:
@@ -114,7 +96,7 @@ class AuthManager:
         user = self.auth_service.get_user_by_username(user_info.get('username'))
 
         if not user or user.session_token != client_token:
-            # self.logger.warning(f"SECURITY ALERT: Token mismatch for user {user.username}!")
+            self.logger.warning(f"SECURITY ALERT: Token mismatch for user {user.username}!")
             self.logout()  # Токени не збігаються — негайний вихід
             return False
 

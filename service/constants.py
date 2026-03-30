@@ -11,6 +11,9 @@ DB_TABLE_DBR_DOC: Final[str] = 'dbr_docs'
 DB_TABLE_NOTIF_DOC: Final[str] = 'notif_docs'
 DB_TABLE_TASK: Final[str] = 'task'
 DB_TABLE_SUBTASK: Final[str] = 'subtask'
+DB_TABLE_USER:Final[str] = 'users'
+DB_TABLE_ROLE_PERMISSIONS:Final[str] = 'role_permissions'
+DB_ALLOWED_TABLES:Final[list[str]] = [DB_TABLE_SUPPORT_DOC, DB_TABLE_DBR_DOC, DB_TABLE_NOTIF_DOC, DB_TABLE_TASK, DB_TABLE_SUBTASK, DB_TABLE_USER, DB_TABLE_ROLE_PERMISSIONS]
 
 DOC_STATUS_DRAFT: Final[str] = 'Draft'
 DOC_STATUS_COMPLETED: Final[str] = 'Completed'

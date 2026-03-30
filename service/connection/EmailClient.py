@@ -25,12 +25,9 @@ class EmailClient:
         try:
             # Використовуємо SMTP_SSL для безпечного з'єднання
             with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port) as server:
-                print(str(self.sender_email))
-                print(str(self.sender_password))
                 server.login(self.sender_email, self.sender_password)
                 server.send_message(msg)
 
-            print(f">>> Email успішно надіслано на {receiver_email}")
             return True
 
         except smtplib.SMTPAuthenticationError:
