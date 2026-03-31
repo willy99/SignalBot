@@ -112,7 +112,7 @@ class AppMenu:
                             if not app.storage.user.get('authenticated'):
                                 return  # Виходимо, якщо юзер не ввійшов
                             # Викликаємо контролер через self.inbox_ctrl
-                            inbox_data = await auth_manager.execute(self.inbox_ctrl.get_user_inbox_messages, auth_manager.get_current_context())
+                            inbox_data = await run.io_bound(self.inbox_ctrl.get_user_inbox_messages, auth_manager.get_current_context())
                             if inbox_data is None:
                                 return
                             # inbox_data = {'personal_files': [], 'root_files':[]}
@@ -168,7 +168,7 @@ class AppMenu:
                             if not auth_manager.get_current_context() or not auth_manager.get_current_context().user_id:
                                 return
 
-                            new_count, prog_count = await auth_manager.execute(self.task_ctrl.get_my_task_counts, auth_manager.get_current_context())
+                            new_count, prog_count = await run.io_bound(self.task_ctrl.get_my_task_counts, auth_manager.get_current_context())
                             if new_count is None:
                                 return
 
@@ -192,7 +192,7 @@ class AppMenu:
                             # ==========================================
                             # 2. ЛОГІКА БУДИЛЬНИКА (ALARM)
                             # ==========================================
-                            alarms = await auth_manager.execute(self.task_ctrl.get_my_alarms, auth_manager.get_current_context())
+                            alarms = await run.io_bound(self.task_ctrl.get_my_alarms, auth_manager.get_current_context())
 
                             for alarm in alarms:
                                 task_id = alarm['id']

@@ -46,6 +46,11 @@ class ConfigService:
         SysConfig(key_name='EXCEL_BLUE_COLOR',          category='Excel', value='BDD7EE',  value_type='str', description='Колір (HEX) для відправок на ДБР',   validation_rule='regex:^[0-9A-Fa-f]{6}$'),
         SysConfig(key_name='EXCEL_SUPPORT_COLOR',       category='Excel', value='E8FFFE',  value_type='str', description='Колір (HEX) для супроводів',         validation_rule='regex:^[0-9A-Fa-f]{6}$'),
 
+        # Безпека
+        SysConfig(key_name='SECURITY_SESSION_TIMEOUT',       category='Безпека', value='3600',  value_type='int', description='Час життя сесії (сек). 3600 = 1 година',               validation_rule='min:300|max:86400'),
+        SysConfig(key_name='SECURITY_MAX_ATTEMPTS',          category='Безпека', value='5',     value_type='int', description='Макс. кількість невдалих спроб входу до блокування',    validation_rule='min:3|max:20'),
+        SysConfig(key_name='SECURITY_LOCKOUT_DURATION_MINS', category='Безпека', value='15',    value_type='int', description='Тривалість блокування акаунту (хвилини)',               validation_rule='min:5|max:120'),
+
         # UI
         SysConfig(key_name='UI_DATE_FORMAT',    category='UI', value='DD.MM.YYYY', value_type='str', description='Формат дат для відображення в UI'),
         SysConfig(key_name='MAX_QUERY_RESULTS', category='UI', value='50',         value_type='int', description='Обмеження кількості записів без пейджеру', validation_rule='min:5|max:500'),

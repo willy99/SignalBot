@@ -99,6 +99,10 @@ class AuthManager:
         user_info = app.storage.user.get('user_info', {})
         client_token = user_info.get('session_token')
 
+        # time_str = datetime.fromtimestamp(last_activity).strftime('%H:%M:%S')
+        # print(f'>>> check sessions (formatted): {time_str}')
+        # print(f'>>> diff: {str(time.time() - last_activity)})')
+
         if time.time() - last_activity > config.SECURITY_SESSION_TIMEOUT:
             self.logout()
             return False
@@ -148,14 +152,17 @@ class AuthManager:
         Перехоплений токен стає недійсним одразу після logout,
         а не лише після закінчення таймауту.
         """
+
         user_info = app.storage.user.get('user_info', {})
         user_id = user_info.get('id')
+        self.logger.debug('>>> Logout ' + user_info.get('username'))
         if user_id:
             try:
                 self.auth_service.invalidate_session_token(user_id)
             except Exception as e:
                 self.logger.warning(f"Не вдалося інвалідувати токен для user_id={user_id}: {e}")
         app.storage.user.clear()
+
 
     def has_access(self, module_name: str, action: str = PERM_READ) -> bool:
         from nicegui import app
