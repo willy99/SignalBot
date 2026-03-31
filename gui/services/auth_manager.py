@@ -143,7 +143,18 @@ class AuthManager:
             raise e
 
     def logout(self):
-        """Очищення даних сесії."""
+        """
+        Інвалідує session_token у БД і очищує локальну сесію.
+        Перехоплений токен стає недійсним одразу після logout,
+        а не лише після закінчення таймауту.
+        """
+        user_info = app.storage.user.get('user_info', {})
+        user_id = user_info.get('id')
+        if user_id:
+            try:
+                self.auth_service.invalidate_session_token(user_id)
+            except Exception as e:
+                self.logger.warning(f"Не вдалося інвалідувати токен для user_id={user_id}: {e}")
         app.storage.user.clear()
 
     def has_access(self, module_name: str, action: str = PERM_READ) -> bool:

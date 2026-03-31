@@ -5,11 +5,44 @@ from gui.controllers.inbox_controller import InboxController
 from gui.controllers.task_controller import TaskController
 from gui.services.auth_manager import AuthManager
 import config
+import os
+import re
 from gui.tools.ui_components import confirm_delete_dialog
 from service.processing.parsers.ParserFactory import ParserFactory
 from domain.person import Person
 from gui.controllers.person_controller import PersonController
 from gui.views.person.person_view import edit_person
+
+# Дозволені розширення файлів для завантаження
+_ALLOWED_EXTENSIONS = {'.doc', '.docx', '.pdf', '.txt', '.jpg', '.jpeg', '.png', '.xlsx', '.xls'}
+
+def _safe_filename(name: str) -> str:
+    """
+    Захист від Path Traversal:
+    1. Відкидає будь-який шлях — залишає тільки ім'я файлу (os.path.basename).
+    2. Видаляє символи поза межами безпечного набору.
+    3. Перевіряє розширення по allowlist.
+    Повертає очищене ім'я або кидає ValueError.
+    """
+    # Крок 1: basename відрізає /../../../ та будь-який шлях
+    name = os.path.basename(name)
+
+    # Крок 2: нормалізуємо — залишаємо лише букви, цифри, крапку, дефіс, підкреслення, пробіл
+    name = re.sub(r'[^\w.\- ]', '_', name, flags=re.UNICODE)
+    name = name.strip()
+
+    if not name:
+        raise ValueError("Ім'я файлу не може бути порожнім")
+
+    # Крок 3: перевірка розширення
+    ext = os.path.splitext(name)[1].lower()
+    if ext not in _ALLOWED_EXTENSIONS:
+        raise ValueError(
+            f"Тип файлу '{ext}' не дозволений. "
+            f"Дозволено: {', '.join(sorted(_ALLOWED_EXTENSIONS))}"
+        )
+
+    return name
 
 def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, person_ctrl:PersonController, auth_manager:AuthManager):
     can_assign = auth_manager.has_access('task', PERM_DELETE)
@@ -109,12 +142,15 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
 
     async def handle_upload(e: events.UploadEventArguments):
         try:
-            filename = e.file.name
+            # Захист від Path Traversal: санітизуємо ім'я файлу до будь-яких операцій
+            filename = _safe_filename(e.file.name)
             file_data = await e.file.read()
             await auth_manager.execute(inbox_ctrl.upload_root_file, auth_manager.get_current_context(), filename, file_data)
             ui.notify(f'Файл "{filename}" завантажено!', type='positive')
             e.sender.reset()
             await load_data()
+        except ValueError as ex:
+            ui.notify(f'Файл відхилено: {ex}', type='warning')
         except Exception as ex:
             ui.notify(f'Помилка завантаження: {ex}', type='negative')
 
@@ -159,12 +195,16 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
 
     async def load_file_content(filename: str, f_type: str):
         try:
+            # Другий рубіж захисту: санітизуємо ім'я навіть при перегляді з серверного списку
+            safe_name = os.path.basename(filename)
             if f_type == 'inbox_personal':
-                file_path = f"{config.INBOX_LOCAL_DIR_PATH}/{auth_manager.get_current_context().user_login}/{filename}"
+                file_path = os.path.join(config.INBOX_LOCAL_DIR_PATH,
+                                         auth_manager.get_current_context().user_login, safe_name)
             elif f_type == 'outbox_personal':
-                file_path = f"{config.OUTBOX_LOCAL_DIR_PATH}/{auth_manager.get_current_context().user_login}/{filename}"
+                file_path = os.path.join(config.OUTBOX_LOCAL_DIR_PATH,
+                                         auth_manager.get_current_context().user_login, safe_name)
             else:
-                file_path = f"{config.INBOX_LOCAL_DIR_PATH}/{filename}"
+                file_path = os.path.join(config.INBOX_LOCAL_DIR_PATH, safe_name)
 
             def extract(ctx):
                 engine = ParserFactory.get_parser(file_path, inbox_ctrl.log_manager)
@@ -180,7 +220,8 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
         with left_panel:
             with ui.card().classes('w-full p-2 shadow-sm border border-blue-200 bg-blue-50/50 mb-2'):
                 ui.label('Завантажити у спільну папку').classes('font-bold text-blue-800 text-sm mb-1')
-                ui.upload(multiple=True, auto_upload=True, on_upload=handle_upload).classes('w-full').props('color="blue" accept="*" flat')
+                ui.upload(multiple=True, auto_upload=True, on_upload=handle_upload).classes('w-full') \
+                    .props('color="blue" accept=".doc,.docx,.pdf,.txt,.jpg,.jpeg,.png,.xlsx,.xls" flat')
 
             with ui.expansion(f'🔴 Вхідні (Inbox) ({len(state["personal_files"])})', value=True) \
                     .props('header-class="font-bold text-red-800 bg-red-50 rounded" dense').classes('w-full'):

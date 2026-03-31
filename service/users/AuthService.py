@@ -145,6 +145,16 @@ class AuthService:
     def clear_force_password_change(self, user_id: int):
         return self.db.__execute_query__(f"UPDATE {DB_TABLE_USER} SET force_password_change = ? WHERE id = ?", (0, user_id))
 
+    def invalidate_session_token(self, user_id: int) -> None:
+        """
+        Скидає session_token у БД при logout.
+        Перехоплений токен стає недійсним негайно, не чекаючи таймауту сесії.
+        """
+        self.db.__execute_query__(
+            f"UPDATE {DB_TABLE_USER} SET session_token = NULL WHERE id = ?",
+            (user_id,)
+        )
+
     def init_default_admin(self):
         """
         Створює адміна при першому запуску, якщо БД порожня.

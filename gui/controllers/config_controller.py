@@ -4,7 +4,6 @@ from gui.services.auth_manager import AuthManager
 from service.config.ConfigService import ConfigService
 from gui.services.request_context import RequestContext
 from service.processing.MyWorkFlow import MyWorkFlow
-from service.storage.LoggerManager import LoggerManager
 
 class ConfigController:
     def __init__(self, workflow: MyWorkFlow, auth_manager: AuthManager):

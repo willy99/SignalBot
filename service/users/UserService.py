@@ -6,6 +6,7 @@ from service.connection.MyDataBase import MyDataBase
 from service.connection.SignalClient import SignalClient
 from service.constants import DB_TABLE_USER
 from service.users.AuthService import AuthService
+from werkzeug.security import generate_password_hash
 
 
 class UserService:
@@ -39,27 +40,34 @@ class UserService:
         return self.set_user_state(phone_number, "START")
 
     def update_user_pending_contact(self, user_id, contact, contact_type, code, expiry):
-        """Зберігає тимчасові дані для підтвердження."""
+        """
+        Зберігає тимчасові дані для підтвердження.
+        OTP-код хешується перед записом — у БД ніколи не зберігається відкритий текст.
+        """
+        code_hash = generate_password_hash(code, method='pbkdf2:sha256')
         query = f'''
-            UPDATE {DB_TABLE_USER} SET 
-                pending_contact = ?, 
-                pending_type = ?, 
-                verification_code = ?, 
-                verification_expiry = ? 
+            UPDATE {DB_TABLE_USER} SET
+                pending_contact = ?,
+                pending_type = ?,
+                verification_code = ?,
+                verification_expiry = ?
             WHERE id = ?
         '''
-        return self.db.__execute_query__(query, (contact, contact_type, code, expiry.isoformat(), user_id))
+        return self.db.__execute_query__(query, (contact, contact_type, code_hash, expiry.isoformat(), user_id))
 
     def get_pending_info(self, user_id):
-        """Отримує дані, що чекають підтвердження."""
+        """
+        Отримує дані, що чекають підтвердження.
+        Повертає 'code_hash' замість 'code' — порівнювати через check_password_hash.
+        """
         query = f"SELECT pending_contact, pending_type, verification_code, verification_expiry FROM {DB_TABLE_USER} WHERE id = ?"
         row = self.db.__execute_fetch__(query, (user_id,))
         if row:
             return {
-                'contact': row[0],
-                'type': row[1],
-                'code': row[2],
-                'expiry': datetime.fromisoformat(row[3]) if row[3] else None
+                'contact':   row[0],
+                'type':      row[1],
+                'code_hash': row[2],   # bcrypt-хеш, не відкритий код
+                'expiry':    datetime.fromisoformat(row[3]) if row[3] else None
             }
         return None
 

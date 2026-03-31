@@ -5,9 +5,10 @@ from gui.services.auth_manager import AuthManager
 from gui.services.request_context import RequestContext
 from datetime import datetime, timedelta
 import string
-import random
+import secrets
 import config
 from service.processing.MyWorkFlow import MyWorkFlow
+from werkzeug.security import check_password_hash
 from service.users.UserService import UserService
 
 class UserController:
@@ -24,29 +25,21 @@ class UserController:
         pending = self.user_service.get_pending_info(ctx.user_id)
         now = datetime.now()
 
-        if pending and pending['code']:
+        # Анти-спам: якщо є активний (невичерпаний) код, відправлений менш ніж 60 сек тому — блокуємо
+        if pending and pending.get('code_hash') and pending.get('expiry'):
             expiry = pending['expiry']
-            # Якщо тип datetime, використовуємо його, якщо строка — конвертимо
             if isinstance(expiry, str):
                 expiry = datetime.fromisoformat(expiry)
             if expiry > now:
-                # Анти-спем: дозволяємо повторну відправку не частіше ніж раз на 60 секунд
-                # Для цього можна порівняти (expiry - 10 хв) з поточним часом
                 creation_time = expiry - timedelta(minutes=10)
                 if (now - creation_time).total_seconds() < 60:
                     raise ValueError("Зачекайте хвилину перед наступною спробою")
 
-                code = pending['code']
-            else:
-                # Якщо старий код прострочений — генеруємо новий
-                code = ''.join(random.choices(string.digits, k=6))
-                expiry = now + timedelta(minutes=10)
-                self.user_service.update_user_pending_contact(ctx.user_id, contact_info, contact_type, code, expiry)
-        else:
-            # Якщо записів немає взагалі — створюємо все з нуля
-            code = ''.join(random.choices(string.digits, k=6))
-            expiry = now + timedelta(minutes=10)
-            self.user_service.update_user_pending_contact(ctx.user_id, contact_info, contact_type, code, expiry)
+        # Завжди генеруємо НОВИЙ код (оригінал не зберігається — тільки хеш,
+        # тому повторне використання старого коду неможливе)
+        code = ''.join(secrets.choice(string.digits) for _ in range(6))
+        expiry = now + timedelta(minutes=10)
+        self.user_service.update_user_pending_contact(ctx.user_id, contact_info, contact_type, code, expiry)
         try:
             if contact_type.lower() == 'email':
                 self.user_service.send_code(contact_info, code)
@@ -67,11 +60,11 @@ class UserController:
 
         pending = self.user_service.get_pending_info(ctx.user_id)
 
-        if not pending or not pending['code']:
+        if not pending or not pending.get('code_hash'):
             raise ValueError("Дані для підтвердження не знайдені")
 
-        # 2. ПЕРЕВІРКА КОДУ
-        if pending['code'] != entered_code:
+        # 2. ПЕРЕВІРКА КОДУ через хеш (constant-time порівняння)
+        if not check_password_hash(pending['code_hash'], entered_code):
             # Реєструємо провал
             attempts, lockout = self.user_service.auth_service.register_failed_attempt(ctx.user_id)
 

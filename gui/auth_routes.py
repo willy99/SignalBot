@@ -22,7 +22,8 @@ def create_login_page(auth_manager, user_ctrl, log_manager):
         state = {
             'needs_2fa': False,
             'username': '',
-            'loading': False
+            'loading': False,
+            'change_pw_user_id': None,  # ID юзера для примусової зміни пароля
         }
 
         with (ui.column().classes('w-full h-screen items-center justify-center bg-slate-100')):
@@ -60,6 +61,12 @@ def create_login_page(auth_manager, user_ctrl, log_manager):
                                 otp_container.set_visibility(True)
                                 ui.notify('Введіть код підтвердження', type='info')
 
+                            elif res and res['status'] == 'force_password_change':
+                                state['change_pw_user_id'] = res['user'].id
+                                login_container.set_visibility(False)
+                                change_pw_container.set_visibility(True)
+                                ui.notify('Потрібно змінити тимчасовий пароль', type='warning')
+
                             elif res and res['status'] == 'success':
                                 logger.debug('Успішна авторизація ' + str(res['user'].username))
                                 ui.navigate.to('/')
@@ -92,6 +99,49 @@ def create_login_page(auth_manager, user_ctrl, log_manager):
 
                     ui.button('ПІДТВЕРДИТИ КОД', on_click=verify_otp).classes('w-full bg-green-600 text-white')
                     ui.button('Назад', on_click=lambda: ui.navigate.to('/login')).props('flat').classes('w-full text-xs mt-2')
+
+                # --- БЛОК 3: ПРИМУСОВА ЗМІНА ПАРОЛЯ ---
+                change_pw_container = ui.column().classes('w-full')
+                change_pw_container.set_visibility(False)
+
+                with change_pw_container:
+                    with ui.row().classes('w-full items-center gap-2 mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg'):
+                        ui.icon('lock_reset', color='amber').classes('text-xl')
+                        with ui.column().classes('flex-grow gap-0'):
+                            ui.label('Потрібно змінити пароль').classes('font-bold text-amber-800 text-sm')
+                            ui.label('Тимчасовий пароль необхідно замінити перед входом').classes('text-xs text-amber-700')
+
+                    new_password = ui.input('Новий пароль', password=True, password_toggle_button=True) \
+                        .classes('w-full mb-2').props('outlined')
+                    confirm_password = ui.input('Підтвердіть пароль', password=True, password_toggle_button=True) \
+                        .classes('w-full mb-4').props('outlined')
+
+                    async def do_change_password():
+                        new_pw = new_password.value.strip()
+                        confirm_pw = confirm_password.value.strip()
+
+                        if len(new_pw) < 8:
+                            ui.notify('Пароль має бути не менше 8 символів', type='warning')
+                            return
+                        if new_pw != confirm_pw:
+                            ui.notify('Паролі не співпадають', type='negative')
+                            return
+
+                        try:
+                            user_id = state['change_pw_user_id']
+                            await run.io_bound(auth_manager.update_password, user_id, new_pw)
+                            await run.io_bound(auth_manager.clear_force_password_change, user_id)
+                            app.storage.user['authenticated'] = True
+                            logger.debug(f'Примусова зміна пароля виконана для user_id={user_id}')
+                            ui.notify('Пароль змінено! Вхід до системи...', type='positive')
+                            ui.navigate.to('/')
+                        except Exception as e:
+                            ui.notify(str(e), type='negative')
+                            logger.warning(f'Помилка зміни пароля: {e}')
+
+                    ui.button('ВСТАНОВИТИ ПАРОЛЬ', on_click=do_change_password) \
+                        .classes('w-full bg-amber-600 text-white')
+                    confirm_password.on('keydown.enter', do_change_password)
 
                 # Обробка Enter для обох випадків
                 password.on('keydown.enter', try_login)
