@@ -619,44 +619,44 @@ def _render_compare_table(rows: list[dict], state: dict):
     # Дефолтне сортування: ненайдені першими
     table_rows.sort(key=lambda r: r['sort_order'])
 
-    # Стан фільтрів: {field: lower_string}
+    # ---- Фільтри (Python-side ui.input) ----
+    # Оголошуємо ДО таблиці, щоб з'являлись над нею в DOM.
     filters: dict[str, str] = {}
     result_label = ui.label(f'Результатів: {len(table_rows)}').classes(
-        'text-right text-grey w-full text-sm mb-1'
+        'text-right text-grey w-full text-sm'
     )
 
+    filterable = [c for c in columns if c['name'] not in ('row', 'status')]
+    if filterable:
+        with ui.row().classes('w-full gap-2 flex-wrap items-end p-2 bg-grey-1 rounded'):
+            ui.label('Фільтри:').classes('text-caption text-grey self-center flex-shrink-0')
+            for col_def in filterable:
+                field = col_def['field']
+                lbl   = col_def['label'].replace('📄 ', '').replace('🗄 ', '')
+
+                def make_handler(f: str):
+                    def on_change(e):
+                        val = (e.value or '').strip().lower()
+                        if val:
+                            filters[f] = val
+                        else:
+                            filters.pop(f, None)
+                        _apply_filters()
+                    return on_change
+
+                ui.input(
+                    label=lbl,
+                    on_change=make_handler(field),
+                ).props('dense outlined clearable').style('width:160px; flex-shrink:0')
+
     # ---- Таблиця ----
+    # БЕЗ virtual-scroll: він конфліктує з динамічним оновленням рядків через t._props.
+    # Sticky header + скрол тіла — чисто CSS через .compare-table.
     t = ui.table(columns=columns, rows=list(table_rows), row_key='id').classes(
         'w-full compare-table'
     )
-    t.props(
-        'bordered separator=cell flat dense virtual-scroll '
-        'style="height:calc(100vh - 480px); min-height:300px;"'
-    )
+    t.props('bordered separator=cell flat dense')
 
-    # ---- Per-column header slots з фільтром.
-    # Використовуємо окремий header-cell-{name} слот для кожної колонки —
-    # це не порушує alignment на відміну від заміни всього `header` слота.
-    # 'row' і 'status' — без фільтра.
-    # emitEvent — NiceGUI global, надійніший ніж $parent.$emit з вкладених елементів.
-    def _filter_slot(field: str) -> str:
-        return (
-            '<q-th :props="props" style="vertical-align:top; padding-bottom:4px;">'
-            '<div style="margin-bottom:3px; white-space:normal;">{{ props.col.label }}</div>'
-            '<q-input dense outlined clearable hide-bottom-space '
-            'placeholder="фільтр…" '
-            'style="min-width:60px; font-weight:normal;" '
-            "@update:model-value=\"val => emitEvent('col_filter', {field: '" + field + "', value: val || ''})\" "
-            "@clear=\"emitEvent('col_filter', {field: '" + field + "', value: ''})\" "
-            '@click.stop />'
-            '</q-th>'
-        )
-
-    for col_def in columns:
-        if col_def['name'] not in ('row', 'status'):
-            t.add_slot(f'header-cell-{col_def["name"]}', _filter_slot(col_def['field']))
-
-    # ---- Слот body-cell-status: кольоровий бейдж ----
     t.add_slot('body-cell-status', '''
         <q-td :props="props">
             <q-badge
@@ -667,34 +667,27 @@ def _render_compare_table(rows: list[dict], state: dict):
         </q-td>
     ''')
 
-    # ---- Python-обробник фільтрації ----
-    def on_col_filter(e):
-        args  = e.args if hasattr(e, 'args') else {}
-        field = args.get('field', '')
-        value = (args.get('value') or '').strip().lower()
-
-        if value:
-            filters[field] = value
-        else:
-            filters.pop(field, None)
-
-        filtered = [
-            r for r in table_rows
-            if all(
-                fv in str(r.get(ff, '')).lower()
-                for ff, fv in filters.items()
-            )
-        ]
-        t.rows = filtered
+    def _apply_filters():
+        filtered = (
+            list(table_rows) if not filters else [
+                r for r in table_rows
+                if all(fv in str(r.get(ff, '')).lower() for ff, fv in filters.items())
+            ]
+        )
+        # Мутуємо _props['rows'] напряму — єдиний надійний спосіб в NiceGUI
+        t._props['rows'] = filtered
         t.update()
-        suffix = f' (фільтр активний: {len(filters)} пол.)' if filters else ''
+        suffix = f'  •  фільтрів: {len(filters)}' if filters else ''
         result_label.set_text(f'Результатів: {len(filtered)} / {len(table_rows)}{suffix}')
 
-    t.on('col_filter', on_col_filter)
-
-    # ---- CSS: sticky header + висота рядка хедера з фільтром ----
+    # ---- CSS: sticky header без virtual-scroll ----
     ui.add_head_html('''
         <style>
+        .compare-table .q-table__middle {
+            max-height: calc(100vh - 520px);
+            min-height: 280px;
+            overflow-y: auto;
+        }
         .compare-table thead tr th {
             position: sticky !important;
             top: 0;

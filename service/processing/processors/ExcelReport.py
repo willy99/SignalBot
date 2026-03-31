@@ -804,7 +804,7 @@ class ExcelReporter:
                 elif ret_date is None or is_dual_event:
                     category = 'standard_event'
 
-                if ins_date == target_date and (ret_date is None or is_dual_event):
+                if ins_date == target_date and (ret_date is None or is_dual_event or category == 'late_return'):
                     des_days = 0
                     if category == 'late_return':
                         des_days = calculate_days_between(raw_des, raw_ret)
