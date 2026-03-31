@@ -1,4 +1,5 @@
 import datetime
+import re
 from datetime import timedelta
 from datetime import datetime, date
 import config
@@ -326,3 +327,181 @@ def get_year_safe(date_val) -> str:
             return date_str[:4]
 
     return None
+
+
+# ---------------------------------------------------------------------------
+# Нормалізація ПІБ до називного відмінка
+# ---------------------------------------------------------------------------
+
+_UKR_VOWELS = set('аеєиіїоуюя')
+
+# Паттерн для прізвищ на -ко/-го/-хо (Шевченко, Петренко, Бойченко...)
+# Генітив таких прізвищ: Шевченка → стем Шевченк, де кінець [нрлм...ь][кгх]
+_SURNAME_NEEDS_O = re.compile(r'(?:[нрлмстдзжшч]|ь)[кгх]$')
+
+
+def _count_trailing_consonants(s: str) -> int:
+    """Кількість приголосних наприкінці рядка до першої голосної."""
+    n = 0
+    for ch in reversed(s.lower()):
+        if ch in _UKR_VOWELS:
+            break
+        n += 1
+    return n
+
+
+def _needs_o_first_name(stem: str) -> bool:
+    """
+    True якщо стем імені мабуть походить від імені на -о (Дмитро, Петро, Павло).
+    Ознака: рівно 2 приголосні на кінці, остання — р або л.
+    """
+    s = stem.lower()
+    return _count_trailing_consonants(s) == 2 and s[-1] in 'рл'
+
+
+def _first_to_nom(name: str, gender: str, case: str) -> str:
+    """Перетворює ім'я з відмінка у називний."""
+    n = name.lower()
+    if gender == 'M':
+        if case == 'instr':
+            if n.endswith('ієм'):  return name[:-3] + 'ій'          # Андрієм → Андрій
+            if n.endswith('єм'):   return name[:-2] + 'й'
+            if n.endswith('ем'):
+                stem = name[:-2]
+                return stem + 'ь' if stem.lower().endswith('л') else stem  # Василем → Василь
+            if n.endswith('ом'):
+                stem = name[:-2]
+                return stem + 'о' if _needs_o_first_name(stem) else stem   # Дмитром → Дмитро
+        elif case == 'gen':
+            if n.endswith('ія'):   return name[:-2] + 'ій'
+            if n.endswith('я'):    return name[:-1] + 'й'            # Андрія → Андрій
+            if n.endswith('а'):
+                stem = name[:-1]
+                return stem + 'о' if _needs_o_first_name(stem) else stem   # Дмитра → Дмитро
+            if n.endswith('и'):    return name[:-1] + 'а'            # Миколи → Микола
+            if n.endswith('і'):    return name[:-1] + 'я'            # Іллі → Ілля
+        elif case == 'dat':
+            if n.endswith('ієві'): return name[:-4] + 'ій'
+            if n.endswith('еві'):  return name[:-3]                  # Ігореві → Ігор
+            if n.endswith('ові'):  return name[:-3]
+            if n.endswith('ю'):    return name[:-1] + 'й'            # Андрію → Андрій
+            if n.endswith('у'):
+                stem = name[:-1]
+                return stem + 'о' if _needs_o_first_name(stem) else stem
+    elif gender == 'F':
+        if case == 'instr':
+            if n.endswith('єю'): return name[:-2] + 'я'             # Надією → Надія
+            if n.endswith('ою'): return name[:-2] + 'а'             # Оленою → Олена
+        elif case in ('gen', 'dat'):
+            if n.endswith('ії'): return name[:-2] + 'ія'            # Марії → Марія
+            if n.endswith('и'):  return name[:-1] + 'а'             # Олени → Олена
+            if n.endswith('і'):  return name[:-1] + 'а'             # Олені → Олена
+    return name
+
+
+def _sur_to_nom(surname: str, gender: str, case: str) -> str:
+    """Перетворює прізвище з відмінка у називний."""
+    s = surname.lower()
+
+    # Невідмінювані на -о (Шевченко, Черненко) — але деякі автори все ж відмінюють!
+    # Тому перевіряємо ДО загальної перевірки на -о
+    if gender == 'M':
+        if case == 'instr':
+            if s.endswith('им'):  return surname[:-2] + 'ий'         # Залужним → Залужний
+            if s.endswith('ім'):  return surname[:-2] + 'ій'
+            if s.endswith('ем'):
+                stem = surname[:-2]
+                return stem + 'ь' if stem.lower().endswith('л') else stem  # Ковалем → Коваль
+            if s.endswith('ом'):
+                stem_om = surname[:-2]
+                # Прізвища на -ко/-го/-хо в орудному: Петренком → Петренко (видаляємо тільки м)
+                if _SURNAME_NEEDS_O.search(stem_om.lower()):
+                    return surname[:-1]    # Петренком → Петренко
+                return stem_om             # Мельником → Мельник
+        elif case == 'gen':
+            if s.endswith('ого'): return surname[:-3] + 'ий'         # Залужного → Залужний
+            if s.endswith('я'):   return surname[:-1] + 'ь'          # Коваля → Коваль
+            if s.endswith('а'):
+                stem = surname[:-1]
+                return stem + 'о' if _SURNAME_NEEDS_O.search(stem.lower()) else stem
+        elif case == 'dat':
+            if s.endswith('ому'): return surname[:-3] + 'ий'
+            if s.endswith('ові'): return surname[:-3]
+            if s.endswith('еві'):
+                stem = surname[:-3]
+                return stem + 'ь' if stem.lower().endswith('л') else stem
+            if s.endswith('у'):
+                stem = surname[:-1]
+                # Прізвища на -ко/-го/-хо у давальному: Іванченку → Іванченко
+                return stem + 'о' if _SURNAME_NEEDS_O.search(stem.lower()) else stem
+    elif gender == 'F':
+        if case == 'instr':
+            if s.endswith('ою'): return surname[:-2] + 'а'           # Сиротою → Сирота
+            if s.endswith('єю'): return surname[:-2] + 'я'
+        elif case in ('gen', 'dat'):
+            if s.endswith('ої'): return surname[:-2] + 'а'           # Білецької → Білецька
+            if s.endswith('ій'): return surname[:-2] + 'а'
+            if s.endswith('и'):  return surname[:-1] + 'а'
+            if s.endswith('і'):  return surname[:-1] + 'а'
+
+    # Невідмінювані: -о (Шевченко) та -их/-іх (Білих)
+    if s.endswith('о') or re.search(r'[иі]х$', s):
+        return surname
+
+    return surname
+
+
+def to_nominative_case(fullname: str) -> str:
+    """
+    Перетворює ПІБ з будь-якого відмінка у називний.
+    Визначає відмінок і стать за по-батькові — найнадійнішим індикатором.
+
+    Приклади:
+        "Черненко Олександром Вікторовичем" → "Черненко Олександр Вікторович"
+        "Мельника Віталія Михайловича"       → "Мельник Віталій Михайлович"
+        "Коваля Василя Павловича"            → "Коваль Василь Павлович"
+        "Залужного Олексія Сергійовича"      → "Залужний Олексій Сергійович"
+    """
+    if not fullname:
+        return fullname
+    parts = fullname.strip().split()
+    if len(parts) != 3:
+        return fullname
+
+    surname, first_name, patronymic = parts
+    p = patronymic.lower()
+
+    # --- Визначаємо стать та відмінок за по-батькові ---
+    m_match = re.match(r'^(.+?(?:ович|евич|євич))(а|у|ем|ові|еві)?$', p)
+    f_match = re.match(r'^(.+вн)(а|и|і|ою)$', p)
+
+    if m_match:
+        gender  = 'M'
+        pat_nom = patronymic[:len(m_match.group(1))]  # обрізаємо відмінкове закінчення
+        suffix  = (m_match.group(2) or '').lower()
+        case    = {'': 'nom', 'а': 'gen', 'у': 'dat', 'ем': 'instr',
+                   'ові': 'dat', 'еві': 'dat'}.get(suffix, 'nom')
+    elif f_match:
+        gender  = 'F'
+        stem    = patronymic[:len(f_match.group(1))]
+        suffix  = f_match.group(2).lower()
+        case    = {'а': 'nom', 'и': 'gen', 'і': 'dat', 'ою': 'instr'}.get(suffix, 'nom')
+        pat_nom = stem + 'а'
+    else:
+        return fullname  # не вдалося розпізнати по-батькові
+
+    if case == 'nom':
+        return fullname  # вже у називному
+
+    first_nom = _first_to_nom(first_name, gender, case)
+    sur_nom   = _sur_to_nom(surname, gender, case)
+
+    def recase(orig: str, result: str) -> str:
+        """Відновлює регістр відповідно до оригіналу (CAPS → CAPS, Title → Title)."""
+        if not result:
+            return result
+        if orig.isupper():
+            return result.upper()
+        return result[0].upper() + result[1:]
+
+    return f"{recase(surname, sur_nom)} {recase(first_name, first_nom)} {recase(patronymic, pat_nom)}"

@@ -16,4 +16,4 @@ if __name__ == '__main__':
     log_manager = LoggerManager('update.log',logging.INFO)
     client = StorageFactory.create_client(config.DOCUMENT_STORAGE_PATH, log_manager)
     manager = FileCacheManager(config.CACHE_FILE_PATH, log_manager)
-    manager.build_cache(config.DOCUMENT_STORAGE_PATH)
+    manager.build_cache(None, config.DOCUMENT_STORAGE_PATH)

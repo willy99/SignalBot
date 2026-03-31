@@ -54,6 +54,51 @@ COLUMN_NOTATION: Final[str] = "Примітка"
 COLUMN_EXPERIENCE: Final[str] = "experienced"
 
 OVERRIDE_COLUMNS: Final[List[str]] = [COLUMN_DESERTION_TYPE, COLUMN_REVIEW_STATUS]
+GENERAL_FIELDS: Final[Tuple[str, ...]] = (
+    COLUMN_INCREMENTAL,
+    COLUMN_INSERT_DATE,
+    COLUMN_DESERTION_DATE,
+    COLUMN_REPORT_DATE,
+    COLUMN_MIL_UNIT,
+    COLUMN_SERVICE_TYPE,
+    COLUMN_TITLE,
+    COLUMN_TITLE_2,
+    COLUMN_NAME,
+    COLUMN_DESERTION_PLACE,
+    COLUMN_DESERTION_TYPE,
+    COLUMN_SUBUNIT,
+    COLUMN_SUBUNIT2,
+    COLUMN_DESERTION_REGION,
+    COLUMN_BIRTHDAY,
+    COLUMN_ID_NUMBER,
+    COLUMN_ENLISTMENT_DATE,
+    COLUMN_DESERT_CONDITIONS,
+    COLUMN_BIO,
+    COLUMN_TZK,
+    COLUMN_TZK_REGION,
+    COLUMN_ADDRESS,
+    COLUMN_PHONE,
+    COLUMN_EXECUTOR,
+    COLUMN_SERVICE_DAYS,
+    COLUMN_RETURN_DATE,
+    COLUMN_RETURN_TO_RESERVE_DATE,
+    COLUMN_DESERTION_TERM,
+    COLUMN_SUSPENDED,
+    COLUMN_REVIEW_STATUS,
+    COLUMN_ORDER_ASSIGNMENT_NUMBER,
+    COLUMN_ORDER_ASSIGNMENT_DATE,
+    COLUMN_ORDER_RESULT_NUMBER,
+    COLUMN_ORDER_RESULT_DATE,
+    COLUMN_CC_ARTICLE,
+    COLUMN_KPP_NUMBER,
+    COLUMN_KPP_DATE,
+    COLUMN_DBR_NUMBER,
+    COLUMN_DBR_DATE,
+    COLUMN_ERDR_DATE,
+    COLUMN_ERDR_NOTATION,
+    COLUMN_NOTATION,
+    COLUMN_EXPERIENCE,
+)
 
 
 PATTERN_TITLE_MAPPING: Final[Dict[str, str]] = {
@@ -77,9 +122,12 @@ PATTERN_TITLE_MAPPING: Final[Dict[str, str]] = {
     r'(?i)сержант[а-я]{0,3}[\b,.\s]': 'сержант',
     r'(?i)солдат[а-я]{0,3}[\b,.\s]': 'солдат',
     r'(?i)матрос[а-я]{0,3}[\b,.\s]': 'матрос',
+    r'(?i)прапорщик[а-я]{0,3}[\b,.\s]': 'прапорщик',
 
     # Специфічні терміни
     r'(?i)військовослужбов[а-я]{2,4}[\b,.\s]': 'солдат',
+    r'(?i)рядов[а-яй]{1,3}[\b,.\s]': 'солдат',
+    r'(?i)рекрут[а-я]{2,4}[\b,.\s]': 'солдат',
     r'(?i)офіцер[а-я]{0,3}[\b,.\s]': 'офіцер',
 }
 
@@ -192,7 +240,7 @@ PATTERN_CLEANUP_POINTS: Final = ':;,. '
 PATTERN_PARAGRAPH_SPLIT: Final = r'[\r\n]{2,}'
 
 
-PATTERN_NAME : Final[str] = r'\b(([А-ЩЬЮЯҐЄІЇ\'ʼ’-]{3,}\s?){1,2})\s+([А-ЯҐЄІЇ][а-яґєії\'ʼ’]{1,}(?:-[А-ЯҐЄІЇ][а-яґєії\'ʼ’]{1,})?)\s+(([А-ЯҐЄІЇ][а-яґєії\-\'ʼ’]{2,}\s?){1,2})\b'
+PATTERN_NAME : Final[str] = r'(([А-ЩЬЮЯҐЄІЇ\'ʼ’-]{3,}\s?){1,2})\s+([А-ЯҐЄІЇ][а-яґєії\'ʼ’]{1,}(?:-[А-ЯҐЄІЇ][а-яґєії\'ʼ’]{1,})?)\s+(([А-ЯҐЄІЇ][а-яґєії\-\'ʼ’]{2,}\s?){1,2})'
 PATTERN_STRICT_NAME:Final[str] = r'^(?!(?:СМТ|ВУЛ|ОБЛ|Р-Н)\b)\b(([А-ЩЬЮЯҐЄІЇ\'ʼ’-]{3,}\s?){1,2})\s+([А-ЯҐЄІЇ][а-яґєії\'’]{2,})\s+(([А-ЯҐЄІЇ][а-яґєії\-\'ʼ’]{2,}\s?){1,2})\b'
 PATTERN_NAME_WITH_CASE:Final[str] = r'(([А-ЩЬЮЯҐЄІЇа-яґєії\'ʼ’-]{3,}\s?){1,2})\s+([А-ЯҐЄІЇ][а-яґєії\'ʼ’]{1,}(?:-[А-ЯҐЄІЇ][а-яґєії\'ʼ’]{1,})?)\s+(([А-ЯҐЄІЇ][а-яґєії\-\'ʼ’]{2,}\s?){1,2})'
 
@@ -224,6 +272,8 @@ PATTERN_RTZK_TRASH: Final[List[str]] = [
     r'\s*,?\s*\d{2}\.\d{2}\.\d{2,4}.*$',
     r'(?i)^(на військову службу|призваний)\s+' # Патерн для очищення на початку рядка
 ]
+
+PATTERN_ERDR:Final[str] = r'[№#]?\s*(\d{14,20})\s+від\s+(\d{2}\.\d{2}\.\d{4})'
 
 PATTERN_RTZK_CALLED: Final =r'(?i)(ТЦК та СП|на військову службу|призваний)[,.:]?\s+'
 
@@ -371,7 +421,7 @@ PATTERN_PIECE_1_END : Final[str] = r'2\.\s+Коли,\s+яким\s+органом
 PATTERN_PIECE_3_START : Final[str] = r'(?:Стислі демографічні да[н|п]і|Адреса проживання.*?Близькі родичі|Близькі родичі.*?Адреса проживання|призваний на військову службу, освіта, сімейний стан)'
 PATTERN_PIECE_3_END : Final[str] = r'\b4[\.\s\)]+(?:Хто проводить|Службове розслідування)'
 
-PATTERN_PIECE_4_START : Final[str] = r'Хто проводить службове (?:розслід[а-яіїє]*)[,\.\s]*строки його[,\.\s]*проведення\.'
+PATTERN_PIECE_4_START : Final[str] = r'Хто проводить службове (?:розслід[а-яіїє]*)[,\.\s]*строки його[,\.\s]*проведе[нп]*я\.'
 PATTERN_PIECE_4_END : Final[str] = r'5[\.\s\)]+Військове звання'
 
 

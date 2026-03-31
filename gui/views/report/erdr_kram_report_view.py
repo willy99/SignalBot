@@ -5,6 +5,7 @@
 Автоматичне розпізнавання ПІБ / дати народження / РНОКПП з тексту.
 Порівняння з основною базою СЗЧ.
 Таблиця результатів з кольоровою індикацією статусу.
+Кнопка «Змінити» для рядків ⚠️ — додає в чергу на запис ЄРДР в базу.
 """
 
 import io
@@ -15,65 +16,77 @@ from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from openpyxl.utils import get_column_letter
 
 from dics.deserter_xls_dic import NA
-from gui.controllers.report_controller import ReportController
 from gui.services.auth_manager import AuthManager
 from service.processing.processors.ErdrKramProcessor import ErdrKramRow
 
 
-def render_erdr_kram_page(report_ctrl: ReportController, auth_manager: AuthManager):
+def render_erdr_kram_page(erdr_kram_ctrl, auth_manager: AuthManager):
     """Головна функція рендеру сторінки ЄРДР КРАМ."""
 
     state: dict = {
-        'rows': [],
-        'file_bytes': None,
+        'rows':          [],    # list[ErdrKramRow] після обробки
+        'file_bytes':    None,
+        'pending':       {},    # source_row -> ErdrKramRow — черга на збереження
     }
 
     # ------------------------------------------------------------------
-    # Розмітка
+    # Шапка — статична, не прокручується разом з таблицею
     # ------------------------------------------------------------------
-    with ui.column().classes('w-full items-center p-4 gap-4'):
+    with ui.column().classes('w-full p-4 gap-3'):
+
         ui.label('ЄРДР КРАМ — звірка кримінальних проваджень').classes('text-h5 font-bold')
         ui.label(
             'Завантажте Excel-файл КРАМ (3 стовпці: опис порушення | в/ч | номер ЄРДР). '
             'Система автоматично витягне ПІБ та дату народження і знайде кожного в основній базі СЗЧ.'
-        ).classes('text-grey text-sm text-center max-w-3xl')
+        ).classes('text-grey text-sm max-w-3xl')
 
-        with ui.card().classes('w-full max-w-3xl p-4'):
-            with ui.row().classes('w-full items-center gap-4'):
+        # Рядок керування — upload ліворуч, кнопки праворуч
+        with ui.row().classes('w-full items-center gap-4'):
 
-                # process_btn оголошуємо ДО upload — щоб handle_upload мав до нього доступ
+            async def handle_upload(e: events.UploadEventArguments):
+                state['file_bytes'] = await e.file.read()
+                process_btn.enable()
+                ui.notify(
+                    f'Файл завантажено: {e.file.name} ({len(state["file_bytes"])} байт)',
+                    type='info',
+                )
+
+            ui.upload(
+                label='Оберіть файл КРАМ (.xlsx)',
+                auto_upload=True,
+                max_files=1,
+                on_upload=handle_upload,
+            ).props('accept=.xlsx').classes('flex-1')
+
+            # Кнопки — праворуч
+            with ui.row().classes('items-center gap-2 ml-auto flex-shrink-0'):
                 process_btn = ui.button(
                     'Обробити',
                     icon='search',
                     on_click=lambda: ui.timer(0, _do_process, once=True),
-                ).props('elevated').classes('self-end')
+                ).props('elevated')
                 process_btn.disable()
 
-                # ----------------------------------------------------------
-                # ПРАВИЛЬНИЙ патерн NiceGUI upload:
-                #   on_upload=handler  (не .on('upload', ...))
-                #   async def + await e.file.read()
-                #   e.file.name  (не e.name)
-                # ----------------------------------------------------------
-                async def handle_upload(e: events.UploadEventArguments):
-                    state['file_bytes'] = await e.file.read()
-                    process_btn.enable()
-                    ui.notify(
-                        f'Файл завантажено: {e.file.name} ({len(state["file_bytes"])} байт)',
-                        type='info',
-                    )
+                save_btn = ui.button(
+                    'Зберегти зміни',
+                    icon='cloud_upload',
+                    on_click=lambda: ui.timer(0, _do_save, once=True),
+                ).props('elevated color=orange')
+                save_btn.set_visibility(False)
 
-                ui.upload(
-                    label='Оберіть файл КРАМ (.xlsx)',
-                    auto_upload=True,
-                    max_files=1,
-                    on_upload=handle_upload,
-                ).props('accept=.xlsx').classes('flex-1')
+                export_btn = ui.button(
+                    'Завантажити',
+                    icon='download',
+                    on_click=lambda: _export(state['rows']),
+                ).props('elevated color=green')
+                export_btn.set_visibility(False)
 
-        stats_row = ui.row().classes('w-full max-w-7xl gap-4')
+        # Статистичні картки
+        stats_row = ui.row().classes('w-full gap-4')
         stats_row.set_visibility(False)
 
-        results_container = ui.column().classes('w-full max-w-7xl')
+    # Контейнер таблиці — окремо від шапки, щоб скролилась незалежно
+    results_container = ui.column().classes('w-full px-4 pb-4')
 
     # ------------------------------------------------------------------
     # Обробка файлу
@@ -84,8 +97,11 @@ def render_erdr_kram_page(report_ctrl: ReportController, auth_manager: AuthManag
             return
 
         process_btn.disable()
+        save_btn.set_visibility(False)
+        export_btn.set_visibility(False)
         results_container.clear()
         stats_row.set_visibility(False)
+        state['pending'].clear()
 
         with results_container:
             ui.spinner(size='lg').classes('mt-6')
@@ -93,7 +109,7 @@ def render_erdr_kram_page(report_ctrl: ReportController, auth_manager: AuthManag
 
         try:
             rows: list[ErdrKramRow] = await auth_manager.execute(
-                report_ctrl.process_kram_file,
+                erdr_kram_ctrl.process_kram_file,
                 auth_manager.get_current_context(),
                 state['file_bytes'],
             )
@@ -111,19 +127,19 @@ def render_erdr_kram_page(report_ctrl: ReportController, auth_manager: AuthManag
             found_count   = sum(1 for r in rows if r.found_in_db)
             erdr_count    = sum(1 for r in rows if r.found_in_db and r.db_erdr_date and r.db_erdr_date != NA)
             missing_count = sum(1 for r in rows if not r.found_in_db)
+            pending_count = sum(1 for r in rows if '⚠️' in r.status)
 
             stats_row.clear()
             stats_row.set_visibility(True)
             with stats_row:
-                _stat_card('Всього рядків',   total_count,   'blue-grey')
-                _stat_card('Знайдено в базі', found_count,   'positive')
-                _stat_card('Є ЄРДР в базі',   erdr_count,    'positive')
-                _stat_card('Не знайдено',      missing_count, 'negative')
-                ui.button(
-                    'Експорт',
-                    icon='download',
-                    on_click=lambda: _export(rows),
-                ).props('color=green elevated').classes('self-end')
+                _stat_card('Всього рядків',    total_count,   'blue-grey')
+                _stat_card('Знайдено в базі',  found_count,   'positive')
+                _stat_card('Є ЄРДР в базі',    erdr_count,    'positive')
+                _stat_card('Не знайдено',       missing_count, 'negative')
+                if pending_count:
+                    _stat_card('Потребують запису', pending_count, 'warning')
+
+            export_btn.set_visibility(True)
 
             with results_container:
                 _render_table(rows)
@@ -137,26 +153,64 @@ def render_erdr_kram_page(report_ctrl: ReportController, auth_manager: AuthManag
             process_btn.enable()
 
     # ------------------------------------------------------------------
-    # Допоміжні функції рендеру
+    # Збереження ЄРДР у базу
     # ------------------------------------------------------------------
+    async def _do_save():
+        pending_rows = list(state['pending'].values())
+        if not pending_rows:
+            ui.notify('Немає змін для збереження', type='warning')
+            return
 
-    def _stat_card(label: str, value: int, color: str):
-        with ui.card().classes(f'p-3 text-center bg-{color}-50'):
-            ui.label(str(value)).classes('text-h5 font-bold')
-            ui.label(label).classes('text-xs text-grey')
+        save_btn.disable()
+        try:
+            saved_count, errors = await auth_manager.execute(
+                erdr_kram_ctrl.save_erdr_updates,
+                auth_manager.get_current_context(),
+                pending_rows,
+            )
 
+            if saved_count:
+                ui.notify(f'Збережено {saved_count} ЄРДР-записів ✅', type='positive')
+                state['pending'].clear()
+                save_btn.set_visibility(False)
+
+                # Оновлюємо статус збережених рядків у state
+                saved_keys = {r.source_row for r in pending_rows}
+                for r in state['rows']:
+                    if r.source_row in saved_keys:
+                        r.db_erdr_date     = r.erdr_date
+                        r.db_erdr_notation = r.erdr_number
+                        r.found_in_db      = True
+
+                # Перемальовуємо таблицю
+                results_container.clear()
+                with results_container:
+                    _render_table(state['rows'])
+
+            if errors:
+                for err in errors:
+                    ui.notify(err, type='negative', timeout=8000)
+
+        except Exception as e:
+            ui.notify(f'Помилка збереження: {e}', type='negative')
+        finally:
+            save_btn.enable()
+
+    # ------------------------------------------------------------------
+    # Рендер таблиці
+    # ------------------------------------------------------------------
     def _render_table(rows: list[ErdrKramRow]):
         columns = [
-            {'name': 'row',        'label': '№ рядка',          'field': 'row',        'align': 'center', 'sortable': True},
-            {'name': 'name',       'label': 'ПІБ (розпізнано)', 'field': 'name',       'align': 'left',   'sortable': True},
-            {'name': 'birthday',   'label': 'Дата народження',  'field': 'birthday',   'align': 'center', 'sortable': True},
-            {'name': 'rnokpp',     'label': 'РНОКПП',           'field': 'rnokpp',     'align': 'center', 'sortable': True},
-            {'name': 'erdr_file',  'label': 'ЄРДР у файлі',     'field': 'erdr_file',  'align': 'left',   'sortable': True},
-            {'name': 'erdr_date',  'label': 'Дата ЄРДР (файл)', 'field': 'erdr_date',  'align': 'center', 'sortable': True},
-            {'name': 'status',     'label': 'Статус',            'field': 'status',     'align': 'left',   'sortable': True},
-            {'name': 'db_erdr',    'label': 'ЄРДР в базі',      'field': 'db_erdr',    'align': 'left',   'sortable': True},
-            {'name': 'db_erdr_dt', 'label': 'Дата ЄРДР (база)', 'field': 'db_erdr_dt', 'align': 'center', 'sortable': True},
-            {'name': 'error',      'label': 'Помилка',           'field': 'error',      'align': 'left'},
+            {'name': 'row',        'label': '№',                 'field': 'row',        'align': 'center', 'sortable': True,  'style': 'width: 55px'},
+            {'name': 'name',       'label': 'ПІБ (розпізнано)',  'field': 'name',       'align': 'left',   'sortable': True},
+            {'name': 'birthday',   'label': 'Дата народження',   'field': 'birthday',   'align': 'center', 'sortable': True,  'style': 'width: 120px'},
+            {'name': 'rnokpp',     'label': 'РНОКПП',            'field': 'rnokpp',     'align': 'center', 'sortable': True,  'style': 'width: 110px'},
+            {'name': 'erdr_file',  'label': 'ЄРДР у файлі',      'field': 'erdr_file',  'align': 'left',   'sortable': True},
+            {'name': 'status',     'label': 'Статус',             'field': 'status',     'align': 'left',   'sortable': True},
+            {'name': 'db_erdr',    'label': 'ЄРДР в базі',       'field': 'db_erdr',    'align': 'left',   'sortable': True},
+            {'name': 'db_erdr_dt', 'label': 'Дата ЄРДР (база)',  'field': 'db_erdr_dt', 'align': 'center', 'sortable': True,  'style': 'width: 120px'},
+            {'name': 'actions',    'label': 'Дія',               'field': 'actions',    'align': 'center', 'style': 'width: 80px'},
+            {'name': 'error',      'label': 'Помилка',            'field': 'error',      'align': 'left'},
         ]
 
         table_rows = []
@@ -165,6 +219,8 @@ def render_erdr_kram_page(report_ctrl: ReportController, auth_manager: AuthManag
             if r.erdr_date and r.erdr_date != NA:
                 erdr_file_str += f' від {r.erdr_date}'
 
+            in_pending = r.source_row in state['pending']
+
             table_rows.append({
                 'id':         r.source_row,
                 'row':        r.source_row,
@@ -172,17 +228,28 @@ def render_erdr_kram_page(report_ctrl: ReportController, auth_manager: AuthManag
                 'birthday':   r.parsed_birthday if r.parsed_birthday != NA else '—',
                 'rnokpp':     r.parsed_rnokpp   if r.parsed_rnokpp   != NA else '—',
                 'erdr_file':  erdr_file_str,
-                'erdr_date':  r.erdr_date        if r.erdr_date       != NA else '—',
                 'status':     r.status,
                 'db_erdr':    r.db_erdr_notation if r.db_erdr_notation != NA else '—',
                 'db_erdr_dt': r.db_erdr_date     if r.db_erdr_date    != NA else '—',
                 'error':      r.error or '',
+                # службові поля для слота
+                'has_warn':   '⚠️' in r.status,
+                'is_queued':  in_pending,
             })
 
-        ui.label(f'Результати: {len(table_rows)} записів').classes('text-right text-grey w-full mb-2')
+        ui.label(f'Результати: {len(table_rows)} записів').classes(
+            'text-right text-grey w-full mb-1'
+        )
 
-        table = ui.table(columns=columns, rows=table_rows, row_key='id').classes('w-full')
-        table.props('bordered separator=cell flat dense virtual-scroll')
+        # Таблиця з повною шириною і власним вертикальним скролом
+        table = ui.table(
+            columns=columns,
+            rows=table_rows,
+            row_key='id',
+        ).classes('w-full')
+        table.props('bordered separator=cell flat dense virtual-scroll style="max-height: calc(100vh - 320px)"')
+
+        # Слот для колонки «Статус» — кольоровий бейдж
         table.add_slot('body-cell-status', '''
             <q-td :props="props">
                 <q-badge
@@ -195,6 +262,64 @@ def render_erdr_kram_page(report_ctrl: ReportController, auth_manager: AuthManag
                 />
             </q-td>
         ''')
+
+        # Слот для колонки «Дія» — кнопка «Змінити» тільки для ⚠️ рядків
+        table.add_slot('body-cell-actions', '''
+            <q-td :props="props">
+                <q-btn
+                    v-if="props.row.has_warn && !props.row.is_queued"
+                    flat dense round
+                    icon="edit"
+                    color="orange"
+                    size="sm"
+                    @click="() => $parent.$emit('queue_row', props.row)"
+                >
+                    <q-tooltip>Додати ЄРДР до збереження</q-tooltip>
+                </q-btn>
+                <q-icon
+                    v-if="props.row.is_queued"
+                    name="schedule"
+                    color="orange"
+                    size="sm"
+                >
+                    <q-tooltip>В черзі на збереження</q-tooltip>
+                </q-icon>
+            </q-td>
+        ''')
+
+        def _on_queue_row(e):
+            row_id = e.args.get('id')
+            # Знаходимо відповідний ErdrKramRow
+            target = next((r for r in rows if r.source_row == row_id), None)
+            if not target:
+                return
+
+            if row_id in state['pending']:
+                # Повторне натискання — знімаємо з черги
+                del state['pending'][row_id]
+                ui.notify(f'Знято з черги: {target.parsed_name}', type='info')
+            else:
+                state['pending'][row_id] = target
+                ui.notify(f'Додано до збереження: {target.parsed_name}', type='info')
+
+            # Оновлюємо поле is_queued в рядку таблиці
+            for tr in table.rows:
+                if tr['id'] == row_id:
+                    tr['is_queued'] = row_id in state['pending']
+                    break
+            table.update()
+
+            save_btn.set_visibility(bool(state['pending']))
+
+        table.on('queue_row', _on_queue_row)
+
+    # ------------------------------------------------------------------
+    # Статистична картка
+    # ------------------------------------------------------------------
+    def _stat_card(label: str, value: int, color: str):
+        with ui.card().classes(f'p-3 text-center bg-{color}-50 flex-shrink-0'):
+            ui.label(str(value)).classes('text-h5 font-bold')
+            ui.label(label).classes('text-xs text-grey')
 
     # ------------------------------------------------------------------
     # Експорт у xlsx

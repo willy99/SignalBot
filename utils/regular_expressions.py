@@ -1,7 +1,7 @@
 from dics.deserter_xls_dic import *
 import re
 from datetime import datetime
-from utils.utils import format_to_excel_date
+from utils.utils import format_to_excel_date, to_nominative_case
 
 
 def extract_locality(conditions: str) -> str:
@@ -27,6 +27,87 @@ def extract_name(text):
         return f"{match.group(1)} {match.group(3)} {match.group(4)}".strip()
     return NA
 
+
+def _build_title_strip_re():
+    """
+    Будує regex для видалення військових звань з початку рядка.
+    Ітерує по КЛЮЧАХ PATTERN_TITLE_MAPPING (не по values!), щоб охопити
+    всі словоформи: 'рядовим', 'солдатом', 'військовослужбовцями' etc.
+    """
+
+    def clean_key(k: str) -> str:
+        c = k.replace('(?i)', '')
+        # Відрізаємо кінцевий службовий символьний клас [\b,.\s]
+        last_bracket = c.rfind('[')
+        if last_bracket != -1:
+            tail = c[last_bracket:]
+            # Якщо це НЕ кирилиця в дужках — це службовий клас, прибираємо
+            if 'б' not in tail and 'я' not in tail and 'і' not in tail:
+                c = c[:last_bracket]
+        return c.rstrip()
+
+    parts = sorted(
+        [clean_key(k) for k in PATTERN_TITLE_MAPPING.keys()],
+        key=len, reverse=True
+    )
+    return re.compile(r'^\s*(?:' + '|'.join(parts) + r')\s*', re.IGNORECASE)
+
+
+_TITLE_STRIP_RE_V2 = _build_title_strip_re()
+_LEADING_NOISE_RE = re.compile(r'^(?:[а-яґєіїʼ\'-]+\s+)+', re.IGNORECASE)
+_CLEAN_SURNAME_RE = re.compile(r"^[А-ЯҐЄІЇа-яґєії'ʼ-]{2,}$")
+_NAME_WITH_CASE_RE = re.compile(PATTERN_NAME_WITH_CASE)
+
+
+def extract_name_lowercased(text: str) -> str:
+    """
+    Витягує ПІБ з тексту кримінального провадження.
+    Підтримує будь-який регістр прізвища (CAPS або звичайний).
+    Повертає ПІБ у тому відмінку, в якому воно зустрічається в тексті
+    (нормалізацію до називного робить to_nominative_case у виклику).
+
+    Алгоритм очищення group(1):
+      1. Спочатку прибираємо шумові слова з малої літери ('призовом', 'зокрема' etc)
+      2. Потім прибираємо звання через ключі PATTERN_TITLE_MAPPING
+         (охоплює всі словоформи: рядовим, солдатом, прапорщик, військовослужбовцями)
+      3. Якщо залишилось чисте прізвище → повертаємо
+      4. Fallback: беремо останнє слово group(1) або group(3) як прізвище
+    """
+    m = _NAME_WITH_CASE_RE.search(text)
+    if not m:
+        return NA
+
+    raw_g1 = m.group(1).strip()
+    first_name = m.group(3).strip()
+    patronymic = m.group(4).strip()
+
+    # Порядок важливий: спочатку шум, потім звання
+    stripped = _LEADING_NOISE_RE.sub('', raw_g1).strip()
+    stripped = _TITLE_STRIP_RE_V2.sub('', stripped).strip()
+
+    if stripped and _CLEAN_SURNAME_RE.match(stripped):
+        return f'{stripped} {first_name} {patronymic}'.strip()
+
+    # Fallback: остання заглавна частина group(1) є прізвищем
+    last_word = raw_g1.rsplit(None, 1)[-1] if raw_g1 else ''
+    if last_word and last_word[0].isupper():
+        return f'{last_word} {first_name} {patronymic}'.strip()
+
+    # Fallback 2: group(1) — тільки шум, прізвище у group(3)
+    parts = patronymic.split(None, 1)
+    fn = parts[0] if parts else ''
+    pat = parts[1] if len(parts) > 1 else ''
+    return to_nominative_case(f'{first_name} {fn} {pat}'.strip() or NA)
+
+
+def extract_erdr(text: str) -> tuple[str, str]:
+    """Витягує номер та дату ЄРДР. Повертає (number, date) або (NA, NA)."""
+    if not text or not str(text).strip():
+        return NA, NA
+    match = re.compile(PATTERN_ERDR, re.IGNORECASE).search(str(text))
+    if match:
+        return match.group(1), format_to_excel_date(match.group(2))
+    return NA, NA
 
 def extract_title(text):
     # Проходимо по мапінгу (важливо: довгі назви мають бути вище коротких)

@@ -24,7 +24,7 @@ class FileCacheManager:
     def get_file_separator(self):
         return self.client.get_separator()
 
-    def build_cache(self, root_folder: str, progress_callback=None):
+    def build_cache(self, ctx: RequestContext, root_folder: str, progress_callback=None):
         print(f"📡 Починаю глибоке сканування папки: {root_folder}...")
         new_cache = []
         yearly_stats = {}

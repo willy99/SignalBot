@@ -14,7 +14,7 @@ class AttachmentHandler:
         source_file = os.path.join(config.SIGNAL_ATTACHMENTS_DIR, attachment_id)
         if not os.path.exists(source_file):
             self.logger.error(f"❌ Файл {attachment_id} не знайдено в системній папці Signal.")
-            return False
+            return []
 
         # 2. Ініціалізуємо наш новий незалежний сервіс обробки
         processor_service = DocumentProcessingService(

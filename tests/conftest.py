@@ -74,13 +74,13 @@ def mock_db():
 
     # Використовуємо внутрішній метод вашого MyDataBase або прямий доступ до sqlite
     # Якщо MyDataBase має доступ до курсору, можна так:
-    with db.connect() as conn:  # припускаю наявність такого методу
+    with db._connect() as conn:  # припускаю наявність такого методу
         conn.executescript(sql_script)
 
     update_path = os.path.join(project_root, 'service', 'connection', 'update.sql')
     if os.path.exists(update_path):
         with open(update_path, 'r', encoding='utf-8') as f:
-            db.connect().executescript(f.read())
+            db._connect().executescript(f.read())
 
     # Додаємо тестового користувача, щоб працювали JOIN-и
     db.insert_record("users", {"id": 1, "username": "test_user", "password_hash":"asdklfjasdlfkajsdlnskjdfksjadlkfjlaksjdf", "role":"admin"})

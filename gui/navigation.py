@@ -23,6 +23,7 @@ from gui.views.report import dups_report_view
 from gui.views.report import error_birthday_report_view
 from gui.views.report import waiting_for_erdr_report_view
 from gui.views.report.erdr_kram_report_view import render_erdr_kram_page
+from gui.views.report.compare_report_view import render_compare_report_page
 from gui.views.report.logs_view import render_logs_page
 from gui.views.report import daily_report_view
 from gui.views.report import general_state_report
@@ -140,6 +141,12 @@ def init_nicegui(workflow_obj):
     def erdr_kram_route():
         app_menu.render(auth_manager)
         render_erdr_kram_page(report_ctrl, auth_manager)
+
+    @ui.page('/report_compare')
+    @require_access(auth_manager, MODULE_REPORT_GENERAL, PERM_READ)
+    def compare_report_route():
+        app_menu.render(auth_manager)
+        render_compare_report_page(report_ctrl, auth_manager)
 
 
     @ui.page('/doc_dbr')
