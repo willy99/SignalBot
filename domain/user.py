@@ -26,6 +26,7 @@ class User:
     verification_code: Optional[str] = None  # Код, що чекає перевірки
     verification_expiry: Optional[datetime] = None
     use_2fa: bool = False
+    force_password_change: bool = False  # Примусова зміна при першому вході
 
     def has_permission(self, module: str, action: str) -> bool:
         module_perms = self.permissions.get(module, {})

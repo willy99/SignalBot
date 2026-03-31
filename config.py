@@ -1,9 +1,50 @@
 import os
+import stat
 from typing import Final
 from dotenv import load_dotenv
 import sys
 
 load_dotenv()
+
+
+def _validate_env() -> None:
+    """
+    Перевіряє безпеку .env файлу при кожному старті.
+    1. Автоматично виправляє права доступу якщо вони надто широкі.
+    2. Попереджає про відсутні обов'язкові змінні.
+    """
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+
+    if not os.path.exists(env_path):
+        print("⚠️  .env файл не знайдено. Змінні оточення мають бути встановлені вручну.")
+        return
+
+    # --- Перевірка прав доступу ---
+    file_mode = os.stat(env_path).st_mode & 0o777
+    if file_mode & 0o077:  # group або other мають хоч якийсь доступ
+        print(f"🚨 SECURITY: .env має небезпечні права {oct(file_mode)}. Виправляю на 600...")
+        os.chmod(env_path, stat.S_IRUSR | stat.S_IWUSR)  # 0o600
+        print("✅ Права .env виправлено: тепер тільки власник може читати файл.")
+
+    # --- Перевірка наявності обов'язкових змінних ---
+    required = {
+        'UI_SECRET_KEY': 'Ключ підпису сесій (обов\'язковий для безпеки UI)',
+        'NET_PASSWORD':  'Пароль до мережевого сховища',
+        'EMAIL_PASSWORD': 'Пароль до SMTP (потрібен для 2FA через Email)',
+    }
+    missing = [f"  • {var}  ({desc})" for var, desc in required.items() if not os.getenv(var)]
+    if missing:
+        print("🚨 SECURITY: Відсутні обов'язкові змінні оточення:")
+        for m in missing:
+            print(m)
+        if not os.getenv('UI_SECRET_KEY'):
+            print("💀 UI_SECRET_KEY відсутній — сесії непідписані. Зупиняю запуск.")
+            sys.exit(1)
+        print("   Деякі функції можуть не працювати. Заповніть .env файл.")
+
+
+_validate_env()
+
 IS_DEV = '--dev' in sys.argv
 
 NET_SERVER_IP = os.getenv("NET_SERVER_IP", "127.0.0.1")

@@ -4,6 +4,7 @@ from domain.user import User
 from service.connection.EmailClient import EmailClient
 from service.connection.MyDataBase import MyDataBase
 from service.connection.SignalClient import SignalClient
+from service.constants import DB_TABLE_USER
 from service.users.AuthService import AuthService
 
 
@@ -39,8 +40,8 @@ class UserService:
 
     def update_user_pending_contact(self, user_id, contact, contact_type, code, expiry):
         """Зберігає тимчасові дані для підтвердження."""
-        query = '''
-            UPDATE users SET 
+        query = f'''
+            UPDATE {DB_TABLE_USER} SET 
                 pending_contact = ?, 
                 pending_type = ?, 
                 verification_code = ?, 
@@ -51,7 +52,7 @@ class UserService:
 
     def get_pending_info(self, user_id):
         """Отримує дані, що чекають підтвердження."""
-        query = "SELECT pending_contact, pending_type, verification_code, verification_expiry FROM users WHERE id = ?"
+        query = f"SELECT pending_contact, pending_type, verification_code, verification_expiry FROM {DB_TABLE_USER} WHERE id = ?"
         row = self.db.__execute_fetch__(query, (user_id,))
         if row:
             return {
@@ -63,14 +64,14 @@ class UserService:
         return None
 
     def update_user_email(self, user_id, email):
-        return self.db.__execute_query__("UPDATE users SET email = ? WHERE id = ?", (email, user_id))
+        return self.db.__execute_query__(f"UPDATE {DB_TABLE_USER} SET email = ? WHERE id = ?", (email, user_id))
 
     def update_user_phone(self, user_id, phone):
-        return self.db.__execute_query__("UPDATE users SET phone = ? WHERE id = ?", (phone, user_id))
+        return self.db.__execute_query__(f"UPDATE {DB_TABLE_USER} SET phone = ? WHERE id = ?", (phone, user_id))
 
     def clear_pending(self, user_id):
         return self.db.__execute_query__(
-            "UPDATE users SET pending_contact=NULL, pending_type=NULL, verification_code=NULL, verification_expiry=NULL WHERE id = ?",
+            f"UPDATE {DB_TABLE_USER} SET pending_contact=NULL, pending_type=NULL, verification_code=NULL, verification_expiry=NULL WHERE id = ?",
             (user_id,)
         )
 
@@ -79,8 +80,8 @@ class UserService:
 
     def update_user_profile(self, user_id: int, full_name: str, use_2fa: bool) -> bool:
         """Оновлює профіль користувача."""
-        query = '''
-            UPDATE users 
+        query = f'''
+            UPDATE {DB_TABLE_USER} 
             SET full_name = ?, 
                 use_2fa = ? 
             WHERE id = ?

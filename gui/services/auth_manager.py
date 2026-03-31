@@ -33,6 +33,10 @@ class AuthManager:
     def update_password(self, user_id: int, new_password: str):
         self.auth_service.update_password(user_id=user_id, new_password=new_password)
 
+    def clear_force_password_change(self, user_id: int):
+        """Знімає прапор примусової зміни пароля після успішної зміни."""
+        self.auth_service.clear_force_password_change(user_id)
+
     def set_permissions(self, role: str, module_name: str, can_read: int, can_write: int, can_delete: int):
         self.auth_service.set_permissions(role=role, module_name=module_name, can_read=can_read, can_write=can_write, can_delete=can_delete)
 
@@ -73,7 +77,13 @@ class AuthManager:
                 "send_type": contact_type
             }
 
-        # 2FA ВИМКНЕНА — пускаємо відразу
+        # Примусова зміна пароля (наприклад, після першого запуску)
+        if user.force_password_change:
+            app.storage.user.update(session_data)
+            app.storage.user['authenticated'] = False
+            return {"status": "force_password_change", "user": user}
+
+        # 2FA ВИМКНЕНА і пароль не потребує заміни — пускаємо відразу
         session_data['authenticated'] = True
         app.storage.user.update(session_data)
         return {"status": "success", "user": user}

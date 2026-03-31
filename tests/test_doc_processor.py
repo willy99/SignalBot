@@ -327,6 +327,25 @@ def test_processing_imaged_pdf_ocr(processor_factory, mock_logger):
     assert person[COLUMN_SERVICE_TYPE] == 'призивом'
     assert person[COLUMN_ADDRESS] == 'Одеська обл., Беляєвський р-н, с. Дослідне, вул. Каштанова, буд. 18'
 
+def test_incorrect_headings_without_numbers(processor_factory, mock_logger):
+    filename = '14_30.03.2026 СЗЧ ППД ЗАЛУЖНИЙ В. Я. ВРЕБ 1дшб.doc'
+    processor = processor_factory(filename)
+    result = processor.process()
+    assert isinstance(result, list)
+    assert len(result) == 1
+    person = result[0]
+
+    assert person[COLUMN_NAME] == 'ЗАЛУЖНИЙ Володимир Ярославович'
+    assert person[COLUMN_MIL_UNIT] == 'А0224'
+    assert person[COLUMN_DESERTION_DATE] == '30.03.2026'
+    assert person[COLUMN_ID_NUMBER] == '3311111125'
+    assert person[COLUMN_PHONE] == '0931111111'
+    assert person[COLUMN_BIRTHDAY] == '03.02.1987'
+    assert person[COLUMN_TITLE] == 'солдат'
+    assert person[COLUMN_SUBUNIT] == '1 дшб'
+    assert person[COLUMN_SERVICE_TYPE] == 'призивом'
+    assert person[COLUMN_ADDRESS] == 'Одеська обл.. м. Біляївка , вул. Отамана Головатого, буд. 111.'
+
 
 #################### загальне модульне тестування регекспів ##############################
 

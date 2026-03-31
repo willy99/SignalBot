@@ -43,7 +43,7 @@ class MyDataBase:
             print(f"❌ Помилка виконання схеми {filepath}: {e}")
 
     def __init_db__(self) -> None:
-        """Виконує schema.sql та update.sql при першому запуску."""
+        """Виконує schema.sql, update.sql та безпечні міграції при запуску."""
         current_dir = os.path.dirname(os.path.abspath(__file__))
         scheme_path = os.path.join(current_dir, 'schema.sql')
         update_path = os.path.join(current_dir, 'update.sql')

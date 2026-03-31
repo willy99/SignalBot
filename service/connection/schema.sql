@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS users (
     pending_type TEXT,
     verification_code TEXT,
     verification_expiry TEXT,
-    use_2fa INTEGER NOT NULL DEFAULT 0
+    use_2fa INTEGER NOT NULL DEFAULT 0,
+    force_password_change INTEGER NOT NULL DEFAULT 0
 );
 
 -- Таблиця прав доступу для ролей

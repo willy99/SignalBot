@@ -4,7 +4,6 @@ from domain.person import Person
 from gui.services.auth_manager import AuthManager
 from gui.views.person.person_view import edit_person
 from domain.person_filter import PersonSearchFilter
-from gui.services.request_context import RequestContext
 import config
 from dics.security_config import MODULE_PERSON, PERM_EDIT
 
@@ -87,6 +86,7 @@ def search_page(person_ctrl, auth_manager: AuthManager):
     ins_year_options = ui_options.get(COLUMN_INSERT_DATE, [])
     title2_options = ['Всі'] + [opt for opt in ui_options.get(COLUMN_TITLE_2, []) if opt]
     service_options = ['Всі'] + [opt for opt in ui_options.get(COLUMN_SERVICE_TYPE, []) if opt]
+    can_edit = auth_manager.has_access(MODULE_PERSON, PERM_EDIT)
 
     # --- 1. ДОДАЄМО ASYNC ТА AWAIT В ОБРОБНИКИ ДАТ ---
     async def on_year_change(e):
@@ -202,6 +202,23 @@ def search_page(person_ctrl, auth_manager: AuthManager):
                 ui.button('Знайти', icon='search', on_click=handle_search).props('elevated').classes(
                     'h-14 bg-blue-600 text-white')
 
+                if can_edit:  # Перевіряємо права доступу
+                    async def create_new_person():
+                        # Створюємо пустий об'єкт Person.
+                        # Обов'язково вказуємо unit з поточного вибору селектора ВЧ
+                        new_p = Person(name="", rnokpp="", subunit="", unit=sheet_select.value)
+
+                        # Викликаємо ту саму форму, що і для редагування
+                        edit_person(
+                            new_p,
+                            person_ctrl,
+                            auth_manager=auth_manager,
+                            on_close=lambda: do_search(force_refresh=True)  # Оновити список після збереження
+                        )
+
+                    ui.button(icon='add', on_click=create_new_person).props('elevated color="positive"').classes('h-14 w-16')
+                    with ui.tooltip():
+                        ui.label('Додати новий запис вручну')
             # Рядок фільтрів 1
             with ui.row().classes('w-full max-w-7xl items-center gap-4 mt-2'):
                 des_year_filter = ui.select(options=des_year_options, multiple=True, label='Рік СЗЧ',
