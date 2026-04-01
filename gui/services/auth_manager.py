@@ -1,12 +1,10 @@
 from typing import Optional
 from domain.user import User
-from werkzeug.security import generate_password_hash
 from gui.services.request_context import RequestContext
 from dics.security_config import PERM_READ
 from service.processing.MyWorkFlow import MyWorkFlow
 from service.users.AuthService import AuthService
 import time
-from datetime import datetime
 import config
 from nicegui import app, run
 
@@ -45,7 +43,8 @@ class AuthManager:
 
 
     async def authenticate(self, username: str, password: str) -> Optional[dict]:
-        user: User = self.auth_service.authenticate(username, password)
+        self.logger.debug('🔑 Спроба залогінится: ' + str(username))
+        user: User = await self.auth_service.authenticate(username, password)
         if not user:
             return None
 
@@ -155,7 +154,6 @@ class AuthManager:
 
         user_info = app.storage.user.get('user_info', {})
         user_id = user_info.get('id')
-        self.logger.debug('>>> Logout ' + user_info.get('username'))
         if user_id:
             try:
                 self.auth_service.invalidate_session_token(user_id)
@@ -189,3 +187,12 @@ class AuthManager:
             session_token=user_info.get('session_token')
         )
         return ctx
+
+
+    def is_ip_blocked(self, ip: str, max_attempts=config.SECURITY_MAX_ATTEMPTS, window_seconds=300) -> bool:
+        return self.auth_service.is_ip_blocked(ip, max_attempts, window_seconds)
+
+
+    def register_ip_attempt(self, ip: str):
+        self.logger.debug('🔑 Логін невірний. IP: ' + str(ip))
+        return self.auth_service.register_ip_attempt(ip)

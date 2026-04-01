@@ -9,26 +9,33 @@ import string
 from datetime import datetime, timedelta
 import config
 from service.constants import DB_TABLE_USER
-
+import asyncio
+import time
 
 class AuthService:
 
     def __init__(self, db):
         self.db = db
+        self.ip_attempts = {}
 
-    def authenticate(self, username: str, password: str) -> Optional[User]:
+    async def authenticate(self, username: str, password: str) -> Optional[User]:
         """Перевірка логіну/пароля."""
         # Використовуємо SELECT *, або чітко перелічуємо поля
         query = f"SELECT * FROM {DB_TABLE_USER} WHERE username = ? AND is_active = 1"
         row = self.db.__execute_fetch__(query, (username,))
         if not row:
+            check_password_hash(generate_password_hash("dummy_password"), password)
+            # Штучна затримка, щоб уповільнити brute-force (наприклад, 1 секунда)
+            await asyncio.sleep(1)
             return None
+
         user_id = row['id']
 
         if row['lockout_until']:
             lockout_time = datetime.fromisoformat(row['lockout_until'])
             if datetime.now() < lockout_time:
                 remaining = int((lockout_time - datetime.now()).total_seconds() / 60)
+                await asyncio.sleep(0.5)
                 raise PermissionError(f"Акаунт заблоковано. Спробуйте через {remaining} хв.")
 
 
@@ -46,6 +53,7 @@ class AuthService:
                 return user
         else:
             self.register_failed_attempt(user_id)
+            await asyncio.sleep(1)
         return None
 
     def get_user_permissions(self, role: str) -> Dict[str, Dict[str, bool]]:
@@ -219,3 +227,39 @@ class AuthService:
     def reset_failed_attempts(self, user_id: int):
         query = f"UPDATE {DB_TABLE_USER} SET failed_login_attempts = 0, lockout_until = NULL WHERE id = ?"
         self.db.__execute_query__(query, (user_id,))
+
+
+    def check_ip_rate_limit(self, ip_address):
+        now = time.time()
+        attempts = self.ip_attempts.get(ip_address, [])
+        # Залишаємо спроби тільки за останні 5 хвилин
+        attempts = [t for t in attempts if now - t < 300]
+        self.ip_attempts[ip_address] = attempts
+
+        if len(attempts) > 20:  # Наприклад, 20 спроб за 5 хв з одного IP
+            return False
+
+        attempts.append(now)
+        return True
+
+
+    def is_ip_blocked(self, ip: str, max_attempts=config.SECURITY_MAX_ATTEMPTS, window_seconds=300) -> bool:
+        """Перевіряє, чи не перевищив IP ліміт спроб за вказаний час (5 хв)."""
+        now = time.time()
+
+        # Отримуємо список таймстемпів для цього IP
+        attempts = self.ip_attempts.get(ip, [])
+
+        # Очищаємо старі спроби (старші за window_seconds)
+        attempts = [t for t in attempts if now - t < window_seconds]
+        self.ip_attempts[ip] = attempts
+
+        return len(attempts) >= max_attempts
+
+
+    def register_ip_attempt(self, ip: str):
+        """Фіксуємо нову невдалу спробу для IP."""
+        now = time.time()
+        if ip not in self.ip_attempts:
+            self.ip_attempts[ip] = []
+        self.ip_attempts[ip].append(now)

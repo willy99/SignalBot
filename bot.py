@@ -20,24 +20,36 @@ from service.config.ConfigService import ConfigService
 from service.processing.MyWorkFlow import MyWorkFlow
 import threading
 from gui.navigation import init_nicegui
-
+import time
 
 def bot_worker(workflow: MyWorkFlow) -> None:
     """Фоновий потік: підключається до Signal і обробляє вхідні повідомлення."""
     if not config.SIGNAL_BOT:
         return
-    try:
-        workflow.signalClient.host = config.TCP_HOST
-        workflow.signalClient.port = config.TCP_PORT
-        workflow.signalClient.connect()
-        file_handle = workflow.signalClient.read()
-        for line in file_handle:
-            if not line.strip():
-                continue
-            data = json.loads(line)
-            workflow.parseSignalData(data)
-    except Exception as e:
-        print(f"❌ Помилка потоку бота: {e}")
+    retry_delay = 5  # Початкова затримка 5 секунд
+    max_delay = 300  # Максимальна затримка 5 хвилин
+    while True:
+        try:
+            print(f"🔄 Спроба підключення до Signal ({config.TCP_HOST}:{config.TCP_PORT})...")
+            workflow.signalClient.host = config.TCP_HOST
+            workflow.signalClient.port = config.TCP_PORT
+            workflow.signalClient.connect()
+            print("✅ З'єднання з Signal встановлено успішно.")
+            retry_delay = 5
+            file_handle = workflow.signalClient.read()
+            for line in file_handle:
+                if not line.strip():
+                    continue
+                data = json.loads(line)
+                workflow.parseSignalData(data)
+        except Exception as e:
+            print(f"❌ Помилка потоку бота: {e}")
+        # Логіка Exponential Backoff
+        print(f"⏳ Наступна спроба через {retry_delay} секунд...")
+        time.sleep(retry_delay)
+
+        # Збільшуємо затримку вдвічі для наступного разу (але не більше max_delay)
+        retry_delay = min(retry_delay * 2, max_delay)
 
 
 def parse_parameters() -> None:

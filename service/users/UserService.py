@@ -104,7 +104,6 @@ class UserService:
     def send_message(self, phone: str, message: str):
         """Відправка через твій SignalClient (JSON-RPC)."""
         try:
-            print('>>> sending message ' + str(message) + ' to ' + phone)
             self.signal_client.send_message(phone, message)
             return True
         except Exception as e:

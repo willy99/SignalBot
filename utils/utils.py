@@ -505,3 +505,21 @@ def to_nominative_case(fullname: str) -> str:
         return result[0].upper() + result[1:]
 
     return f"{recase(surname, sur_nom)} {recase(first_name, first_nom)} {recase(patronymic, pat_nom)}"
+
+
+def sanitize_filename(self, filename: str) -> str:
+    """Очищує ім'я файлу від спроб виходу за межі директорії."""
+    if not filename:
+        return "unnamed_attachment"
+
+    # 1. Беремо тільки фінальну частину імені (ігноруємо будь-які шляхи / або \)
+    safe_name = os.path.basename(filename)
+
+    # 2. Видаляємо підозрілі послідовності точок
+    safe_name = safe_name.replace('..', '')
+
+    # 3. Видаляємо пробіли та зайві символи на початку/в кінці
+    safe_name = safe_name.strip()
+
+    # 4. Fallback, якщо після очищення нічого не залишилось
+    return safe_name if safe_name else "safe_attachment"

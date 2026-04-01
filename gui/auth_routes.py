@@ -7,13 +7,15 @@ from dics.security_config import PERM_READ
 from gui.services.auth_manager import AuthManager
 from gui.services.request_context import RequestContext
 import time
-
+from fastapi import Request
 
 def create_login_page(auth_manager, user_ctrl, log_manager):
     logger = log_manager.get_logger()
 
     @ui.page('/login')
-    def login_page():
+    def login_page(request: Request):
+        client_ip = request.client.host
+        logger.debug(f"🔑 Спроба входу з IP: {client_ip}")
         if app.storage.user.get('authenticated', False):
             ui.navigate.to('/')
             return
@@ -37,6 +39,9 @@ def create_login_page(auth_manager, user_ctrl, log_manager):
                     password = ui.input('Пароль').classes('w-full mb-6').props('type=password outlined')
 
                     async def try_login():
+                        if auth_manager.is_ip_blocked(client_ip):
+                            ui.notify('Забагато невдалих спроб з вашої адреси. Зачекайте 5 хвилин.', type='negative')
+                            return
                         u, p = username.value.strip(), password.value.strip()
                         if not u or not p: return
 
@@ -70,7 +75,12 @@ def create_login_page(auth_manager, user_ctrl, log_manager):
                             elif res and res['status'] == 'success':
                                 logger.debug('Успішна авторизація ' + str(res['user'].username))
                                 ui.navigate.to('/')
+                            else:
+                                ui.notify('Логін або пароль невірний', type='negative')
+                                logger.debug('Логін або пароль невірний')
+                                auth_manager.register_ip_attempt(client_ip)
                         except Exception as e:
+                            auth_manager.register_ip_attempt(client_ip)
                             ui.notify(str(e), type='negative')
                             logger.debug('Провальна авторизація ' + str(username.value))
 
