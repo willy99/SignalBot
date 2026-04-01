@@ -1,6 +1,7 @@
 import os
 import multiprocessing
 import argparse
+import asyncio
 
 os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
@@ -22,7 +23,7 @@ import threading
 from gui.navigation import init_nicegui
 import time
 
-def bot_worker(workflow: MyWorkFlow) -> None:
+async def bot_worker(workflow: MyWorkFlow) -> None:
     """Фоновий потік: підключається до Signal і обробляє вхідні повідомлення."""
     if not config.SIGNAL_BOT:
         return
@@ -41,7 +42,7 @@ def bot_worker(workflow: MyWorkFlow) -> None:
                 if not line.strip():
                     continue
                 data = json.loads(line)
-                workflow.parseSignalData(data)
+                await workflow.parseSignalData(data)
         except Exception as e:
             print(f"❌ Помилка потоку бота: {e}")
         # Логіка Exponential Backoff
@@ -62,6 +63,11 @@ def parse_parameters() -> None:
     if config.IS_DEV:
         print('>>> 🖥🖥🖥🖥🖥🖥🖥🖥🖥🖥🖥🖥🖥    RUNNING IN DEV MODE:    🖥🖥🖥🖥🖥🖥🖥🖥🖥🖥🖥🖥🖥')
 
+def run_async_bot(workflow):
+    """Ця функція запускається в окремому потоці і створює свій Event Loop."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(bot_worker(workflow))
 
 def main() -> None:
     parse_parameters()
@@ -86,7 +92,7 @@ def main() -> None:
         workflow.excelProcessor.switch_to_sheet(config.DESERTER_TAB_NAME)
 
         if config.SIGNAL_BOT:
-            threading.Thread(target=bot_worker, args=(workflow,), daemon=True).start()
+            threading.Thread(target=run_async_bot, args=(workflow,), daemon=True).start()
         else:
             print("🤖 Signal Bot вимкнено.")
 

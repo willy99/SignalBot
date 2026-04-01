@@ -19,8 +19,22 @@ def render_place_report_page(report_ctrl:ReportController, person_ctrl: PersonCo
         ui.label('Аналітика: Загальний стан справ').classes('text-h4 mb-6')
 
         with ui.row().classes('w-full max-w-4xl justify-center items-center gap-4 mb-6'):
+
+            def on_year_change():
+                if year_select.value:
+                    date_from.value = None
+                    date_to.value = None
+
+            # Функція: якщо почали вводити дати -> чистимо рік
+            def on_date_change():
+                if date_from.value or date_to.value:
+                    year_select.value = None
+
             # Додамо фільтр по роках, якщо треба (опціонально)
-            year_select = ui.select(year_options, label='Рік').classes('w-32')
+            year_select = ui.select(year_options, label='Рік СЗЧ', on_change=on_year_change).classes('w-32')
+
+            date_from = ui.input('З дати', on_change=on_date_change).props('type=date').classes('w-40')
+            date_to = ui.input('По дату', on_change=on_date_change).props('type=date').classes('w-40')
 
             generate_btn = ui.button('Сформувати', icon='analytics',
                                      on_click=lambda: do_report()) \
@@ -30,12 +44,23 @@ def render_place_report_page(report_ctrl:ReportController, person_ctrl: PersonCo
                                    on_click=lambda: export_place_report_to_excel(state['rows'], state['columns'])) \
                 .props('elevated').bind_visibility_from(state, 'rows', backward=lambda r: len(r) > 0)
 
-        results_container = ui.column().classes('w-full items-center mt-2')
+        ui.label('Аналіз за місцем залишення (Обставини)').classes('text-h6 mt-4')
+        place_container = ui.column().classes('w-full items-center mt-2')
+
+        ui.label('Аналіз за підрозділами').classes('text-h6 mt-8')
+        unit_container = ui.column().classes('w-full items-center mt-2')
+
 
     async def do_report():
-        results_container.clear()
-        with results_container:
-            ui.spinner(size='xl')
+        place_container.clear()
+        unit_container.clear()
+
+        with place_container:
+            loading = ui.spinner(size='xl')
+
+        filt = PersonSearchFilter()
+        filt.des_date_from = date_from.value
+        filt.des_date_to = date_to.value
 
         try:
             # Створюємо фільтр (можна розширити)
@@ -43,24 +68,33 @@ def render_place_report_page(report_ctrl:ReportController, person_ctrl: PersonCo
             if year_select.value:
                 filt.des_year = [year_select.value]
 
+            filt.des_date_from = date_from.value
+            filt.des_date_to = date_to.value
+
+
             # Викликаємо твій новий метод з контролера
             data = await auth_manager.execute(report_ctrl.get_general_state_report, auth_manager.get_current_context(), filt)
 
-            results_container.clear()
+            place_container.clear()
+
             if not data:
                 ui.notify('Дані за вказаними критеріями відсутні', type='warning')
                 return
 
-            with results_container:
-                rows, columns = build_place_table(data)
-                state['rows'] = rows
-                state['columns'] = columns
+            with place_container:
+                rows, cols = build_report_table(data['places'], "Обставини (звідки)")
+                state['place_rows'] = rows
+                state['columns'] = cols  # вони однакові за структурою
+
+            with unit_container:
+                rows, _ = build_report_table(data['units'], "Підрозділ")
+                state['unit_rows'] = rows
 
         except Exception as e:
             ui.notify(f'Помилка: {e}', type='negative')
 
 
-def build_place_table(data):
+def build_report_table(data, first_col_label):
     rows = []
 
     # Створюємо рядок "РАЗОМ"

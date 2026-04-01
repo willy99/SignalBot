@@ -391,7 +391,9 @@ class ExcelReporter:
                 }
 
             # stats[місце_сзч] = template
-            stats = defaultdict(get_row_template)
+
+            place_stats = defaultdict(get_row_template)
+            unit_stats = defaultdict(get_row_template)
 
             # 2. Індекси (беремо потрібні)
             place_idx = self.excelProcessor.header.get(COLUMN_DESERTION_PLACE) - 1
@@ -399,6 +401,7 @@ class ExcelReporter:
             des_date_idx = self.excelProcessor.header.get(COLUMN_DESERTION_DATE) - 1
             ret_date_idx = self.excelProcessor.header.get(COLUMN_RETURN_DATE) - 1
             res_ret_date_idx = self.excelProcessor.header.get(COLUMN_RETURN_TO_RESERVE_DATE) - 1
+            idx_unit = self.excelProcessor.header.get(COLUMN_SUBUNIT) - 1
 
             # Для фільтрації (якщо треба лишити базову фільтрацію по датах)
             des_year_idx = des_date_idx  # використовуємо ту саму колонку для року
@@ -432,24 +435,34 @@ class ExcelReporter:
 
                 if q_des_date_from or q_des_date_to:
                     if des_date:
+                        # Гнучке перетворення des_date у чисту дату (без часу)
                         if isinstance(des_date, datetime):
                             row_des_date = des_date.date()
                         elif isinstance(des_date, date):
                             row_des_date = des_date
+                        elif isinstance(des_date, str):
+                            try:
+                                # Якщо раптом дата прийшла рядком
+                                row_des_date = datetime.strptime(des_date, '%Y-%m-%d').date()
+                            except:
+                                row_des_date = None
                         else:
                             row_des_date = None
 
                         if row_des_date:
+                            # ТУТ МАЄ БУТИ ПОРІВНЯННЯ DATE vs DATE
                             if q_des_date_from:
+                                # Переконайся, що q_des_date_from теж date
                                 match_des_year_from = (row_des_date >= q_des_date_from)
                             if q_des_date_to:
                                 match_des_year_to = (row_des_date <= q_des_date_to)
                         else:
                             match_des_year_from = False
-                            match_des_year_to = False  # Додано скидання для дати "До"
+                            match_des_year_to = False
                     else:
                         match_des_year_from = False
                         match_des_year_to = False
+
                 match_period = match_des_year and match_des_year_from and match_des_year_to
 
                 # --- Базова фільтрація (можна скопіювати твою логіку по роках/датах) ---
@@ -460,6 +473,8 @@ class ExcelReporter:
                 # --- Основна логіка збору ---
                 place = str(row[place_idx] or "Не вказано").strip()
                 status = str(row[status_idx] or REVIEW_STATUS_NOT_ASSIGNED).strip()
+                unit = str(row[idx_unit] or "Невідомий підрозділ").strip()
+
                 ret_date = row[ret_date_idx]
                 res_ret_date = row[res_ret_date_idx]
 
@@ -469,26 +484,30 @@ class ExcelReporter:
                 days = calculate_days_between(des_date, end_point_date)
 
                 # 3. Наповнюємо статистику для конкретного місця
-                current_row = stats[place]
-                current_row['total'] += 1
+                for stats_map, key in [(place_stats, place), (unit_stats, unit)]:
+                    current_row = stats_map[key]
+                    current_row['total'] += 1
 
-                # Стовпці статусів (згідно твого REVIEW_STATUS_MAP)
-                if status in REVIEW_STATUS_MAP[REVIEW_STATUS_NOT_ASSIGNED]:
-                    current_row[REVIEW_STATUS_NOT_ASSIGNED] += 1
-                elif status in REVIEW_STATUS_MAP[REVIEW_STATUS_ASSIGNED]:
-                    current_row[REVIEW_STATUS_ASSIGNED] += 1
-                elif status in REVIEW_STATUS_MAP[REVIEW_STATUS_CLOSED]:
-                    current_row[REVIEW_STATUS_CLOSED] += 1
+                    # Стовпці статусів (згідно твого REVIEW_STATUS_MAP)
+                    if status in REVIEW_STATUS_MAP[REVIEW_STATUS_NOT_ASSIGNED]:
+                        current_row[REVIEW_STATUS_NOT_ASSIGNED] += 1
+                    elif status in REVIEW_STATUS_MAP[REVIEW_STATUS_ASSIGNED]:
+                        current_row[REVIEW_STATUS_ASSIGNED] += 1
+                    elif status in REVIEW_STATUS_MAP[REVIEW_STATUS_CLOSED]:
+                        current_row[REVIEW_STATUS_CLOSED] += 1
 
-                # Стовпці термінів
-                if days <= 10:
-                    current_row['term_under_10'] += 1
-                elif 10 < days <= 30:
-                    current_row['term_10_30'] += 1
-                else:
-                    current_row['term_over_30'] += 1
+                    # Стовпці термінів
+                    if days <= 10:
+                        current_row['term_under_10'] += 1
+                    elif 10 < days <= 30:
+                        current_row['term_10_30'] += 1
+                    else:
+                        current_row['term_over_30'] += 1
 
-            return stats
+            return {
+                'places': {k: dict(v) for k, v in place_stats.items()},
+                'units': {k: dict(v) for k, v in unit_stats.items()}
+            }
 
         except Exception as e:
             traceback.print_exc()

@@ -114,9 +114,11 @@ class ExcelProcessor:
                 # Вставляємо новий рядок через native Excel API
                 try:
                     self.sheet.range((target_insert_row, 1)).api.entire_row.insert()
+                    self.app.api.cut_copy_mode = False
                 except Exception as e:
                     self.sheet.range(f'{target_insert_row - 1}:{target_insert_row - 1}').copy()
                     self.sheet.range(f'{target_insert_row}:{target_insert_row}').insert(shift='down')
+                    self.app.api.cut_copy_mode = False
 
                 # Зачистка строки від сміття
                 new_row_range = self.sheet.range((target_insert_row, 1), (target_insert_row, last_col_idx))
@@ -795,9 +797,12 @@ class ExcelProcessor:
             self.logger.error(f"❌ Помилка при оновленні формули SUBTOTAL: {e}")
 
     def get_last_row(self):
-        last_row = self.sheet.used_range.last_cell.row
+        # last_row = self.sheet.used_range.last_cell.row
 
         # Читаємо ВЕСЬ стовпець 'A' в пам'ять (це миттєво)
+        last_row = self.sheet.range('A1048576').end('up').row
+
+        '''
         col_a_values = self.sheet.range(f"A1:A{last_row}").value
 
         # Захист: якщо таблиця складається лише з 1 рядка, xlwings може повернути просто значення, а не список
@@ -813,6 +818,6 @@ class ExcelProcessor:
             if val is not None and str(val).strip() != '':
                 last_row = i + 1  # +1, бо індекси масивів починаються з 0, а рядки в Excel з 1
                 break
-
+        '''
         print('>>> last row :: ' + str(last_row))
         return last_row
