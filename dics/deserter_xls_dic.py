@@ -53,7 +53,15 @@ COLUMN_ERDR_NOTATION: Final[str] = "примітки/ ЄРДР"
 COLUMN_NOTATION: Final[str] = "Примітка"
 COLUMN_EXPERIENCE: Final[str] = "experienced"
 
-OVERRIDE_COLUMNS: Final[List[str]] = [COLUMN_DESERTION_TYPE, COLUMN_REVIEW_STATUS]
+OVERRIDE_COLUMNS: Final[List[str]] = [COLUMN_DESERTION_TYPE,
+                                      COLUMN_REVIEW_STATUS,
+                                      COLUMN_TZK_REGION,
+                                      COLUMN_KPP_NUMBER,
+                                      COLUMN_KPP_DATE,
+                                      COLUMN_DBR_NUMBER,
+                                      COLUMN_DBR_DATE,
+                                      COLUMN_ERDR_DATE,
+                                      COLUMN_ERDR_NOTATION]
 GENERAL_FIELDS: Final[Tuple[str, ...]] = (
     COLUMN_INCREMENTAL,
     COLUMN_INSERT_DATE,

@@ -52,31 +52,33 @@ class ExcelProcessor:
         self.switch_to_sheet(sheet_name)
         try:
             next_empty_row = self._processRow(records_list)
-            if next_empty_row:
-                # 💡 Викликаємо нашу нову функцію!
-                self.update_total_formula(next_empty_row)
+            self.update_total_formula()
 
             if not self.batch_processing:
                 self.save()
             return True
         except Exception as e:
-            self.logger.error(f"❌ Помилка під час upsert_record: {e}")
+            self.logger.error(f"❌ Помилка під час upsert_record: {e}. Перевірте, що можете встромити рядок у екселі. По-друге, позбавляйтесь його ;) ")
             traceback.print_exc()
-            if self.workbook:
-                self.workbook.close()
-                self.workbook = None
+            #if self.workbook:
+            #    self.workbook.close()
+            #    self.workbook = None
             return False
+
+    def _can_update_cell(self, col_name, current_col_value):
+        if col_name == COLUMN_REVIEW_STATUS:
+            if current_col_value and str(current_col_value).strip() == REVIEW_STATUS_ERDR:
+                return False
+        return True
 
     def _processRow(self, records_list):
         id_col_idx = self.column_map.get(COLUMN_INCREMENTAL.lower())
         if not id_col_idx:
-            self.logger.error("❌ Помилка: Не знайдено колонку №")
+            self.logger.error("❌ Помилка: Не знайдено колонку №. Ексель був пʼян")
             return
 
         last_row_with_data = self.get_last_row()
-
         target_insert_row = last_row_with_data + 1
-
         last_val = self.sheet.range((last_row_with_data, id_col_idx)).value
 
         try:
@@ -92,7 +94,7 @@ class ExcelProcessor:
 
         self.logger.debug(f'--- Визначено останній ID: {current_id} (з рядка {last_row_with_data})')
 
-        last_col_idx = config.EXCEL_LAST_COL_NUMBER
+        last_col_idx = self.get_last_col()
 
         # 3. Перебір кожного словника в масиві
         for data_dict in records_list:
@@ -104,7 +106,7 @@ class ExcelProcessor:
                     if idx:
                         # Кортеж тут!
                         current_cell = self.sheet.range((existing_row, idx))
-                        if (not current_cell.value or current_cell.value == NA or col_name in OVERRIDE_COLUMNS) and value:
+                        if (not current_cell.value or current_cell.value == NA or col_name in OVERRIDE_COLUMNS) and value and self._can_update_cell(col_name, current_cell.value):
                             current_cell.value = get_typed_value(value)
                             self.logger.debug(f'--- [Рядок {existing_row}] оновлюємо {col_name}: {value}')
             else:
@@ -187,7 +189,7 @@ class ExcelProcessor:
             return None
 
         # 3. Отримання масиву через чанки (кине Exception при помилці)
-        data_range = self._fetch_records_by_chunks(last_row, len(self.column_map))
+        data_range = self._fetch_records_by_chunks(last_row, self.get_last_col())
 
         # self.logger.debug('--- data length ' + str(len(data_range)))
         # --- ЗАХИСТ ВІД 'NoneType' ---
@@ -703,16 +705,26 @@ class ExcelProcessor:
                 except ValueError:
                     self.logger.debug(f"❌ EXCEL, update_row_by_index, ID {row_id} не знайдено в колонці А")
                     return False
-                last_col_idx = len(headers)
+                last_col_idx = self.get_last_col()
                 row_range = self.sheet.range((target_row_idx, 1), (target_row_idx, last_col_idx))
                 if paint_with_color:
                     self._color_row(row_range, paint_with_color)
-                row_values = row_range.value
-                for col_name, new_value in updated_data.items():
+
+                current_values = row_range.value
+                new_values = list(current_values)
+
+                for col_name, new_val in updated_data.items():
                     if col_name in header_map:
                         idx = header_map[col_name]
-                        row_values[idx] = new_value
-                row_range.value = row_values
+                        current_val_in_cell = current_values[idx]
+
+                        # --- ЛОГІКА ЗАХИСТУ КОМІРКИ ---
+                        if col_name == COLUMN_REVIEW_STATUS:
+                            if str(current_val_in_cell).strip() == REVIEW_STATUS_ERDR:
+                                self.logger.debug(f"--- [Skip Column] Статус ЄРДР вже встановлено для ID {row_id}, не затираємо.")
+                                continue
+                        new_values[idx] = get_typed_value(new_val)
+                row_range.value = new_values
 
                 return True
         except Exception as e:
@@ -774,17 +786,16 @@ class ExcelProcessor:
 
         return results
 
-    def update_total_formula(self, target_row: int):
+    def update_total_formula(self):
         """
         Вставляє формулу =SUBTOTAL(...) у колонку 'I' під останнім записом.
         target_row - рядок, куди треба вставити формулу.
         """
-        return
-        last_data_row = target_row - 1
-        formula_str = f"=SUBTOTAL(103, $I$2:$I${last_data_row})"
+        last_data_row = self.get_last_row() + 1
+        formula_str = f"=SUBTOTAL(103, $I$2:$I${last_data_row-1})"
 
         try:
-            cell = self.sheet.range(f'I{target_row}')
+            cell = self.sheet.range(f'I{last_data_row}')
             cell.formula = formula_str
             try:
                 if sys.platform == "win32":
@@ -796,28 +807,12 @@ class ExcelProcessor:
         except Exception as e:
             self.logger.error(f"❌ Помилка при оновленні формули SUBTOTAL: {e}")
 
+    def get_last_col(self):
+        headers = self.sheet.range('A1').expand('right').value
+        return len(headers)
+
     def get_last_row(self):
         # last_row = self.sheet.used_range.last_cell.row
-
-        # Читаємо ВЕСЬ стовпець 'A' в пам'ять (це миттєво)
         last_row = self.sheet.range('A1048576').end('up').row
-
-        '''
-        col_a_values = self.sheet.range(f"A1:A{last_row}").value
-
-        # Захист: якщо таблиця складається лише з 1 рядка, xlwings може повернути просто значення, а не список
-        if not isinstance(col_a_values, list):
-            col_a_values = [col_a_values]
-
-        # Йдемо циклом ЗНИЗУ ВГОРУ по отриманих значеннях
-        # len(col_a_values) - 1 — це останній індекс списку
-        for i in range(len(col_a_values) - 1, -1, -1):
-            val = col_a_values[i]
-
-            # Якщо знайшли клітинку, яка не None і не порожній рядок
-            if val is not None and str(val).strip() != '':
-                last_row = i + 1  # +1, бо індекси масивів починаються з 0, а рядки в Excel з 1
-                break
-        '''
         print('>>> last row :: ' + str(last_row))
         return last_row

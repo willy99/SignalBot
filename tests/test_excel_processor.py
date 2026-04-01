@@ -161,3 +161,77 @@ def test_bulk_upsert_and_search(temp_excel_file, mock_logger):
 
     finally:
         processor.close()
+
+
+def test_upsert_logic_with_different_statuses(temp_excel_file, mock_logger):
+    """
+    Комплексна перевірка:
+    1. Якщо статус ЄРДР — він НЕ затирається, але інші поля оновлюються.
+    2. Якщо статус інший (наприклад, 'Не призначено') — статус ПЕРЕЗАПИСУЄТЬСЯ новими даними.
+    """
+    processor = ExcelProcessor(temp_excel_file, mock_logger, is_test_mode=True)
+
+    try:
+        # --- СЦЕНАРІЙ 1: Захист ЄРДР (вже перевірений нами) ---
+        pib_protected = "Захищений Стус Васильович"
+        base_erdr = {
+            COLUMN_NAME: pib_protected,
+            COLUMN_ID_NUMBER: "3344556677",
+            COLUMN_BIRTHDAY: "15.06.1985",
+            COLUMN_DESERTION_DATE: "10.10.2023",
+            COLUMN_REVIEW_STATUS: REVIEW_STATUS_ERDR,
+            COLUMN_TZK_REGION: "Київська область",
+            COLUMN_MIL_UNIT: config.DESERTER_TAB_NAME
+        }
+        processor.upsert_record([base_erdr])
+
+        # Спроба оновити (змінити статус на ASSIGNED та оновити регіон/номери)
+        update_erdr = base_erdr.copy()
+        update_erdr[COLUMN_REVIEW_STATUS] = REVIEW_STATUS_ASSIGNED
+        update_erdr[COLUMN_TZK_REGION] = "Львівська область"
+        update_erdr[COLUMN_DBR_NUMBER] = '642/4444'
+
+        processor.upsert_record([update_erdr])
+
+        row_1 = 2
+        status_col = processor.column_map.get(COLUMN_REVIEW_STATUS.lower())
+        region_col = processor.column_map.get(COLUMN_TZK_REGION.lower())
+        dbr_col = processor.column_map.get(COLUMN_DBR_NUMBER.lower())
+
+        assert processor.sheet.range((row_1, status_col)).value == REVIEW_STATUS_ERDR, "ЄРДР МАЄ зберегтися!"
+        assert processor.sheet.range((row_1, region_col)).value == "Львівська область", "Регіон МАЄ оновитися!"
+        assert processor.sheet.range((row_1, dbr_col)).value == '642/4444', "DBR МАЄ оновитися!"
+
+        # --- СЦЕНАРІЙ 2: Звичайний статус (Перезапис дозволено) ---
+        pib_normal = "Звичайний Петренко Петро"
+        base_normal = {
+            COLUMN_NAME: pib_normal,
+            COLUMN_ID_NUMBER: "9988776655",
+            COLUMN_BIRTHDAY: "20.05.1990",
+            COLUMN_DESERTION_DATE: "12.12.2023",
+            COLUMN_REVIEW_STATUS: REVIEW_STATUS_NOT_ASSIGNED,
+            COLUMN_TZK_REGION: "Одеська область",
+            COLUMN_MIL_UNIT: config.DESERTER_TAB_NAME
+        }
+        processor.upsert_record([base_normal])
+
+        # Отримуємо номер рядка для другого запису
+        row_2 = 3
+
+        # Дані для оновлення
+        update_normal = base_normal.copy()
+        update_normal[COLUMN_REVIEW_STATUS] = REVIEW_STATUS_ASSIGNED  # Має змінитись!
+        update_normal[COLUMN_TZK_REGION] = "Полтавська область"
+
+        processor.upsert_record([update_normal])
+
+        actual_status_2 = processor.sheet.range((row_2, status_col)).value
+        actual_region_2 = processor.sheet.range((row_2, region_col)).value
+
+        assert actual_status_2 == REVIEW_STATUS_ASSIGNED, \
+            f"Статус МАВ змінитись на {REVIEW_STATUS_ASSIGNED}, але залишився {actual_status_2}"
+
+        assert actual_region_2 == "Полтавська область", "Регіон МАВ оновитися"
+
+    finally:
+        processor.close()
