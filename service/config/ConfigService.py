@@ -1,7 +1,7 @@
 import config
 from typing import List
 from domain.sys_config import SysConfig
-
+import re
 
 class ConfigService:
     """
@@ -103,6 +103,13 @@ class ConfigService:
         return [SysConfig(**dict(row)) for row in rows]
 
     def update_value(self, key_name: str, new_value: str) -> bool:
+        # Знаходимо метадані для цього ключа
+        setting = next((s for s in self.DEFAULT_SETTINGS if s.key_name == key_name), None)
+        if not setting:
+            raise ValueError(f"Невідомий ключ конфігурації: {key_name}")
+        # Server-side validation
+        self._validate(setting, new_value)
+
         """Оновлює значення одного параметра з UI."""
         result = self.db.__execute_query__(
             "UPDATE sys_config SET value = ? WHERE key_name = ?",
@@ -116,3 +123,13 @@ class ConfigService:
         """Перезаписує змінні модуля config значеннями з бази (в пам'яті)."""
         for conf in self.get_all():
             setattr(config, conf.key_name, conf.get_typed_value())
+
+    def _validate(self, setting: SysConfig, value: str):
+        rule = setting.validation_rule or ''
+        for part in rule.split('|'):
+            if part.startswith('min:'):
+                if float(value) < float(part[4:]):
+                    raise ValueError(f"{setting.key_name}: значення менше мінімуму")
+            elif part.startswith('regex:'):
+                if not re.match(part[6:], value):
+                    raise ValueError(f"{setting.key_name}: невірний формат")

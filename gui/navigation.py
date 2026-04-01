@@ -27,7 +27,6 @@ from gui.views.report.compare_report_view import render_compare_report_page
 from gui.views.report.logs_view import render_logs_page
 from gui.views.report import daily_report_view
 from gui.views.report import general_state_report
-from gui.views.report import erdr_kram_report_view
 from gui.views.inbox import inbox_triage_view
 from gui.views.task import task_list_view, task_edit_view
 from gui.views.calendar import calendar_view
@@ -53,9 +52,9 @@ def init_nicegui(workflow_obj):
     file_manager = FileCacheManager(config.CACHE_FILE_PATH, log_manager=workflow_obj.log_manager)
 
     app.add_static_files('/static', str(static_dir))
-    app.add_static_files('/templates', str(templates_form))
-    support_templates_dir = current_dir / '../resources/templates'
-    doc_templator = DocTemplator(support_templates_dir)
+    # app.add_static_files('/templates', str(templates_form))
+    templates_dir = current_dir / '../resources/templates'
+    doc_templator = DocTemplator(templates_dir)
     auth_manager = AuthManager(workflow_obj)
 
     support_ctrl = SupportController(doc_templator, workflow_obj, auth_manager)
@@ -290,7 +289,32 @@ def init_nicegui(workflow_obj):
         app_menu.render(auth_manager)
         render_file_search_page(file_manager, auth_manager)
 
+    @ui.page('/download/template/{template_path:path}')
+    @require_access(auth_manager, MODULE_DOC_SUPPORT, PERM_READ)
+    def download_template(template_path: str):
+        """Захищене завантаження шаблонів Word."""
+        try:
+            safe_filename = os.path.basename(template_path)
+
+            full_path = templates_form / template_path  # Якщо довіряємо структурі підпапок
+
+            if not str(Path(full_path).resolve()).startswith(str(templates_form.resolve())):
+                ui.notify('Спроба несанкціонованого доступу до файлової системи!', type='negative')
+                return
+
+            if full_path.exists() and full_path.is_file():
+                ui.download(full_path, safe_filename)
+            else:
+                ui.notify('Шаблон не знайдено', type='warning')
+
+        except Exception as e:
+            ui.notify(f'Помилка завантаження: {e}', type='negative')
 
     # native=False дозволяє працювати як веб-сервер
     # reload=False обов'язково, бо ми в потоці
-    ui.run(port=config.UI_PORT, title='A0224 Втікачі', reload=config.UI_RELOAD, show=False, storage_secret=config.UI_SECRET_KEY)
+    ui.run(
+        port=config.UI_PORT,
+        title=config.PROJECT_TITLE,
+        reload=config.UI_RELOAD,
+        show=False,
+        storage_secret=config.UI_SECRET_KEY)

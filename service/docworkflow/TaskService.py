@@ -144,6 +144,12 @@ class TaskService:
             return 0, 0
 
     def delete_task(self, task_id: int):
+        task = self.get_task_by_id(task_id)
+        if not task:
+            raise ValueError("Задачу не знайдено")
+        # Тільки автор або адмін може видаляти
+        if task.created_by != self.ctx.user_id and self.ctx.user_role != 'admin':
+            raise PermissionError("Недостатньо прав для видалення цієї задачі")
         self.db.delete_record(DB_TABLE_TASK, task_id)
 
     def change_status(self, task_id: int, new_status: str) -> bool:

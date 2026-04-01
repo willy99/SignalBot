@@ -44,7 +44,7 @@ def _validate_env() -> None:
 
 
 _validate_env()
-
+PROJECT_TITLE = "A0224 Втікачі"
 IS_DEV = '--dev' in sys.argv
 
 NET_SERVER_IP = os.getenv("NET_SERVER_IP", "127.0.0.1")

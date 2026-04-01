@@ -158,3 +158,25 @@ class MyWorkFlow:
             return "Фігня-цифра"
 
         return MENU_PROMPT
+
+
+    async def get_ai_answer(self, user_text):
+        # Спочатку перевіряємо "швидкі команди" (Паляниця і т.д.)
+        if user_text.lower() in self.ANSWERS:
+            return self.ANSWERS[user_text.lower()]
+
+        # Якщо команди немає — запитуємо нейронку
+        try:
+            return ''
+            '''
+            response = await client.chat.completions.create(
+                model="gpt-4o",  # або локальна "llama3"
+                messages=[
+                    {"role": "system", "content": "Ти — бот-саботяра. Твій стиль: суміш програміста та військового."},
+                    {"role": "user", "content": user_text}
+                ]
+            )
+            return response.choices[0].message.content
+            '''
+        except:
+            return "Мозок заклинило, йду на перезавантаження... 😵‍💫"

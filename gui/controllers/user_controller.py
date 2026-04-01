@@ -63,7 +63,10 @@ class UserController:
         if not pending or not pending.get('code_hash'):
             raise ValueError("Дані для підтвердження не знайдені")
 
-        # 2. ПЕРЕВІРКА КОДУ через хеш (constant-time порівняння)
+        # 2. ПЕРЕВІРКА ЧАСУ
+        if datetime.now() > pending['expiry']:
+            raise ValueError("Термін дії коду вичерпано")
+        # 3. ПЕРЕВІРКА КОДУ через хеш (constant-time порівняння)
         if not check_password_hash(pending['code_hash'], entered_code):
             # Реєструємо провал
             attempts, lockout = self.user_service.auth_service.register_failed_attempt(ctx.user_id)
@@ -74,9 +77,6 @@ class UserController:
             left = config.SECURITY_MAX_ATTEMPTS - attempts
             raise ValueError(f"Невірний код! Залишилося спроб: {left}")
 
-        # 3. ПЕРЕВІРКА ЧАСУ
-        if datetime.now() > pending['expiry']:
-            raise ValueError("Термін дії коду вичерпано")
 
         # 4. УСПІХ — Код вірний
         if pending['type'].lower() == 'email':
