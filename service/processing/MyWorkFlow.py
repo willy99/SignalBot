@@ -1,47 +1,22 @@
 from watchfiles import awatch
+
+from dics.deserter_xls_dic import REGEX_ANSWERS
 from service.connection.EmailClient import EmailClient
 from service.connection.SignalClient import SignalClient
-from service.ml.AiService import AiService
 from service.processing.processors.DocProcessor import DocProcessor
 from service.processing.processors.ExcelProcessor import ExcelProcessor
 from service.processing.AttachmentHandler import AttachmentHandler
 from service.connection.MyDataBase import MyDataBase
-from service.processing.processors.BatchProcessor import BatchProcessor
 import traceback
 from service.storage.LoggerManager import LoggerManager
 from service.processing.processors.ExcelReport import ExcelReporter
-from service.processing.converter.ColumnConverter import ColumnConverter
 from service.storage.BackupData import BackupData
 from service.users.UserService import UserService
 import threading
 import re
-import random
+import html
 
 class MyWorkFlow:
-    REGEX_ANSWERS = [
-        (r"(привіт|бажаю|міцного|здоров|вітаю|куку|вечір в хату)",
-         ["Привіт! Що трапилося? 🤖", "Бажаю міцного! Я на зв'язку. 🫡", "Вітаю! Слухаю уважно.", "Вечір в хату", "Доброго раночку з кавочкой", "Здоровенькі були та й будьмо!"]),
-
-        (r"(на все добре|пока|побачення)",
-         ["На все добре! 🤖", "Тихої ночі. 🫡", "Я пішов спатки.", "Будьмо!"]),
-
-        (r"(як справи|шо там|як воно|як сам)",
-         ["Сракопад жахливий! 🚀", "Тримаємось на багах та каві. ☕", "Все стабільно: факапи за розкладом."]),
-
-        (r"(хто ти|що ти за звір|ти хто)",
-         ["Я бот-ботяра-саботяра, повний шаїчечки та багів. 🛠️"]),
-
-        (r"(паляниця|укрзалізниця)",
-         ["Укрзалізниця! 🇺🇦"]),
-
-        (r"(слава україні|героям слава)",
-         ["Героям Слава! 🇺🇦"]),
-
-        (r"(слава нації)",
-         ["Смерть ворогам! 🇺🇦"])
-
-    ]
-
 
     def __init__(self, db: MyDataBase = None):
         self.log_manager = LoggerManager()
@@ -56,7 +31,6 @@ class MyWorkFlow:
         self.db: MyDataBase = db if db is not None else MyDataBase()
         self.excelFilePath = None
         self._excel_lock = threading.Lock()
-        self.aiService = AiService()
 
         self.backuper = BackupData(self.log_manager)
 
@@ -99,7 +73,8 @@ class MyWorkFlow:
 
                 elif message_text:
                     response = await self._get_text_response(source, message_text)
-                    self.logger.debug(f"🤖 Відповідаю: {response}")
+                    safe_response = html.escape(response).replace("\n", " ")
+                    self.logger.debug(f"🤖 Відповідаю: {safe_response}")
                     if group_id is None:
                         self.signalClient.send_message(source, response)
 
@@ -133,7 +108,7 @@ class MyWorkFlow:
         current_state = self._user_service.get_user_state(user_id)
 
         # 3. ФІЛЬТР: Регулярні вирази для вільного спілкування
-        for pattern, responses in self.REGEX_ANSWERS:
+        for pattern, responses in REGEX_ANSWERS:
             if re.search(pattern, normalized):
                 import random
                 return random.choice(responses)
@@ -200,7 +175,3 @@ class MyWorkFlow:
 
         return MENU_PROMPT
 
-
-    async def get_ai_answer(self, user_text) -> str:
-        ai_answer = await self.aiService.get_response(user_text)
-        return ai_answer

@@ -126,10 +126,25 @@ class ConfigService:
 
     def _validate(self, setting: SysConfig, value: str):
         rule = setting.validation_rule or ''
+        if not rule:
+            return
+
         for part in rule.split('|'):
-            if part.startswith('min:'):
-                if float(value) < float(part[4:]):
-                    raise ValueError(f"{setting.key_name}: значення менше мінімуму")
-            elif part.startswith('regex:'):
-                if not re.match(part[6:], value):
-                    raise ValueError(f"{setting.key_name}: невірний формат")
+            try:
+                if part.startswith('min:'):
+                    if float(value) < float(part[4:]):
+                        raise ValueError(f"Параметр {setting.key_name}: мінімальне значення {part[4:]}")
+
+                elif part.startswith('max:'):  # ДОДАЄМО MAX
+                    if float(value) > float(part[4:]):
+                        raise ValueError(f"Параметр {setting.key_name}: максимальне значення {part[4:]}")
+
+                elif part.startswith('regex:'):
+                    if not re.match(part[6:], value):
+                        raise ValueError(f"Параметр {setting.key_name}: невірний формат (очікується regex: {part[6:]})")
+
+            except ValueError as e:
+                # Якщо це наша помилка — прокидаємо далі
+                if "Параметр" in str(e): raise e
+                # Якщо це помилка конвертації float(value)
+                raise ValueError(f"Параметр {setting.key_name}: очікується числове значення")

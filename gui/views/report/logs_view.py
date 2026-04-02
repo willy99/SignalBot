@@ -2,6 +2,7 @@ import os
 import re
 from nicegui import ui
 import config
+import html
 
 # Регулярний вираз для парсингу логу: Дата/Час - РІВЕНЬ - Повідомлення
 LOG_PATTERN = re.compile(r"^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2},\d{3})\s-\s([A-Z]+)\s-\s(.*)$")
@@ -11,6 +12,8 @@ def format_log_line(line: str) -> str:
     line = line.strip()
     if not line:
         return ""
+
+    safe_line = html.escape(line)
 
     # Екрануємо символи < та >, щоб логи не ламали HTML-верстку
     line = line.replace('<', '&lt;').replace('>', '&gt;')
@@ -35,7 +38,7 @@ def format_log_line(line: str) -> str:
         return f'<div class="mb-1"><span class="text-cyan-400">[{timestamp}]</span> <span class="{level_color}">[{level}]</span> <span class="text-gray-300">{msg}</span></div>'
     else:
         # Якщо рядок не відповідає формату (наприклад, traceback помилки)
-        return f'<div class="mb-1 text-gray-500">{line}</div>'
+        return f'<div class="mb-1 text-gray-500">{safe_line}</div>'
 
 
 def render_logs_page(log_file_path: str):
