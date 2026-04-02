@@ -64,9 +64,11 @@ class InboxService:
                 self.logger.error(f"Помилка завантаження файлу {target_path}: {e}")
                 raise
 
-    def assign_file(self, source_user: str, filename: str, target_user: str):
+    def assign_file(self, source_user: str, filename: str, target_user: str, source_folder=None):
+        if not source_folder:
+            source_folder = config.INBOX_DIR_PATH  # дефолт
         """Переміщує файл до папки target_user."""
-        root_dir = config.INBOX_DIR_PATH
+        root_dir = source_folder
 
         client = StorageFactory.create_client(root_dir, self.log_manager)
         if source_user:

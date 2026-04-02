@@ -51,7 +51,7 @@ class ReportController:
         return results
 
     @refresh_session_method
-    def get_daily_added_files_report(self, ctx: RequestContext, target_date: date = None, exclude_names: List[str] = None, pre_fetched_archive=None):
+    def get_daily_returns_report(self, ctx: RequestContext, target_date: date = None, exclude_names: List[str] = None, pre_fetched_archive=None):
         return self.reporter.get_daily_returns_report(target_date, exclude_names, pre_fetched_archive)
 
     @refresh_session_method

@@ -388,12 +388,14 @@ class ExcelReporter:
                     'term_under_10': 0,
                     'term_10_30': 0,
                     'term_over_30': 0,
+                    'dynamic_places': defaultdict(int)
                 }
 
             # stats[місце_сзч] = template
 
             place_stats = defaultdict(get_row_template)
             unit_stats = defaultdict(get_row_template)
+            all_found_sources = set()
 
             # 2. Індекси (беремо потрібні)
             place_idx = self.excelProcessor.header.get(COLUMN_DESERTION_PLACE) - 1
@@ -401,6 +403,7 @@ class ExcelReporter:
             des_date_idx = self.excelProcessor.header.get(COLUMN_DESERTION_DATE) - 1
             ret_date_idx = self.excelProcessor.header.get(COLUMN_RETURN_DATE) - 1
             res_ret_date_idx = self.excelProcessor.header.get(COLUMN_RETURN_TO_RESERVE_DATE) - 1
+            order_ass_date_idx = self.excelProcessor.header.get(COLUMN_ORDER_ASSIGNMENT_DATE) - 1
             idx_unit = self.excelProcessor.header.get(COLUMN_SUBUNIT) - 1
 
             # Для фільтрації (якщо треба лишити базову фільтрацію по датах)
@@ -419,6 +422,10 @@ class ExcelReporter:
             target_date = datetime.now()
 
             for row in data:
+
+                source_place = str(row[place_idx] or "Не вказано").strip()
+                all_found_sources.add(source_place)
+
                 des_date = row[des_date_idx] # mandatory field
                 des_date_year = get_year_safe(des_date)
 
@@ -469,6 +476,7 @@ class ExcelReporter:
                 des_date = row[des_date_idx]
                 if not des_date: continue
                 if not match_period: continue
+                order_ass_date = row[order_ass_date_idx]
 
                 # --- Основна логіка збору ---
                 place = str(row[place_idx] or "Не вказано").strip()
@@ -478,15 +486,20 @@ class ExcelReporter:
                 ret_date = row[ret_date_idx]
                 res_ret_date = row[res_ret_date_idx]
 
-                # Визначаємо термін СЗЧ
-                end_point_date = ret_date if ret_date else res_ret_date if res_ret_date else target_date
+                # Визначаємо термін
+                # end_point_date = ret_date if ret_date else res_ret_date if res_ret_date else target_date
+                end_point_date = target_date
 
-                days = calculate_days_between(des_date, end_point_date)
+                if order_ass_date:
+                    days = calculate_days_between(order_ass_date, end_point_date)
+                else:
+                    days = 60
 
                 # 3. Наповнюємо статистику для конкретного місця
                 for stats_map, key in [(place_stats, place), (unit_stats, unit)]:
                     current_row = stats_map[key]
                     current_row['total'] += 1
+                    current_row['dynamic_places'][source_place] += 1
 
                     # Стовпці статусів (згідно твого REVIEW_STATUS_MAP)
                     if status in REVIEW_STATUS_MAP[REVIEW_STATUS_NOT_ASSIGNED]:
@@ -497,16 +510,18 @@ class ExcelReporter:
                         current_row[REVIEW_STATUS_CLOSED] += 1
 
                     # Стовпці термінів
-                    if days <= 10:
-                        current_row['term_under_10'] += 1
-                    elif 10 < days <= 30:
-                        current_row['term_10_30'] += 1
-                    else:
-                        current_row['term_over_30'] += 1
+                    if status in REVIEW_STATUS_MAP[REVIEW_STATUS_ASSIGNED]:
+                        if days <= 10:
+                            current_row['term_under_10'] += 1
+                        elif 10 < days <= 30:
+                            current_row['term_10_30'] += 1
+                        else:
+                            current_row['term_over_30'] += 1
 
             return {
                 'places': {k: dict(v) for k, v in place_stats.items()},
-                'units': {k: dict(v) for k, v in unit_stats.items()}
+                'units': {k: dict(v) for k, v in unit_stats.items()},
+                'detected_sources': sorted(list(all_found_sources))
             }
 
         except Exception as e:

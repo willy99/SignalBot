@@ -22,7 +22,9 @@ from service.processing.processors.ExcelReport import ExcelReporter
 from service.processing.processors.BatchProcessor import BatchProcessor
 from service.processing.converter.ColumnConverter import ColumnConverter
 from service.storage.LoggerManager import LoggerManager
-
+from itertools import groupby
+import re
+from datetime import datetime
 
 class SignalBotHandler:
 
@@ -115,6 +117,17 @@ class SignalBotHandler:
 
     def _process_state(self, phone_number: str, text: str) -> str:
         state = self.user_service.get_user_state(phone_number)
+
+        # special cases
+        date_match = re.search(r"(?:щоден[н]?ий\s*(?:звіт\s*за|звіт|за|[,])?)\s*(\d{2}\.\d{2}\.\d{4})", text.lower())
+        if date_match:
+            date_str = date_match.group(1)
+            try:
+                parsed_date = datetime.strptime(date_str, "%d.%m.%Y").date()
+                return self._daily_report_text(parsed_date)
+            except ValueError:
+                return f"❌ Неправильний формат дати: {date_str}. Використовуйте ДД.ММ.РРРР"
+
         self.logger.debug(
             f"Signal-бот: phone=...{phone_number[-4:]}, state={state}, text='{text}'"
         )
@@ -182,47 +195,66 @@ class SignalBotHandler:
     # Форматування звіту
     # ------------------------------------------------------------------
 
-    def _daily_report_text(self) -> str:
-        """
-        Текстовий варіант щоденного зведеного звіту для Signal.
-        Два блоки:
-          А) Загальна статистика (brief_summary)
-          Б) Нові записи за сьогодні (get_daily_report)
-        """
+    def _daily_report_text(self, target_date: date = None) -> str:
         try:
-            today = date.today()
-            lines = [f"📊 Зведений звіт за {today.strftime('%d.%m.%Y')}\n"]
+            for_date = target_date if target_date else date.today()
+            lines = [f"📊 *ЗВЕДЕНИЙ ЗВІТ ЗА {for_date.strftime('%d.%m.%Y')}*\n"]
 
-            # --- Блок 1: Загальна статистика ---
+            # --- Блок 1: Загальна статистика (Беремо як приклад для А0224) ---
             summary_rows = self.reporter.get_brief_summary()
             if summary_rows:
                 s = summary_rows[0]
-                lines.append("📌 Загальна статистика А0224:")
-                lines.append(f"  Всього СЗЧ:       {s.get('total_awol', 0)}")
-                lines.append(f"  В розшуку:         {s.get('in_search', 0)}")
-                lines.append(f"  Повернулись:       {s.get('returned', 0)}")
-                lines.append(f"  В БРЕЗ:            {s.get('res_returned', 0)}")
+                lines.append("📌 *Загальна статистика А0224:*")
+                lines.append(f"  Всього СЗЧ: {s.get('total_awol', 0)}")
+                lines.append(f"  В розшуку:   {s.get('in_search', 0)}")
+                lines.append(f"  Повернулись: {s.get('returned', 0)}")
                 lines.append("")
 
             # --- Блок 2: Нові записи сьогодні ---
-            daily = self.reporter.get_daily_report(today)
-            if not daily:
+            daily_data = self.reporter.get_daily_report(for_date)
+
+            if not daily_data:
                 lines.append("ℹ️ Нових записів за сьогодні немає.")
             else:
-                lines.append(f"📋 Нові записи ({len(daily)}):")
-                for i, r in enumerate(daily, 1):
-                    name     = r.get('name', '—')
-                    title    = r.get('title', '—')
-                    subunit  = r.get('subunit', '—')
-                    des_date = r.get('des_date')
-                    des_date_str = des_date.strftime('%d.%m.%Y') if des_date else '—'
-                    locality = r.get('desertion_locality') or r.get('desertion_place') or '—'
-                    lines.append(
-                        f"\n{i}. {title} {name}\n"
-                        f"   Підрозділ: {subunit}\n"
-                        f"   Дата СЗЧ: {des_date_str}\n"
-                        f"   Місце: {locality}"
-                    )
+                # Сортуємо для коректної роботи groupby: спочатку по в/ч, потім по категорії
+                daily_data.sort(key=lambda x: (x['sheet_name'], x['category']))
+
+                # Групуємо по Військовій частині (sheet_name)
+                for sheet_name, sheet_group in groupby(daily_data, key=lambda x: x['sheet_name']):
+                    lines.append(f"🏢 *ЧАСТИНА {sheet_name}*")
+                    lines.append("=" * 20)
+
+                    # Перетворюємо групу в список, щоб пройтися по ній двічі (для СЗЧ та Повернень)
+                    records = list(sheet_group)
+
+                    # 1. Секція СЗЧ (standard_event)
+                    new_awol = [r for r in records if r['category'] == 'standard_event']
+                    if new_awol:
+                        lines.append(f" 🏃‍♂️ *НОВІ ПОДІЇ / СЗЧ ({len(new_awol)}):*")
+                        for i, r in enumerate(new_awol, 1):
+                            locality = r.get('desertion_locality') or r.get('desertion_place') or '—'
+                            lines.append(
+                                f"{i}. {r['title']} {r['name']}\n"
+                                f"   • {r['subunit']} | СЗЧ від: {r['des_date'].strftime('%d.%m.%Y') if r['des_date'] else '—'}\n"
+                                f"   • Місце: {locality}"
+                            )
+                        lines.append("")
+
+                    # 2. Секція Повернень (late_return)
+                    returned = [r for r in records if r['category'] == 'late_return']
+                    if returned:
+                        lines.append(f"✅ *НЕСВОЄЧАСНІ ПОВЕРНЕННЯ ({len(returned)}):*")
+                        for i, r in enumerate(returned, 1):
+                            # Рахуємо скільки днів був відсутній
+                            absent_days = r.get('term_absent', '—')
+                            lines.append(
+                                f"{i}. {r['title']} {r['name']}\n"
+                                f"   • {r['subunit']} | Відсутній: {absent_days} діб\n"
+                                f"   • Повернувся: {r['ret_date'].strftime('%d.%m.%Y') if r['ret_date'] else '—'}"
+                            )
+                        lines.append("")
+
+                    lines.append("")  # Розділювач між частинами
 
             return "\n".join(lines)
 

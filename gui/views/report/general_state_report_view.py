@@ -82,22 +82,32 @@ def render_place_report_page(report_ctrl:ReportController, person_ctrl: PersonCo
                 return
 
             with place_container:
-                rows, cols = build_report_table(data['places'], "Обставини (звідки)")
+                rows, cols = build_report_table(data.get('places', {}), 'Місце СЗЧ', show_dynamic_sources=False)
+                # rows, cols = build_report_table(data['places'], "Обставини (звідки)")
                 state['place_rows'] = rows
                 state['columns'] = cols  # вони однакові за структурою
 
             with unit_container:
-                rows, _ = build_report_table(data['units'], "Підрозділ")
+                rows, _ = build_report_table(data.get('units', {}), 'Підрозділ', show_dynamic_sources=True)
                 state['unit_rows'] = rows
 
         except Exception as e:
             ui.notify(f'Помилка: {e}', type='negative')
 
 
-def build_report_table(data, first_col_label):
+def build_report_table(data, first_col_label, show_dynamic_sources=False):
     rows = []
 
-    # Створюємо рядок "РАЗОМ"
+    # 1. Визначаємо динамічні джерела (тільки якщо потрібно)
+    sorted_sources = []
+    if show_dynamic_sources:
+        all_sources = set()
+        for stats in data.values():
+            if 'dynamic_places' in stats:
+                all_sources.update(stats['dynamic_places'].keys())
+        sorted_sources = sorted(list(all_sources))
+
+    # 2. Шаблон для "РАЗОМ"
     grand_total = {
         'place': 'РАЗОМ ПО ВЧ',
         REVIEW_STATUS_NOT_ASSIGNED: 0,
@@ -109,64 +119,80 @@ def build_report_table(data, first_col_label):
         'total': 0,
         'is_grand_total': True
     }
+    if show_dynamic_sources:
+        for src in sorted_sources:
+            grand_total[f'src_{src}'] = 0
 
-    # Перетворюємо dict у список рядків для таблиці
+    # 3. Формуємо ряди
     for place, stats in data.items():
         row = {'place': place, 'is_grand_total': False, **stats}
+
+        if show_dynamic_sources:
+            dynamic = stats.get('dynamic_places', {})
+            for src in sorted_sources:
+                val = dynamic.get(src, 0)
+                row[f'src_{src}'] = val
+                grand_total[f'src_{src}'] += val
+
         rows.append(row)
 
         for key in grand_total:
-            if key not in ['place', 'is_grand_total']:
+            if key not in ['place', 'is_grand_total'] and not key.startswith('src_'):
                 grand_total[key] += stats.get(key, 0)
 
     rows.sort(key=lambda x: x['total'], reverse=True)
     rows.append(grand_total)
 
-    columns = [
-        {'name': 'place', 'label': 'Обставини (звідки)', 'field': 'place', 'align': 'left'},
+    # 4. Колонки
+    columns = [{'name': 'place', 'label': first_col_label, 'field': 'place', 'align': 'left'}]
+
+    # Додаємо "Звідки" ТІЛЬКИ ЯКЩО ЦЕ ДРУГА ТАБЛИЦЯ (ПІДРОЗДІЛИ)
+    if show_dynamic_sources:
+        for src in sorted_sources:
+            columns.append({
+                'name': f'src_{src}',
+                'label': src,
+                'field': f'src_{src}',
+                'headerClasses': 'bg-green-50'
+            })
+
+    # Стандартні колонки
+    columns.extend([
         {'name': 'not_assigned', 'label': 'Не призначено', 'field': REVIEW_STATUS_NOT_ASSIGNED},
-        {'name': 'assigned', 'label': 'Призначено', 'field': REVIEW_STATUS_ASSIGNED},
         {'name': 'closed', 'label': 'Закрито', 'field': REVIEW_STATUS_CLOSED},
+        {'name': 'assigned', 'label': 'Призначено', 'field': REVIEW_STATUS_ASSIGNED},
         {'name': 'u10', 'label': 'до 10 діб', 'field': 'term_under_10', 'headerClasses': 'bg-orange-50'},
         {'name': 'u30', 'label': '10-30 діб', 'field': 'term_10_30', 'headerClasses': 'bg-orange-50'},
         {'name': 'o30', 'label': '> 30 діб', 'field': 'term_over_30', 'headerClasses': 'bg-red-50'},
-        {'name': 'total', 'label': 'Всього СЗЧ', 'field': 'total', 'headerClasses': 'bg-blue-100 font-bold'},
-    ]
+        {'name': 'total', 'label': 'Всього', 'field': 'total', 'headerClasses': 'bg-blue-100 font-bold'},
+    ])
 
-    table = ui.table(columns=columns, rows=rows, row_key='place').classes('w-full max-w-5xl')
+    # 5. Рендеринг з адаптивною шапкою
+    table = ui.table(columns=columns, rows=rows, row_key='place').classes('w-full max-w-full overflow-x-auto')
     table.props('bordered separator=cell flat dense')
 
-    # Шапка з об'єднанням стовпців (як ти любиш)
-    table.add_slot('header', '''
+    src_colspan = len(sorted_sources)
+    # Якщо динамічних стовпців немає, ця секція просто не відобразиться коректно,
+    # тому робимо умову в f-рядку для colspan:
+    sources_header = f'<q-th colspan="{src_colspan}" class="bg-green-1 text-bold">Обставини (звідки СЗЧ)</q-th>' if show_dynamic_sources else ''
+
+    table.add_slot('header', f'''
         <q-tr>
-            <q-th colspan="1" class="bg-grey-2 text-bold">Місце</q-th>
+            <q-th colspan="1" class="bg-grey-2 text-bold">Найменування</q-th>
+            {sources_header}
             <q-th colspan="3" class="bg-indigo-1 text-bold">Статус розслідування</q-th>
-            <q-th colspan="3" class="bg-orange-1 text-bold">Тривалість СЗЧ (календарних діб)</q-th>
-            <q-th colspan="1" class="bg-blue-2 text-bold text-subtitle2">Загалом</q-th>
+            <q-th colspan="3" class="bg-orange-1 text-bold">Тривалість СЗЧ</q-th>
+            <q-th colspan="1" class="bg-blue-2 text-bold">Загалом</q-th>
         </q-tr>
         <q-tr>
             <q-th v-for="col in props.cols" :key="col.name" :props="props">
-                {{ col.label }}
+                {{{{ col.label }}}}
             </q-th>
         </q-tr>
     ''')
 
-    # Кастомні рядки з підсвіткою "РАЗОМ"
-    table.add_slot('body', '''
-        <q-tr :props="props" :class="props.row.is_grand_total ? 'bg-orange-1 font-bold' : ''">
-            <q-td v-for="col in props.cols" :key="col.name" :props="props">
-                <template v-if="col.name === 'place' && props.row.is_grand_total">
-                    <q-icon name="summarize" color="primary" /> {{ col.value }}
-                </template>
-                <template v-else>
-                    {{ col.value }}
-                </template>
-            </q-td>
-        </q-tr>
-    ''')
-
+    # ... (body slot залишається без змін) ...
     return rows, columns
-
 
 def export_place_report_to_excel(rows, columns):
     if not rows:

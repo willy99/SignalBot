@@ -152,7 +152,7 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
             all_daily_files = await auth_manager.execute(report_ctrl.get_daily_archive_files, auth_manager.get_current_context(), target_date, [])
 
             # 2. ПОВЕРНЕННЯ (передаємо сюди вже розпарсені файли)
-            return_data = await auth_manager.execute(report_ctrl.get_daily_added_files_report, auth_manager.get_current_context(), target_date, [], all_daily_files)
+            return_data = await auth_manager.execute(report_ctrl.get_daily_returns_report, auth_manager.get_current_context(), target_date, [], all_daily_files)
             late_return_names = {r['name'].strip().lower() for r in late_returns if r.get('name')}
             return_data = [
                 r for r in return_data

@@ -25,11 +25,11 @@ class InboxController:
         service = InboxService(self.log_manager, ctx)
         return service.download_file(ctx.user_login if is_personal else None, filename, root_dir)
 
-    def assign_file(self, ctx: RequestContext, filename: str, is_personal: bool, target_username: str):
+    def assign_file(self, ctx: RequestContext, filename: str, is_personal: bool, target_username: str, source_folder=None):
         """Викликається з UI для переміщення файлу."""
         service = InboxService(self.log_manager, ctx)
         source_user = ctx.user_login if is_personal else None
-        service.assign_file(source_user, filename, target_username)
+        service.assign_file(source_user, filename, target_username, source_folder)
 
     def delete_file(self, ctx:RequestContext, user_login:str, folder:str, filename: str):
         """Обробник для видалення файлу користувачем."""

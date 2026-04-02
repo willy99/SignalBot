@@ -104,7 +104,15 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
                     elif atype == 'assign':
                         target = action['target']
                         is_pers = action.get('is_personal', False)
-                        await auth_manager.execute(inbox_ctrl.assign_file, auth_manager.get_current_context(), fname, is_pers, target)
+                        f_folder = action.get('folder')
+                        await auth_manager.execute(
+                            inbox_ctrl.assign_file,
+                            auth_manager.get_current_context(),
+                            fname,
+                            is_pers,
+                            target,
+                            f_folder  # <--- Передаємо шлях (напр. config.OUTBOX_DIR_PATH)
+                        )
                         ui.notify(f'👤 {fname} передано користувачу {target}', type='positive')
 
                 except Exception as ex:
