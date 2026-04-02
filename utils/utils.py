@@ -523,3 +523,14 @@ def sanitize_filename(self, filename: str) -> str:
 
     # 4. Fallback, якщо після очищення нічого не залишилось
     return safe_name if safe_name else "safe_attachment"
+
+
+def normalize_phone(phone: str) -> str:
+    """
+    Нормалізує номер телефону до формату +380XXXXXXXXX.
+    Signal надсилає '+380501234567', але в БД може бути збережено '0501234567' або '380501234567'.
+    Порівнюємо тільки цифри (останні 9), щоб уникнути невідповідностей формату.
+    """
+    if not phone:
+        return ''
+    return re.sub(r'\D', '', phone)  # залишаємо тільки цифри

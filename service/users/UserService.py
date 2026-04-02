@@ -8,6 +8,8 @@ from service.constants import DB_TABLE_USER
 from service.users.AuthService import AuthService
 from werkzeug.security import generate_password_hash
 
+from utils.utils import normalize_phone
+
 
 class UserService:
     def __init__(self, db:MyDataBase, signal_client: SignalClient, email_client: EmailClient):
@@ -109,3 +111,36 @@ class UserService:
         except Exception as e:
             print(f"❌ Помилка Signal RPC: {e}")
             raise e
+
+    def get_user_by_phone(self, phone_number: str) -> Optional[User]:
+        """
+        Знаходить активного користувача за номером телефону Signal.
+        Порівнює тільки цифрову частину номера, щоб пережити різні формати
+        (+380..., 380..., 0...).
+
+        Повертає User ТІЛЬКИ якщо:
+          - телефон знайдено в полі users.phone (верифікований через 2FA)
+          - користувач активний (is_active = 1)
+          - use_2fa = 1 (підтверджений Signal-контакт)
+        Якщо user не пройшов 2FA-верифікацію — phone порожній, доступу немає.
+        """
+        if not phone_number:
+            return None
+
+        digits = normalize_phone(phone_number)
+        if len(digits) < 9:
+            return None
+
+        # Перевіряємо по останніх 9 цифрах (локальна частина номера)
+        # щоб не залежати від коду країни у форматі
+        suffix = digits[-9:]
+
+        rows = self.db.__execute_fetchall__(
+            f"SELECT * FROM {DB_TABLE_USER} WHERE phone IS NOT NULL AND phone != '' AND is_active = 1 AND use_2fa = 1"
+        )
+        for row in rows:
+            stored_digits = normalize_phone(str(row['phone']))
+            if stored_digits[-9:] == suffix:
+                return self.auth_service._map_to_user(row)
+
+        return None

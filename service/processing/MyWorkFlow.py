@@ -1,13 +1,13 @@
-from watchfiles import awatch
-
 from dics.deserter_xls_dic import REGEX_ANSWERS
 from service.connection.EmailClient import EmailClient
 from service.connection.SignalClient import SignalClient
 from service.processing.processors.DocProcessor import DocProcessor
 from service.processing.processors.ExcelProcessor import ExcelProcessor
-from service.processing.AttachmentHandler import AttachmentHandler
+from service.processing.workflow.AttachmentHandler import AttachmentHandler
 from service.connection.MyDataBase import MyDataBase
 import traceback
+
+from service.processing.workflow.SignalBotHandler import SignalBotHandler
 from service.storage.LoggerManager import LoggerManager
 from service.processing.processors.ExcelReport import ExcelReporter
 from service.storage.BackupData import BackupData
@@ -33,11 +33,21 @@ class MyWorkFlow:
         self._excel_lock = threading.Lock()
 
         self.backuper = BackupData(self.log_manager)
+        self._bot_handler: SignalBotHandler = None
 
     def initExcelProcessor(self, excelFilePath):
         self.excelProcessor = ExcelProcessor(excelFilePath, log_manager=self.log_manager,)
         self.reporter = ExcelReporter(self.excelProcessor, log_manager=self.log_manager,)
         self.excelFilePath = excelFilePath
+
+        user_service = UserService(self.db, self.signalClient, self.emailClient)
+        self._bot_handler = SignalBotHandler(
+            user_service=user_service,
+            reporter=self.reporter,
+            log_manager=self.log_manager,
+            excel_file_path=self.excelFilePath,
+            excel_lock=self._excel_lock,
+        )
 
     async def parseSignalData(self, data: dict):
         """Розбирає JSON-RPC пакет від Signal та запускає відповідну логіку."""
@@ -56,27 +66,11 @@ class MyWorkFlow:
                 group_id = group_info.get("groupId") if group_info else None
                 message_text = msg.get("message", "")
                 attachments = msg.get("attachments", [])
-
                 if attachments:
-                    self.logger.debug("--- ПОЧАТОК ОБРОБКИ ВКЛАДЕНЬ ---")
-                    for att in attachments:
-                        att_id = att.get("id")
-                        filename = att.get("filename")
-                        self.logger.debug(f"📎 Отримано файл: {filename} (ID: {att_id})")
-
-                        self.attachmentHandler = AttachmentHandler(self)
-                        file_process_messages = self.attachmentHandler.handle_attachment(att_id, filename)
-
-                        emoji = "➕" if len(file_process_messages) == 0 else "⚠️"
-                        self.signalClient.send_reaction(group_id, source, emoji, source_uuid, timestamp)
-                    self.logger.debug("--- КІНЕЦЬ ОБРОБКИ ВКЛАДЕНЬ ---")
-
+                    self._handle_attachments(attachments, group_id, source, source_uuid, timestamp)
                 elif message_text:
-                    response = await self._get_text_response(source, message_text)
-                    safe_response = html.escape(response).replace("\n", " ")
-                    self.logger.debug(f"🤖 Відповідаю: {safe_response}")
-                    if group_id is None:
-                        self.signalClient.send_message(source, response)
+                    self._handle_text_message(source, group_id, message_text)
+
 
             elif "syncMessage" in envelope:
                 sync_msg = envelope["syncMessage"]
@@ -96,82 +90,44 @@ class MyWorkFlow:
 
         return None
 
-    async def _get_text_response(self, user_id: str, text: str) -> str:
-        """Повертає відповідь з урахуванням стану меню та регулярних виразів."""
-        normalized = text.lower().strip()
+    def _handle_text_message(self, source: str, group_id, message_text: str) -> None:
+        """Обробляє вхідне текстове повідомлення."""
+        normalized = message_text.lower().strip()
 
-        # 2. ПРІОРИТЕТ: Робота з меню
-        # Якщо в тексті є ключові слова меню АБО якщо користувач уже в якомусь стані (не START)
-        if not hasattr(self, '_user_service'):
-            self._user_service = UserService(self.db, self.signalClient, self.emailClient)
-
-        current_state = self._user_service.get_user_state(user_id)
-
-        # 3. ФІЛЬТР: Регулярні вирази для вільного спілкування
+        # Швидкі відповіді без авторизації (привітання тощо)
         for pattern, responses in REGEX_ANSWERS:
             if re.search(pattern, normalized):
                 import random
-                return random.choice(responses)
+                response = random.choice(responses)
+                self.signalClient.send_message(source, response)
+                return
+        # Повна обробка з авторизацією та стейт-машиною
+        if self._bot_handler is None:
+            self.logger.warning("Signal-бот: _bot_handler не ініціалізовано")
+            response = "⚠️ Система ще не готова. Спробуйте пізніше."
+        else:
+            response = self._bot_handler.handle(source, message_text)
 
-        # Якщо юзер написав "меню" або він вже знаходиться в процесі вибору (цифри 1, 2, 3...)
-        if any(word in normalized for word in ['меню', 'menu', 'help']) or current_state != "START":
-            return self._handle_menu(user_id, normalized)
+        self.logger.debug(f"🤖 Відповідаю {source}: {response[:60]}...")
 
-        # 4. ФОЛБЕК: Якщо нічого не підійшло
-        return "Моя твоя не розуміти. Напиши 'меню', щоб побачити варіанти. 🔕"
+        # Відповідаємо тільки в особистих повідомленнях, не в групах
+        if group_id is None and response:
+            self.signalClient.send_message(source, response)
 
-    def _handle_menu(self, user_id: str, text: str) -> str:
-        """Обробляє стан-машину текстового меню."""
-        # UserService — легкий, можна зберігати як поле, а не створювати щоразу
-        if not hasattr(self, '_user_service'):
-            self._user_service = UserService(self.db, self.signalClient, self.emailClient)
 
-        user_service = self._user_service
-        current_state = user_service.get_user_state(user_id)
+    def _handle_attachments(self, attachments: list, group_id, source: str, source_uuid, timestamp) -> None:
+        """Обробляє вхідні вкладення."""
+        self.logger.debug("--- ПОЧАТОК ОБРОБКИ ВКЛАДЕНЬ ---")
+        for att in attachments:
+            att_id   = att.get("id")
+            filename = att.get("filename")
+            self.logger.debug(f"📎 Отримано файл: {filename} (ID: {att_id})")
 
-        self.logger.debug(f"МЕНЮ: юзер={user_id}, стан={current_state}, текст='{text}'")
+            handler = AttachmentHandler(self)
+            messages = handler.handle_attachment(att_id, filename)
 
-        MAIN_MENU = "Ви у Головному меню:\n1. Різна обробка\n2. Статистика\n3. Вихід"
-        PROCESS_MENU = "ОБРОБКА MENU:\n1. Batch обробка файлів\n2. Конвертація полів\n0. Вихід"
-        MENU_PROMPT = "Напишіть 'меню' для початку роботи."
-        STAT_MENU = "Статистика. 0. Вихід"
-
-        print('>> current state ' + str(current_state))
-        if text in ("меню", "start", "menu"):
-            user_service.set_user_state(user_id, "MAIN_MENU")
-            return MAIN_MENU
-
-        if current_state == "MAIN_MENU":
-            if text == "1":
-                user_service.set_user_state(user_id, "PROCESS")
-                return PROCESS_MENU
-            if text == "2":
-                user_service.set_user_state(user_id, "STAT")
-                return STAT_MENU
-            if text in ("4", "вихід"):
-                user_service.set_user_state(user_id, "START")
-                return MENU_PROMPT
-            if text == "0":
-                return MAIN_MENU
-
-        elif current_state == "PROCESS":
-            if text == "0":
-                user_service.set_user_state(user_id, "MAIN_MENU")
-                return MAIN_MENU
-            if text in ("1", "batch"):
-                #with self._excel_lock:
-                    # BatchProcessor(self.log_manager, self.excelFilePath).start_processing(0)
-                return "Зараз вимкнено"
-            if text in ("2", "convert"):
-                # with self._excel_lock:
-                #    ColumnConverter(self.excelFilePath, self.log_manager).convert()
-                return "Зараз вимкнено"
-
-        elif current_state == "STAT":
-            if text == "0":
-                user_service.set_user_state(user_id, "MAIN_MENU")
-                return MAIN_MENU
-            return "Фігня-цифра"
-
-        return MENU_PROMPT
-
+            emoji = "➕" if len(messages) == 0 else "⚠️"
+            self.signalClient.send_reaction(
+                group_id, source, emoji, source_uuid, timestamp
+            )
+        self.logger.debug("--- КІНЕЦЬ ОБРОБКИ ВКЛАДЕНЬ ---")
