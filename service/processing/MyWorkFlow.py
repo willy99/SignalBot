@@ -47,6 +47,7 @@ class MyWorkFlow:
             log_manager=self.log_manager,
             excel_file_path=self.excelFilePath,
             excel_lock=self._excel_lock,
+            excel_processor=self.excelProcessor
         )
 
     async def parseSignalData(self, data: dict):
@@ -69,7 +70,7 @@ class MyWorkFlow:
                 if attachments:
                     self._handle_attachments(attachments, group_id, source, source_uuid, timestamp)
                 elif message_text:
-                    self._handle_text_message(source, group_id, message_text)
+                    await self._handle_text_message(source, group_id, message_text)
 
 
             elif "syncMessage" in envelope:
@@ -90,7 +91,7 @@ class MyWorkFlow:
 
         return None
 
-    def _handle_text_message(self, source: str, group_id, message_text: str) -> None:
+    async def _handle_text_message(self, source: str, group_id, message_text: str) -> None:
         """Обробляє вхідне текстове повідомлення."""
         normalized = message_text.lower().strip()
 
@@ -106,7 +107,7 @@ class MyWorkFlow:
             self.logger.warning("Signal-бот: _bot_handler не ініціалізовано")
             response = "⚠️ Система ще не готова. Спробуйте пізніше."
         else:
-            response = self._bot_handler.handle(source, message_text)
+            response = await self._bot_handler.handle(source, message_text)
 
         self.logger.debug(f"🤖 Відповідаю {source}: {response[:60]}...")
 
