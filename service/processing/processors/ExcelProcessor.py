@@ -275,6 +275,7 @@ class ExcelProcessor:
 
         # Створюємо словник зі списками для об'єднання
         columns_to_gather = [
+            COLUMN_INSERT_DATE, COLUMN_DESERTION_DATE,
             COLUMN_TZK_REGION, COLUMN_SUBUNIT, COLUMN_SUBUNIT2,
             COLUMN_SERVICE_TYPE, COLUMN_TITLE, COLUMN_TITLE_2,
             COLUMN_DESERTION_TYPE, COLUMN_REVIEW_STATUS,
@@ -304,11 +305,16 @@ class ExcelProcessor:
                         col_idx = header_to_idx[col_name] + 1
                         # Зчитуємо стовпець
                         values = sheet.range((2, col_idx), (last_row, col_idx)).value
+
                         if not isinstance(values, list):
                             values = [values]
 
                         for v in values:
-                            if v is not None and str(v).strip() != "":
+                            if v is None or str(v).strip() == "":
+                                continue
+                            if isinstance(v, (datetime, date)):
+                                global_sets[col_name].add(str(v.year))
+                            elif v is not None and str(v).strip() != "":
                                 global_sets[col_name].add(str(v).strip())
             except Exception as e:
                 self.logger.warning(f"Не вдалося зчитати довідники з листа {s_name}: {e}")
@@ -732,53 +738,46 @@ class ExcelProcessor:
         range.color = hex_color
 
     def batch_search_names(self, names_list: List[str]) -> List[Dict[str, Any]]:
-        """
-        Масовий пошук ПІБ в базі Excel.
-        Повертає відсортований список словників: спочатку ті, кого НЕ знайдено (False), потім ті, хто Є (True).
-        """
-        # Переконуємось, що ми на правильному листі
         self.switch_to_sheet(config.DESERTER_TAB_NAME, silent=True)
 
-        # 1. Знаходимо колонку з ПІБ
-        pib_col_idx = self.column_map.get(COLUMN_NAME.lower()) or self.header.get(COLUMN_NAME)
-        if not pib_col_idx:
-            self.logger.error(f"❌ Не знайдено колонку {COLUMN_NAME} для масового пошуку")
-            return []
+        # 1. Отримуємо індекси колонок
+        pib_idx = self.column_map.get(COLUMN_NAME.lower())
+        rnokpp_idx = self.column_map.get(COLUMN_ID_NUMBER.lower())
 
         last_row = self.get_last_row()
-
-        # 3. Забираємо всю колонку з бази ОДНИМ запитом
         if last_row < 2:
-            excel_names_raw = []
-        else:
-            excel_names_raw = self.sheet.range((2, pib_col_idx), (last_row, pib_col_idx)).value
+            return [{'name': n, 'found': False, 'rnokpp': None} for n in names_list]
 
-        if not isinstance(excel_names_raw, list):
-            excel_names_raw = [excel_names_raw]
+        # 2. Забираємо дані обох колонок одним запитом (діапазон від A до останньої потрібної)
+        # Щоб не гадати з буквами, візьмемо весь рядок даних з 2 по last_row
+        # Або точково, якщо колонки далеко:
+        data_range = self.sheet.range((2, 1), (last_row, self.get_last_col())).value
 
-        # 4. Формуємо Set (множину) у нижньому регістрі для миттєвого пошуку
-        excel_db_set = set()
-        for val in excel_names_raw:
-            if val:
-                excel_db_set.add(str(val).strip().lower())
+        # 3. Формуємо словник для швидкого пошуку: { "прізвище": "код" }
+        # Використовуємо словник, щоб дістати РНОКПП за ПІБ
+        db_map = {}
+        for row in data_range:
+            name_val = row[pib_idx - 1]  # xlwings 1-based, list 0-based
+            if name_val:
+                name_key = str(name_val).strip().lower()
+                code_val = row[rnokpp_idx - 1] if rnokpp_idx else None
+                # Якщо знайдено, зберігаємо код (чистимо від .0 якщо це float з Excel)
+                db_map[name_key] = get_strint_fromfloat(code_val) if code_val else "---"
 
-        # 5. Перевіряємо кожне ім'я з нашого списку (textarea)
+        # 4. Перевіряємо список
         results = []
         for orig_name in names_list:
-            if not orig_name:
-                continue
-
             search_name = str(orig_name).strip().lower()
-            is_found = search_name in excel_db_set
+            found = search_name in db_map
 
             results.append({
-                'name': orig_name,  # Зберігаємо оригінальний регістр для красивого виводу
-                'found': is_found
+                'name': orig_name,
+                'found': found,
+                'rnokpp': db_map.get(search_name) if found else None
             })
 
-        # 6. Сортуємо: спочатку False (хрестики, бо False = 0), потім True (галочки, бо True = 1)
+        # Сортування: спочатку не знайдені
         results.sort(key=lambda x: x['found'])
-
         return results
 
     def update_total_formula(self):

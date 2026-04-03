@@ -102,7 +102,7 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
 
     async def handle_save(person, person_ctrl: PersonController, dialog, on_close=None, paint_color=None, btns=None):
         critical_inputs = [
-            rnokpp_inp, birthday_inp, tzk_input, name_input
+            birthday_inp, tzk_input, name_input
         ]
         is_valid = all([i.validate() for i in critical_inputs])
 

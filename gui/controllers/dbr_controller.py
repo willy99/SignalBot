@@ -28,6 +28,7 @@ class DbrController:
 
     def save_dbr_doc(self, ctx: RequestContext, out_number: str, out_date: str, payload: list,
                      dbr_doc_id: int = None) -> int:
+        self.logger.debug('UI:' + ctx.user_name + ': Зберігаємо пакет супроводів: ' + str(out_number))
         service = DbrService(self.db, ctx)
 
         doc_model = DbrDoc(

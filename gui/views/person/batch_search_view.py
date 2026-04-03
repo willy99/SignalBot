@@ -86,6 +86,8 @@ def render_bulk_search_page(person_ctrl, auth_manager: AuthManager):
                     with ui.row().classes(
                             f'w-full items-center justify-between p-3 border rounded-lg {bg_color} shadow-sm'):
                         ui.label(item['name']).classes('text-md font-medium')
+                        if item['found'] and item['rnokpp']:
+                            ui.label(f"РНОКПП: {item['rnokpp']}").classes('text-xs text-gray-500')
 
                         if item['found']:
                             with ui.row().classes('items-center gap-1'):

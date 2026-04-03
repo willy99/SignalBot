@@ -28,6 +28,7 @@ from service.storage.LoggerManager import LoggerManager
 import re
 from datetime import datetime
 from domain.person import Person
+import html
 
 class SignalBotHandler:
 
@@ -38,7 +39,10 @@ class SignalBotHandler:
         "Головне меню:\n"
         "1. Операції з файлами\n"
         "2. Статистика і звіти\n"
-        "0. Вихід"
+        "0. Вихід\n"
+        "пошук ПІБ - шукає інформацію за введеними даними\n"
+        "щоденний за dd.mm.YYYY - щоденний звіт за дату"
+
     )
     _PROCESS_MENU = (
         "Операції:\n"
@@ -51,7 +55,10 @@ class SignalBotHandler:
         "1. Щоденний зведений звіт (сьогодні)\n"
         "0. Назад"
     )
-    _MENU_PROMPT = "Напишіть 'меню' для початку роботи."
+    _MENU_PROMPT = ("Напишіть 'меню' для початку роботи.\n"
+        "пошук ПІБ - шукає інформацію за введеними даними\n"
+        "щоденний за dd.mm.YYYY - щоденний звіт за дату"
+    )
 
     def __init__(
         self,
@@ -122,7 +129,7 @@ class SignalBotHandler:
 
     async def _process_state(self, phone_number: str, text: str) -> str:
         state = self.user_service.get_user_state(phone_number)
-
+        self.logger.debug('>>>> text from signal ' + str(html.escape(text)))
         # special cases
         date_match = re.search(r"(?:щоден[н]?ий\s*(?:звіт\s*за|звіт|за|[,])?)\s*(\d{2}\.\d{2}\.\d{4})", text.lower())
         if date_match:
@@ -137,7 +144,7 @@ class SignalBotHandler:
             f"Signal-бот: phone=...{phone_number[-4:]}, state={state}, text='{text}'"
         )
 
-        search_match = re.search(r"^(?:пошук|шукай|знайди)\s+(.+)", text.lower().strip())
+        search_match = re.search(r"^(?:пошук|шука[й|ти]*|знайди)\s+(.+)", text.lower().strip())
         if search_match:
             query_text = search_match.group(1).strip()
             return await self._handle_person_search(query_text)
@@ -392,23 +399,24 @@ class SignalBotHandler:
                 line = (
                     f"👤 {main.title} {main.name}\n"
                     f"- Дн: {bday} | РНОКПП: {main.rnokpp or '---'}\n"
-                    f"- {main.mil_unit} | {main.subunit}"
+                    f"- {main.mil_unit} | {main.subunit}  " + (f"| {str(main.suspended)}" if main.suspended else '')
                 )
 
                 # Виводимо кожен епізод СЗЧ окремими рядками
-                line += "\n- 📌 Епізоди СЗЧ:"
+                line += "\n\n- 📌 Епізоди СЗЧ:"
                 for ep in episodes:
                     d_date = ep.desertion_date.strftime("%d.%m.%Y") if isinstance(ep.desertion_date, date) else ep.desertion_date or "---"
+                    ret_date = f' - {ep.return_date}' if ep.return_date else f' - {ep.return_reserve_date}' if ep.return_reserve_date else " - ..."
                     erdr_str = ""
                     if ep.erdr_date:
                         e_date = ep.erdr_date.strftime("%d.%m.%Y") if isinstance(ep.erdr_date, date) else ep.erdr_date
-                        erdr_str = f" | ⚖️ ЄРДР: {e_date}"
+                        erdr_str = f"\n   ЄРДР: {e_date}"
 
-                    line += f"\n  ▫️ {d_date} ({ep.desertion_place or 'місце не вказано'}){erdr_str}"
+                    line += f"\n  ▫️ {d_date} ({ep.desertion_place or 'місце не вказано'}){ret_date}{erdr_str}"
                     if ep.review_status:
                         line += f" [Статус: {ep.review_status}]"
 
-                response_lines.append(line + "\n" + "—" * 15)
+                response_lines.append(line + "\n\n" + "—" * 15)
 
             if len(persons) > 10:
                 response_lines.append("...показано перші 10 результатів. Уточніть запит.")

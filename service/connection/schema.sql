@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
     session_token VARCHAR(50) DEFAULT '',
     failed_login_attempts INTEGER DEFAULT 0,
     lockout_until DATETIME,
+    signal_last_activity DATETIME,
     email TEXT,
     phone TEXT,
     pending_contact TEXT,

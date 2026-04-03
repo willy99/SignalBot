@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from domain.user import User
 from service.connection.EmailClient import EmailClient
@@ -7,7 +7,7 @@ from service.connection.SignalClient import SignalClient
 from service.constants import DB_TABLE_USER
 from service.users.AuthService import AuthService
 from werkzeug.security import generate_password_hash
-
+import config
 from utils.utils import normalize_phone
 
 
@@ -17,6 +17,7 @@ class UserService:
         self.signal_client = signal_client
         self.email_client = email_client
         self.auth_service = AuthService(self.db)
+        self._signal_sessions = {}
 
     def get_user_state(self, phone_number: str) -> str:
         """Отримує стан користувача (повертає 'START', якщо не знайдено)."""
@@ -144,3 +145,45 @@ class UserService:
                 return self.auth_service._map_to_user(row)
 
         return None
+
+
+    #### SIGNAL SESSION ###
+
+    def verify_password(self, username: str, raw_password: str) -> bool:
+        """
+        Перевірка пароля.
+        Використовуй ту ж логіку, що в NiceGUI (наприклад, passlib.hash.bcrypt.verify)
+        """
+        query = "SELECT password_hash FROM users WHERE username = ?"
+        res = self.db.__execute_fetch__(query, (username,))
+        if not res:
+            return False
+
+        # Приклад для bcrypt (заміни на свій метод з веб-версії)
+        return generate_password_hash(raw_password) == res['password_hash']
+
+    def update_signal_activity(self, phone_number: str):
+        """Фіксуємо активність у базі даних"""
+        query = "UPDATE users SET signal_last_activity = ? WHERE phone = ?"
+        self.db.__execute_query__(query, (datetime.now(), phone_number))
+
+    def is_signal_session_valid(self, phone_number: str, ttl_minutes: int) -> bool:
+        """Перевіряємо валідність сесії через БД"""
+        query = "SELECT signal_last_activity FROM users WHERE phone = ? AND is_active = 1"
+        res = self.db.__execute_fetch__(query, (phone_number,))
+
+        if not res or not res['signal_last_activity']:
+            return False
+
+        # Обробка формату (sqlite повертає рядок або об'єкт залежно від драйвера)
+        last_act = res['signal_last_activity']
+        if isinstance(last_act, str):
+            last_act = datetime.fromisoformat(last_act)
+
+        return (datetime.now() - last_act) < timedelta(minutes=ttl_minutes)
+
+    def logout_signal(self, phone_number: str):
+        """Скидаємо сесію та стан"""
+        query = "UPDATE users SET signal_last_activity = NULL WHERE phone = ?"
+        self.db.__execute_query__(query, (phone_number,))
+        self.set_user_state(phone_number, "START")

@@ -181,7 +181,7 @@ def build_report_table(data, first_col_label, show_dynamic_sources=False):
             <q-th colspan="1" class="bg-grey-2 text-bold">Найменування</q-th>
             {sources_header}
             <q-th colspan="3" class="bg-indigo-1 text-bold">Статус розслідування</q-th>
-            <q-th colspan="3" class="bg-orange-1 text-bold">Тривалість СЗЧ</q-th>
+            <q-th colspan="3" class="bg-orange-1 text-bold">Тривалість СЗЧ (призначено)</q-th>
             <q-th colspan="1" class="bg-blue-2 text-bold">Загалом</q-th>
         </q-tr>
         <q-tr>

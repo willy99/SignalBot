@@ -11,6 +11,8 @@ class LoggerManager:
         self.logger = logging.getLogger(log_name)
         self.logger.setLevel(logging_level)
 
+        logging.getLogger('nicegui.binding').setLevel(logging.WARNING)
+
         # Запобігаємо дублюванню логів, якщо об'єкт створюється двічі
         if not self.logger.handlers:
             self._setup_handlers()

@@ -47,6 +47,7 @@ class Person(BaseModel):
     service_days: Optional[Union[str, int]] = Field(None, alias=COLUMN_SERVICE_DAYS)
 
     review_status: Optional[str] = Field("", alias=COLUMN_REVIEW_STATUS)
+    suspended: Optional[Union[int, str]] = Field("", alias=COLUMN_SUSPENDED)
     o_ass_num: Optional[Union[str, int]] = Field("", alias=COLUMN_ORDER_ASSIGNMENT_NUMBER)
     o_res_num: Optional[Union[str, int]] = Field("", alias=COLUMN_ORDER_RESULT_NUMBER)
     cc_article: Optional[Union[str, int]] = Field("", alias=COLUMN_CC_ARTICLE)

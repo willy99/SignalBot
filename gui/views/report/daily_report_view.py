@@ -332,6 +332,20 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
 
                             with ui.column().classes('flex-1 min-w-[300px]'):
                                 ui.label('Розподіл за складом').classes('font-bold text-gray-700 mb-2')
+
+                                has_officers = any(row.get('Офіцери', '-') != '-' for row in state['matrix2_rows'] if row['place'] != 'Всього:')
+                                has_sergeants = any(row.get('Сержанти', '-') != '-' for row in state['matrix2_rows'] if row['place'] != 'Всього:')
+
+                                if has_officers:
+                                    with ui.badge(color='red').classes('w-full p-2 mb-1 items-center justify-center'):
+                                        ui.icon('report_problem').classes('mr-2')
+                                        ui.label('УВАГА: СЕРЕД СЗЧ Є ОФІЦЕРИ').classes('text-sm font-bold uppercase')
+
+                                if has_sergeants:
+                                    with ui.badge(color='orange').classes('w-full p-2 mb-1 items-center justify-center'):
+                                        ui.icon('warning').classes('mr-2')
+                                        ui.label('ЗВЕРНІТЬ УВАГУ: СЕРЕД СЗЧ Є СЕРЖАНТИ').classes('text-sm font-bold uppercase text-black')
+
                                 ui.label('Бажаю здоровʼя, за добу станом на 18:00').classes('font-bold text-gray-900 mb-2')
                                 ui.table(columns=state['matrix2_cols'], rows=state['matrix2_rows']).classes('w-full analytics-table').props('dense flat bordered')
 
