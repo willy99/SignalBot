@@ -507,7 +507,7 @@ def to_nominative_case(fullname: str) -> str:
     return f"{recase(surname, sur_nom)} {recase(first_name, first_nom)} {recase(patronymic, pat_nom)}"
 
 
-def sanitize_filename(self, filename: str) -> str:
+def sanitize_filename(filename: str) -> str:
     """Очищує ім'я файлу від спроб виходу за межі директорії."""
     if not filename:
         return "unnamed_attachment"

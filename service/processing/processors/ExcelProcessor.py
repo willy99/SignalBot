@@ -34,6 +34,7 @@ class ExcelProcessor:
         self.lock = threading.RLock()
 
         self.column_values: Dict[str, List[str]] = {} # для комбіков
+        self._build_global_column_values()
 
     def get_correct_sheet_name(self, mil_unit):
         sheet_name = config.DESERTER_TAB_NAME
@@ -268,61 +269,56 @@ class ExcelProcessor:
                     self.column_map[clean_name_lower] = idx + 1
                     self.header[clean_name] = idx + 1
 
-    def _build_column_values(self):
-        columns_to_gather = [
-            COLUMN_TZK_REGION,
-            COLUMN_SUBUNIT,
-            COLUMN_SUBUNIT2,
-            COLUMN_SERVICE_TYPE,
-            COLUMN_TITLE,
-            COLUMN_TITLE_2,
-            COLUMN_DESERTION_TYPE,
-            COLUMN_REVIEW_STATUS,
-            COLUMN_DESERTION_PLACE,
-            COLUMN_DESERTION_REGION,
+    def _build_global_column_values(self):
+        """Збирає унікальні значення з усіх робочих листів (основний + резерв)"""
+        self.logger.debug(">> Збір глобальних значень для комбобоксів...")
 
-            COLUMN_INSERT_DATE,
-            COLUMN_DESERTION_DATE,
+        # Створюємо словник зі списками для об'єднання
+        columns_to_gather = [
+            COLUMN_TZK_REGION, COLUMN_SUBUNIT, COLUMN_SUBUNIT2,
+            COLUMN_SERVICE_TYPE, COLUMN_TITLE, COLUMN_TITLE_2,
+            COLUMN_DESERTION_TYPE, COLUMN_REVIEW_STATUS,
+            COLUMN_DESERTION_PLACE, COLUMN_DESERTION_REGION
         ]
 
+        # Використовуємо set для автоматичної унікальності
+        global_sets = {col: set() for col in columns_to_gather}
+
+        # Список листів, з яких ми хочемо витягти довідники
+        target_sheets = [MIL_UNITS[0], MIL_UNITS[1]]
+
+        for s_name in target_sheets:
+            try:
+                sheet = self.workbook.sheets[s_name]
+                # Отримуємо заголовки конкретного листа
+                headers = sheet.range('A1').expand('right').value
+                header_to_idx = {name: i for i, name in enumerate(headers)}
+
+                # Визначаємо останній рядок на цьому листі
+                last_row = self.get_last_row()
+                if last_row < 2:
+                    continue
+
+                for col_name in columns_to_gather:
+                    if col_name in header_to_idx:
+                        col_idx = header_to_idx[col_name] + 1
+                        # Зчитуємо стовпець
+                        values = sheet.range((2, col_idx), (last_row, col_idx)).value
+                        if not isinstance(values, list):
+                            values = [values]
+
+                        for v in values:
+                            if v is not None and str(v).strip() != "":
+                                global_sets[col_name].add(str(v).strip())
+            except Exception as e:
+                self.logger.warning(f"Не вдалося зчитати довідники з листа {s_name}: {e}")
+
+        # Перетворюємо set у відсортовані списки для UI
         self.column_values = {}
+        for col_name, val_set in global_sets.items():
+            self.column_values[col_name] = sorted(list(val_set))
 
-        # 1. Отримуємо заголовки для пошуку індексів
-        headers = self.sheet.range('A1').expand('right').value
-        header_to_idx = {name: i for i, name in enumerate(headers)}
-
-        # 2. Визначаємо межі даних (остання заповнена строка)
-        # last_row = self.sheet.range('A' + str(self.sheet.cells.last_cell.row)).end('up').row
-        last_row = self.get_last_row()
-
-        if last_row < 2:
-            return {col: [] for col in columns_to_gather}
-
-        for col_name in columns_to_gather:
-            if col_name in header_to_idx:
-                col_idx = header_to_idx[col_name] + 1  # xlwings індекси з 1
-
-                # Зчитуємо весь стовпець одним махом (від рядка 2 до останнього)
-                column_values = self.sheet.range((2, col_idx), (last_row, col_idx)).value
-                if not isinstance(column_values, list):
-                    column_values = [column_values]
-
-                processed_values = set()
-                for v in column_values:
-                    if v is None or str(v).strip() == "":
-                        continue
-
-                    if isinstance(v, (datetime, date)):
-                        processed_values.add(str(v.year))
-                    else:
-                        processed_values.add(str(v).strip())
-
-                unique = sorted(list(processed_values), key=lambda x: int(x) if x.isdigit() else x)
-                self.column_values[col_name] = unique
-            else:
-                self.column_values[col_name] = []
-
-        return self.column_values
+        self.logger.debug(f">> Глобальні довідники зібрані: {len(target_sheets)} листа опрацьовано")
 
     def _load_workbook(self, sheet_name) -> None:
         try:
@@ -349,7 +345,6 @@ class ExcelProcessor:
         self.sheet = self.workbook.sheets[sheet_name]
         if not silent:
             self._build_column_map()
-            self._build_column_values()
 
     def save(self) -> None:
         if self.workbook is None:

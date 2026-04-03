@@ -114,7 +114,8 @@ class AuthManager:
         user = self.auth_service.get_user_by_username(user_info.get('username'))
 
         if not user or user.session_token != client_token:
-            self.logger.warning(f"ОЙ! Токени не збігаються для користувача: {user.username}!")
+            uname = user.username if user else user_info.get('username', '?')
+            self.logger.warning(f"ОЙ! Токени не збігаються для користувача: {uname}!")
             self.logout()
             return False
 

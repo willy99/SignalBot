@@ -195,7 +195,12 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
                 with ui.tab_panel(main_tab):
                     with ui.card().classes('w-full max-w-5xl mx-auto p-6 shadow-sm border border-gray-200'):
                         with ui.row().classes('w-full gap-6'):
-                            search_select(MIL_UNITS, COLUMN_MIL_UNIT, person, 'mil_unit').classes('w-32')
+                            mil_unit_select = search_select(MIL_UNITS, COLUMN_MIL_UNIT, person, 'mil_unit').classes('w-32')
+                            if person.id is not None:
+                                mil_unit_select.props('disable')
+                                mil_unit_select.tooltip('Зміна в/ч для існуючого запису заборонена. Видаліть та створіть новий, якщо помилилися.')
+                            else:
+                                mil_unit_select.value = MIL_UNITS[0]
                             name_input = ui.input(COLUMN_NAME, validation=req).bind_value(person, 'name').classes('flex-grow')
                             rnokpp_inp = ui.input(COLUMN_ID_NUMBER, placeholder='xxxxxxxxxx', validation={
                                 'Обов’язкове поле': lambda v: bool(v),
