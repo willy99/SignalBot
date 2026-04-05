@@ -89,12 +89,12 @@ class SignalBotHandler:
         """
         user = self.user_service.get_user_by_phone(phone_number)
         if user:
-            self.logger.info(
-                f"Signal-бот: авторизація OK — {user.username} ({phone_number[-4:]}****)"
+            self.logger.debug(
+                f" ✅ Signal-бот: авторизація OK — {user.username} ({phone_number[-4:]}****)"
             )
         else:
             self.logger.warning(
-                f"Signal-бот: СПРОБА ДОСТУПУ від незнайомого номера {phone_number}"
+                f" ❌ Signal-бот: СПРОБА ДОСТУПУ від незнайомого номера {phone_number}"
             )
         return user
 

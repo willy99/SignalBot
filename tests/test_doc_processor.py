@@ -560,6 +560,10 @@ def test_rtzk_extraction(processor_factory, mock_logger):
     res = extract_rtzk(text)
     assert res == "Вінницьким ОМТЦК та СП м. Вінниця"
 
+    text = "Призваний Полтавським РТЦК та СП в місті Полтава, Полтавської області, 01.07.2024. РНОКП"
+    res = extract_rtzk(text)
+    assert res == "Полтавським РТЦК та СП в місті Полтава, Полтавської області"
+
 
 def test_rtzk_region_extraction(processor_factory, mock_logger):
     processor = processor_factory("any.docx")

@@ -12,9 +12,17 @@ from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from datetime import datetime
 
 def render_place_report_page(report_ctrl:ReportController, person_ctrl: PersonController, auth_manager: AuthManager):
-    state = {'rows': [], 'columns': []}
+    state = {
+        'place_rows': [],
+        'unit_rows': [],
+        'columns': [],
+        'cols_p': [],
+        'cols_u': []
+    }
+
     year_options = person_ctrl.get_column_options().get(COLUMN_INSERT_DATE, [])
     year_options = sorted([str(y) for y in year_options], reverse=True)
+
     with ui.column().classes('w-full items-center p-4'):
         ui.label('Аналітика: Загальний стан справ').classes('text-h4 mb-6')
 
@@ -40,14 +48,17 @@ def render_place_report_page(report_ctrl:ReportController, person_ctrl: PersonCo
                                      on_click=lambda: do_report()) \
                 .props('elevated color="primary"')
 
-            export_btn = ui.button('Excel', icon='download', color='green',
-                                   on_click=lambda: export_place_report_to_excel(state['rows'], state['columns'])) \
-                .props('elevated').bind_visibility_from(state, 'rows', backward=lambda r: len(r) > 0)
 
         ui.label('Аналіз за місцем залишення (Обставини)').classes('text-h6 mt-4')
+        ui.button('Експорт (Обставини)', icon='download', color='green',
+                  on_click=lambda: export_place_report_to_excel(state['place_rows'], state['cols_p'], "Обставини")) \
+            .props('flat dense').bind_visibility_from(state, 'place_rows', backward=lambda r: len(r) > 0)
         place_container = ui.column().classes('w-full items-center mt-2')
 
         ui.label('Аналіз за підрозділами').classes('text-h6 mt-8')
+        ui.button('Експорт (Підрозділи)', icon='download', color='green',
+                  on_click=lambda: export_place_report_to_excel(state['unit_rows'], state['cols_u'], "Підрозділи")) \
+            .props('flat dense').bind_visibility_from(state, 'unit_rows', backward=lambda r: len(r) > 0)
         unit_container = ui.column().classes('w-full items-center mt-2')
 
 
@@ -82,17 +93,30 @@ def render_place_report_page(report_ctrl:ReportController, person_ctrl: PersonCo
                 return
 
             with place_container:
-                rows, cols = build_report_table(data.get('places', {}), 'Місце СЗЧ', show_dynamic_sources=False)
-                # rows, cols = build_report_table(data['places'], "Обставини (звідки)")
-                state['place_rows'] = rows
-                state['columns'] = cols  # вони однакові за структурою
+                rows_p, cols_p = build_report_table(data.get('places', {}), 'Місце СЗЧ', show_dynamic_sources=False)
+                state['place_rows'] = rows_p
+                state['columns'] = cols_p
+                state['cols_p'] = cols_p
 
             with unit_container:
-                rows, _ = build_report_table(data.get('units', {}), 'Підрозділ', show_dynamic_sources=True)
-                state['unit_rows'] = rows
+                rows_u, cols_u = build_report_table(data.get('units', {}), 'Підрозділ', show_dynamic_sources=True)
+                state['unit_rows'] = rows_u
+                # Оновлюємо колонки, бо в підрозділах їх більше
+                state['columns'] = cols_u
+                state['cols_u'] = cols_u
 
         except Exception as e:
             ui.notify(f'Помилка: {e}', type='negative')
+
+
+PLACE_ORDER = ['рвбз', 'нц', 'ппд', 'лікування', 'відпустка', 'відрядження']
+
+def sort_by_priority(item_name):
+    """Повертає індекс для сортування: спочатку за списком, потім за алфавітом."""
+    name_lower = str(item_name).lower().strip()
+    if name_lower in PLACE_ORDER:
+        return (0, PLACE_ORDER.index(name_lower))
+    return (1, name_lower)
 
 
 def build_report_table(data, first_col_label, show_dynamic_sources=False):
@@ -105,7 +129,7 @@ def build_report_table(data, first_col_label, show_dynamic_sources=False):
         for stats in data.values():
             if 'dynamic_places' in stats:
                 all_sources.update(stats['dynamic_places'].keys())
-        sorted_sources = sorted(list(all_sources))
+        sorted_sources = sorted(list(all_sources), key=sort_by_priority)
 
     # 2. Шаблон для "РАЗОМ"
     grand_total = {
@@ -140,13 +164,19 @@ def build_report_table(data, first_col_label, show_dynamic_sources=False):
             if key not in ['place', 'is_grand_total'] and not key.startswith('src_'):
                 grand_total[key] += stats.get(key, 0)
 
-    rows.sort(key=lambda x: x['total'], reverse=True)
+    # --- ЛОГІКА СОРТУВАННЯ РЯДКІВ ---
+    if not show_dynamic_sources:
+        # ПЕРША ТАБЛИЦЯ: за вашим списком пріоритетів
+        rows.sort(key=lambda x: sort_by_priority(x['place']))
+    else:
+        # ДРУГА ТАБЛИЦЯ (Підрозділи): за алфавітом
+        rows.sort(key=lambda x: str(x['place']).lower())
+
     rows.append(grand_total)
 
     # 4. Колонки
     columns = [{'name': 'place', 'label': first_col_label, 'field': 'place', 'align': 'left'}]
 
-    # Додаємо "Звідки" ТІЛЬКИ ЯКЩО ЦЕ ДРУГА ТАБЛИЦЯ (ПІДРОЗДІЛИ)
     if show_dynamic_sources:
         for src in sorted_sources:
             columns.append({
@@ -156,14 +186,14 @@ def build_report_table(data, first_col_label, show_dynamic_sources=False):
                 'headerClasses': 'bg-green-50'
             })
 
-    # Стандартні колонки
+        # НОВИЙ ПОРЯДОК СТАНДАРТНИХ КОЛОНОК
     columns.extend([
-        {'name': 'not_assigned', 'label': 'Не призначено', 'field': REVIEW_STATUS_NOT_ASSIGNED},
-        {'name': 'closed', 'label': 'Закрито', 'field': REVIEW_STATUS_CLOSED},
-        {'name': 'assigned', 'label': 'Призначено', 'field': REVIEW_STATUS_ASSIGNED},
         {'name': 'u10', 'label': 'до 10 діб', 'field': 'term_under_10', 'headerClasses': 'bg-orange-50'},
         {'name': 'u30', 'label': '10-30 діб', 'field': 'term_10_30', 'headerClasses': 'bg-orange-50'},
         {'name': 'o30', 'label': '> 30 діб', 'field': 'term_over_30', 'headerClasses': 'bg-red-50'},
+        {'name': 'assigned', 'label': 'Всього призначено', 'field': REVIEW_STATUS_ASSIGNED, 'headerClasses': 'bg-orange-100 font-bold'},
+        {'name': 'not_assigned', 'label': 'Не призначено', 'field': REVIEW_STATUS_NOT_ASSIGNED, 'headerClasses': 'bg-amber-100'},
+        {'name': 'closed', 'label': 'Закрито', 'field': REVIEW_STATUS_CLOSED, 'headerClasses': 'bg-green-100'},
         {'name': 'total', 'label': 'Всього', 'field': 'total', 'headerClasses': 'bg-blue-100 font-bold'},
     ])
 
@@ -191,94 +221,93 @@ def build_report_table(data, first_col_label, show_dynamic_sources=False):
         </q-tr>
     ''')
 
-    # ... (body slot залишається без змін) ...
     return rows, columns
 
-def export_place_report_to_excel(rows, columns):
+
+def export_place_report_to_excel(rows, columns, sheet_name_suffix=""):
     if not rows:
         ui.notify('Немає даних для експорту', type='warning')
         return
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "Звіт за обставинами"
+    ws.title = f"{sheet_name_suffix}"
 
-    # --- СТИЛІ ---
+    # --- ВИЗНАЧЕННЯ КОЛЬОРІВ (HEX) ---
+    fill_cream = PatternFill("solid", fgColor="FFF9C4")  # Кремовий (терміни + призначено)
+    fill_orange = PatternFill("solid", fgColor="FFE0B2")  # Лайтово-померанчевий (не призначено)
+    fill_green = PatternFill("solid", fgColor="C8E6C9")  # Блідо-зелений (закрито)
+    fill_total = PatternFill("solid", fgColor="BBDEFB")  # Блакитний (всього)
+    header_fill = PatternFill("solid", fgColor="EEEEEE")
+
     bold_font = Font(bold=True)
-    thin_border = Border(
-        left=Side(style='thin'), right=Side(style='thin'),
-        top=Side(style='thin'), bottom=Side(style='thin')
-    )
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                         top=Side(style='thin'), bottom=Side(style='thin'))
+
     center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    vertical_align = Alignment(horizontal="center", vertical="center", textRotation=90)
 
-    header_fill = PatternFill("solid", fgColor="EEEEEE")  # Сірий для шапки
-    total_fill = PatternFill("solid", fgColor="FFE0B2")  # Помаранчевий для "РАЗОМ"
-    blue_fill = PatternFill("solid", fgColor="E3F2FD")  # Блакитний для колонки "Всього"
+    # Визначаємо індекс, де починаються колонки термінів (після "звідки")
+    # У нашому новому порядку перша колонка термінів — 'u10'
+    idx_terms_start = next((i for i, c in enumerate(columns) if c['name'] == 'u10'), len(columns))
 
-    # --- 1. ПЕРШИЙ РЯДОК ШАПКИ (Групування) ---
-    # Об'єднуємо комірки згідно з логікою build_place_table
-    # A1: Місце, B1-D1: Статус, E1-G1: Тривалість, H1: Загалом
-
-    def setup_header_cell(cell_range, value):
-        ws.merge_cells(cell_range)
-        cell = ws[cell_range.split(':')[0]]
-        cell.value = value
-        cell.font = bold_font
-        cell.alignment = center_align
-        cell.fill = header_fill
-        # Проставляємо межі для всіх об'єднаних комірок
-        for row in ws[cell_range]:
-            for c in row:
-                c.border = thin_border
-
-    setup_header_cell('A1:A1', 'Обставини (звідки)')
-    setup_header_cell('B1:D1', 'Статус розслідування')
-    setup_header_cell('E1:G1', 'Тривалість СЗЧ (діб)')
-    setup_header_cell('H1:H1', 'Всього СЗЧ')
-
-    # --- 2. ДРУГИЙ РЯДОК ШАПКИ (Назви колонок) ---
+    # --- ШАПКА (Рядок 2) ---
     for idx, col in enumerate(columns, start=1):
         cell = ws.cell(row=2, column=idx, value=col['label'])
         cell.font = bold_font
         cell.border = thin_border
-        cell.alignment = center_align
         cell.fill = header_fill
 
-    # --- 3. ЗАПОВНЕННЯ ДАНИМИ ---
-    # Починаємо з 3-го рядка
+        # Вертикальний текст для "Звідки" (колонки між першою та термінами)
+        if idx > 1:
+            cell.alignment = vertical_align
+            ws.column_dimensions[cell.column_letter].width = 5
+        else:
+            cell.alignment = center_align
+            ws.column_dimensions[cell.column_letter].width = 15
+
+    ws.column_dimensions['A'].width = 35
+
+    # --- ДАНІ ТА ФАРБУВАННЯ (Рядок 3+) ---
     for r_idx, row_data in enumerate(rows, start=3):
-        is_grand_total = row_data.get('is_grand_total', False)
+        is_total_row = row_data.get('is_grand_total', False)
 
         for c_idx, col_def in enumerate(columns, start=1):
             val = row_data.get(col_def['field'])
             cell = ws.cell(row=r_idx, column=c_idx, value=val)
-
-            # Базові стилі для кожної клітинки
             cell.border = thin_border
-            cell.alignment = Alignment(horizontal="center") if c_idx > 1 else Alignment(horizontal="left")
+            cell.alignment = center_align if c_idx > 1 else Alignment(horizontal="left")
 
-            # Підсвітка останнього рядка "РАЗОМ"
-            if is_grand_total:
-                cell.fill = total_fill
+            # Логіка кольорів для стовпчиків:
+            if c_idx > 1:  # не фарбуємо першу колонку назв, крім підсумку
+                c_name = col_def['name']
+
+                # Перші 4 після "звідки" (до 10, до 30, >30, призначено) -> Кремовий
+                if c_name in ['u10', 'u30', 'o30', 'assigned']:
+                    cell.fill = fill_cream
+
+                # Не призначено -> Лайтово-померанчевий
+                elif c_name == 'not_assigned':
+                    cell.fill = fill_orange
+
+                # Закрито -> Блідо-зелений
+                elif c_name == 'closed':
+                    cell.fill = fill_green
+
+                # Всього (остання) -> Блакитний
+                elif c_name == 'total':
+                    cell.fill = fill_total
+                    cell.font = bold_font
+
+            if is_total_row:
                 cell.font = bold_font
+                # Для підсумкового рядка можна змінити стиль,
+                # або залишити колір колонки, але додати жирний шрифт
 
-            # Підсвітка останньої колонки "Всього"
-            elif col_def['name'] == 'total':
-                cell.fill = blue_fill
-                cell.font = bold_font
-
-    # --- 4. НАЛАШТУВАННЯ ВИГЛЯДУ ---
-    ws.column_dimensions['A'].width = 40  # Ширша колонка для назв місць
-    for col_let in ['B', 'C', 'D', 'E', 'F', 'G', 'H']:
-        ws.column_dimensions[col_let].width = 15
-
-    # Фіксація шапки (перші 2 рядки)
     ws.freeze_panes = 'A3'
 
-    # --- 5. ЗАВАНТАЖЕННЯ ---
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
-
-    ui.download(buffer.getvalue(), filename='Загальний Стан (' + utils.utils.format_to_excel_date(datetime.now()) + ').xlsx')
-    ui.notify('Excel-файл сформовано', type='positive')
+    filename = f"General_Report_{sheet_name_suffix}.xlsx"
+    ui.download(buffer.getvalue(), filename=filename)

@@ -28,25 +28,25 @@ class ReportController:
 
     @refresh_session_method
     def do_subunit_desertion_report(self, ctx: RequestContext, search_filter: PersonSearchFilter):
-        self.logger.debug('UI:' + ctx.user_name + ': Генеруємо репорт: ' + str(search_filter))
+        self.logger.debug('UI:' + ctx.user_name + ': Генеруємо репорт subunit: ' + str(search_filter))
         results = self.reporter.get_subunit_desertion_stats(search_filter)
         return results
 
     @refresh_session_method
     def get_general_state_report(self, ctx: RequestContext, search_filter: PersonSearchFilter):
-        self.logger.debug('UI:' + ctx.user_name + ': Генеруємо репорт: ' + str(search_filter))
+        self.logger.debug('UI:' + ctx.user_name + ': Генеруємо репорт general: ' + str(search_filter))
         results = self.reporter.get_general_state_report(search_filter)
         return results
 
     @refresh_session_method
     def get_yearly_desertion_report(self, ctx: RequestContext, search_filter: PersonSearchFilter):
-        self.logger.debug('UI:' + ctx.user_name + ': Генеруємо репорт: ' + str(search_filter))
+        self.logger.debug('UI:' + ctx.user_name + ': Генеруємо репорт yealy stat: ' + str(search_filter))
         results = self.reporter.get_yearly_desertion_stats()
         return results
 
     @refresh_session_method
     def get_daily_added_records_report(self, ctx: RequestContext, target_date: date = None):
-        self.logger.debug('UI:' + ctx.user_name + ': Генеруємо щоденний репорт: ' + str(target_date))
+        self.logger.debug('UI:' + ctx.user_name + ': Генеруємо щоденний репорт daily: ' + str(target_date))
         results = self.reporter.get_daily_report(target_date)
         return results
 
@@ -84,7 +84,7 @@ class ReportController:
     @refresh_session_method
     def process_kram_file(self, ctx: RequestContext, file_bytes: bytes) -> list[ErdrKramRow]:
         """Парсить файл КРАМ і звіряє кожен запис з основною базою."""
-        self.logger.info(
+        self.logger.debug(
             f"UI:{ctx.user_name}: запуск звірки ЄРДР КРАМ, "
             f"розмір файлу: {len(file_bytes)} байт"
         )
@@ -98,7 +98,7 @@ class ReportController:
         erdr_count = sum(1 for r in results if r.found_in_db and r.db_erdr_date and r.db_erdr_date != 'н/д')
         miss_count = sum(1 for r in results if not r.found_in_db)
 
-        self.logger.info(
+        self.logger.debug(
             f"UI:{ctx.user_name}: КРАМ — оброблено {len(results)} рядків. "
             f"Знайдено: {found_count}, є ЄРДР: {erdr_count}, не знайдено: {miss_count}"
         )
@@ -123,7 +123,7 @@ class ReportController:
         if not rows_to_save:
             return 0, []
 
-        self.logger.info(
+        self.logger.debug(
             f"UI:{ctx.user_name}: зберігаємо ЄРДР для {len(rows_to_save)} записів"
         )
 
@@ -168,7 +168,7 @@ class ReportController:
 
             if success_count > 0:
                 processor.save()
-                self.logger.info(
+                self.logger.debug(
                     f"UI:{ctx.user_name}: КРАМ — збережено {success_count} ЄРДР-записів"
                 )
 
@@ -198,7 +198,7 @@ class ReportController:
         from domain.person_key import PersonKey
         from dics.deserter_xls_dic import NA
 
-        self.logger.info(
+        self.logger.debug(
             f"UI:{ctx.user_name}: compare_file_with_db, "
             f"mapping={mapping}, sel_upload={sel_upload}, sel_general={sel_general}"
         )
@@ -234,7 +234,7 @@ class ReportController:
             file_rows.append(row_dict)
 
         wb.close()
-        self.logger.info(f"compare: прочитано {len(file_rows)} рядків з файлу")
+        self.logger.debug(f"compare: прочитано {len(file_rows)} рядків з файлу")
 
         if not file_rows:
             return []
@@ -262,7 +262,7 @@ class ReportController:
             db_results = {}
 
         found_count = len(db_results)
-        self.logger.info(f"compare: знайдено {found_count} з {len(file_rows)} у базі")
+        self.logger.debug(f"compare: знайдено {found_count} з {len(file_rows)} у базі")
 
         # -- Збираємо результат ---------------------------------------------
         results: list[dict] = []
@@ -303,7 +303,7 @@ class ReportController:
                 destination_path = f"{config.REPORT_DAILY_DESERTION}{client.get_separator()}{file_name}"
                 buffer = io.BytesIO(file_bytes)
                 client.save_file_from_buffer(destination_path, buffer)
-                self.log_manager.get_logger().info(f"✅ Звіт СЗЧ успішно збережено в архів: {destination_path}")
+                self.log_manager.get_logger().debug(f"✅ Звіт СЗЧ успішно збережено в архів: {destination_path}")
         except Exception as e:
             self.log_manager.get_logger().error(f"❌ Не вдалося зберегти звіт в архівну папку: {e}")
         return file_bytes, file_name
