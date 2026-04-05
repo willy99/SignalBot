@@ -600,6 +600,97 @@ class ExcelProcessor:
 
         return results
 
+    def find_persons_by_ids(
+        self,
+        ids: list[int],
+        mil_units: list[str] | None = None,
+    ) -> dict[int, dict]:
+        """
+        Шукає рядки в Excel за логічним № (значення колонки A, COLUMN_INCREMENTAL).
+
+        Відрізняється від find_persons тим, що:
+          - Не потрібно знати ПІБ або РНОКПП — тільки логічний №
+          - Повертає словник {logical_id: {'row_idx': int, 'data': dict}}
+            де row_idx = фактичний номер рядка Excel (2-based),
+            а logical_id = значення з колонки A (те, що приймає update_row_by_id)
+
+        Використовується у compare_report_view для побудови Person перед save_persons:
+            person = Person.from_excel_dict({
+                COLUMN_INCREMENTAL: logical_id,   # ← ось що треба update_row_by_id
+                COLUMN_MIL_UNIT: mil_unit,
+                'Дата СЗЧ': '01.03.2023',
+            })
+
+        Args:
+            ids:       список логічних № для пошуку
+            mil_units: аркуші для пошуку; якщо None — шукаємо по всіх MIL_UNITS
+
+        Returns:
+            {logical_id: {'row_idx': int, 'data': dict}} — знайдені записи
+        """
+        if not ids:
+            return {}
+
+        target_units = mil_units or MIL_UNITS
+        # Множина для O(1) пошуку — ids можуть бути int або float (Excel повертає float)
+        ids_set = {int(i) for i in ids if i is not None}
+        results: dict[int, dict] = {}
+
+        with self.lock:
+            for unit in target_units:
+                if not ids_set:
+                    break  # всі знайдено — виходимо
+
+                try:
+                    self.switch_to_sheet(unit, silent=True)
+                except Exception as e:
+                    self.logger.warning(f"find_persons_by_ids: не вдалось переключити аркуш {unit}: {e}")
+                    continue
+
+                last_row = self.get_last_row()
+                if last_row < 2:
+                    continue
+
+                data = self.sheet.range(f"A2:BB{last_row}").value
+                if not data:
+                    continue
+
+                id_col_idx = self.header.get(COLUMN_INCREMENTAL, 1) - 1
+
+                for i, row in enumerate(data):
+                    if not row or not row[id_col_idx]:
+                        continue
+
+                    raw_id = row[id_col_idx]
+                    try:
+                        logical_id = int(float(raw_id))
+                    except (ValueError, TypeError):
+                        continue
+
+                    if logical_id not in ids_set:
+                        continue
+
+                    serialized: list = []
+                    for cell in row:
+                        self._transform_cell(cell, serialized)
+
+                    row_data = dict(zip(self.header, serialized))
+                    row_data[COLUMN_MIL_UNIT] = unit  # гарантуємо наявність mil_unit
+
+                    results[logical_id] = {
+                        'row_idx':  i + 2,   # фактичний рядок Excel (для логів)
+                        'data':     row_data,
+                    }
+                    ids_set.discard(logical_id)
+
+        if ids_set:
+            self.logger.debug(
+                f"find_persons_by_ids: не знайдено {len(ids_set)} записів: {ids_set}"
+            )
+
+        return results
+
+
     def find_person(self, key: PersonKey) -> dict:
         with self.lock:
             if key.mil_unit:

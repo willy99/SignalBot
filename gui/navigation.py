@@ -145,7 +145,7 @@ def init_nicegui(workflow_obj):
     @require_access(auth_manager, MODULE_REPORT_GENERAL, PERM_READ)
     def compare_report_route():
         app_menu.render(auth_manager)
-        render_compare_report_page(report_ctrl, auth_manager)
+        render_compare_report_page(report_ctrl, person_ctrl, auth_manager)
 
 
     @ui.page('/doc_dbr')

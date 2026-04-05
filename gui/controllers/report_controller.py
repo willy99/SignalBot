@@ -1,12 +1,16 @@
 from typing import List
 
 import config
-from dics.deserter_xls_dic import MIL_UNITS, COLUMN_MIL_UNIT, COLUMN_INCREMENTAL, COLUMN_ERDR_NOTATION, COLUMN_ERDR_DATE, COLUMN_NAME, COLUMN_ID_NUMBER, COLUMN_BIRTHDAY
+import io
+import openpyxl
+from datetime import date, datetime
+
 from dics.security_config import PERM_READ, MODULE_ADMIN
-from gui.auth_routes import refresh_session_method
-from gui.services.request_context import RequestContext
+from dics.deserter_xls_dic import *
 from domain.person_filter import PersonSearchFilter
+from gui.auth_routes import refresh_session_method
 from gui.services.auth_manager import AuthManager
+from gui.services.request_context import RequestContext
 from service.processing.DocumentProcessingService import DocumentProcessingService
 from service.processing.MyWorkFlow import MyWorkFlow
 from service.processing.processors.DocTemplator import DocTemplator
@@ -14,17 +18,17 @@ from service.processing.processors.ErdrKramProcessor import ErdrKramProcessor, E
 from service.processing.processors.ExcelReport import ExcelReporter
 from service.storage.LoggerManager import LoggerManager
 from service.storage.StorageFactory import StorageFactory
-import io
-from datetime import date
+from utils.utils import format_to_excel_date
+
 
 class ReportController:
     def __init__(self, doc_templator: DocTemplator, worklow: MyWorkFlow, auth_manager: AuthManager):
-        self.doc_templator:DocTemplator = doc_templator
-        self.reporter:ExcelReporter = worklow.reporter
-        self.auth_manager:AuthManager = auth_manager
-        self.log_manager:LoggerManager = worklow.log_manager
+        self.doc_templator: DocTemplator = doc_templator
+        self.reporter:      ExcelReporter = worklow.reporter
+        self.workflow:      MyWorkFlow    = worklow        # потрібен для compare (excelProcessor)
+        self.auth_manager:  AuthManager   = auth_manager
+        self.log_manager:   LoggerManager = worklow.log_manager
         self.logger = worklow.log_manager.get_logger()
-        self.workflow = worklow
 
     @refresh_session_method
     def do_subunit_desertion_report(self, ctx: RequestContext, search_filter: PersonSearchFilter):
@@ -179,117 +183,131 @@ class ReportController:
         self,
         ctx: RequestContext,
         file_bytes: bytes,
-        mapping: dict,          # {gen_field: upload_col}
-        sel_upload: list,       # які колонки файлу показувати у звіті
-        sel_general: list,      # які поля бази показувати у звіті
+        mapping: dict[str, str],       # {gen_field: upload_col}
+        sel_upload: list[str],         # колонки файлу для відображення (порядок важливий)
+        sel_general: list[str],        # поля бази для відображення
     ) -> list[dict]:
         """
-        Порівнює рядки завантаженого Excel-файлу з основною базою.
+        Порівнює рядки з завантаженого xlsx з основною базою СЗЧ.
 
         Алгоритм:
-          1. Читаємо файл, будуємо список рядків із даними.
-          2. Для кожного рядка витягуємо ключові поля через mapping
-             (ПІБ, РНОКПП, дата народження).
-          3. Один пакетний виклик find_persons() → dict[uid, match].
-          4. Повертаємо list[dict] з file_data, db_data, found, has_diff.
+          1. Читаємо файл, витягуємо рядки у вигляді {col: value}
+          2. Для кожного рядка шукаємо збіг у А0224 і А7018 за маппінгом
+             (пріоритет: РНОКПП → ПІБ)
+          3. Повертаємо список рядків з file_data, db_data, found, db_row_idx, db_mil_unit
+
+        Значення дат нормалізуються до config.EXCEL_DATE_FORMAT (dd.mm.YYYY).
+        Для коректного сортування в UI додається _sort_key у форматі YYYY-MM-DD.
         """
-        import io as _io
-        import openpyxl
-        from domain.person_key import PersonKey
-        from dics.deserter_xls_dic import NA
+        self.logger.info(f"UI:{ctx.user_name}: порівняння файлу, маппінг={list(mapping.keys())}")
 
-        self.logger.debug(
-            f"UI:{ctx.user_name}: compare_file_with_db, "
-            f"mapping={mapping}, sel_upload={sel_upload}, sel_general={sel_general}"
-        )
-
-        # -- Читаємо файл --------------------------------------------------
-        wb = openpyxl.load_workbook(_io.BytesIO(file_bytes), read_only=True, data_only=True)
+        # --- Крок 1: читаємо файл ---
+        wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
         ws = wb.active
+        rows_iter = ws.iter_rows(values_only=True)
+        headers = [str(c).strip() for c in next(rows_iter) if c is not None]
 
-        # Зчитуємо хедер (рядок 1)
-        raw_header = [
-            str(cell).strip() if cell is not None else ''
-            for cell in next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
-        ]
-        col_index: dict[str, int] = {name: i for i, name in enumerate(raw_header)}
-
-        # Маппінг у зворотному напрямку для швидкого доступу
-        # gen_field → індекс колонки у файлі
-        gf_to_idx: dict[str, int] = {
-            gf: col_index[uc]
-            for gf, uc in mapping.items()
-            if uc in col_index
-        }
-
-        # Зчитуємо дані рядки
-        file_rows: list[dict] = []   # [{col_name: value, ...}, ...]
-        for row in ws.iter_rows(min_row=2, values_only=True):
+        file_rows: list[dict] = []
+        for row in rows_iter:
             if not any(row):
                 continue
-            row_dict = {
-                raw_header[i]: (str(row[i]).strip() if row[i] is not None else '')
-                for i in range(min(len(row), len(raw_header)))
-            }
-            file_rows.append(row_dict)
-
+            file_rows.append({headers[i]: row[i] for i in range(len(headers))})
         wb.close()
-        self.logger.debug(f"compare: прочитано {len(file_rows)} рядків з файлу")
 
-        if not file_rows:
-            return []
+        # --- Крок 2: будуємо пошуковий індекс по обох аркушах ---
+        processor = self.workflow.excelProcessor
+        key_rnokpp_col = mapping.get(COLUMN_ID_NUMBER, '')
+        key_name_col   = mapping.get(COLUMN_NAME, '')
+        key_bday_col   = mapping.get(COLUMN_BIRTHDAY, '')
 
-        # -- Будуємо PersonKey для кожного рядка ----------------------------
-        def _get(row: dict, gen_field: str) -> str:
-            uc = mapping.get(gen_field, '')
-            return row.get(uc, '') or ''
+        # Збираємо рядки з обох аркушів — один прохід по кожному
+        db_by_rnokpp: dict[str, dict] = {}
+        db_by_name:   dict[str, dict] = {}
 
-        keys: list[PersonKey] = [
-            PersonKey(
-                name=_get(r, COLUMN_NAME),
-                rnokpp=_get(r, COLUMN_ID_NUMBER),
-                des_date='',
-                mil_unit='',
-            )
-            for r in file_rows
-        ]
+        for mil_unit in MIL_UNITS:
+            try:
+                with processor.lock:
+                    processor.switch_to_sheet(mil_unit, silent=True)
+                    last_row = processor.get_last_row()
+                    data = processor.sheet.range(f'A2:BB{last_row}').value
+                    header = processor.header      # {col_name: col_index_1based}
+            except Exception as e:
+                self.logger.warning(f"compare: не вдалось прочитати аркуш {mil_unit}: {e}")
+                continue
 
-        # -- Пакетний пошук -------------------------------------------------
-        try:
-            db_results: dict[str, dict] = self.workflow.excelProcessor.find_persons(keys)
-        except Exception as e:
-            self.logger.error(f"compare: помилка find_persons: {e}")
-            db_results = {}
+            if not data:
+                continue
 
-        found_count = len(db_results)
-        self.logger.debug(f"compare: знайдено {found_count} з {len(file_rows)} у базі")
+            rnokpp_idx = header.get(COLUMN_ID_NUMBER, 1) - 1
+            name_idx   = header.get(COLUMN_NAME, 1) - 1
 
-        # -- Збираємо результат ---------------------------------------------
-        results: list[dict] = []
-        for row, key in zip(file_rows, keys):
-            match = db_results.get(key.uid)
-            db_data = match.get('data', {}) if match else {}
+            for i, row in enumerate(data):
+                if not row or not row[name_idx]:
+                    continue
 
-            # Визначаємо чи є розбіжності у вибраних полях
-            has_diff = False
-            if match:
-                for gf in sel_general:
-                    uc = mapping.get(gf)
-                    if uc:
-                        file_val = (row.get(uc) or '').strip().lower()
-                        db_val   = str(db_data.get(gf) or '').strip().lower()
-                        if file_val and db_val and file_val != db_val:
-                            has_diff = True
-                            break
+                serialized: list = []
+                for cell in row:
+                    processor._transform_cell(cell, serialized)
+
+                row_dict = dict(zip(header, serialized))
+                row_dict[COLUMN_MIL_UNIT] = mil_unit
+
+                entry = {
+                    'data':        row_dict,
+                    'row_idx':     i + 2,
+                    'mil_unit':    mil_unit,
+                }
+
+                rnokpp_val = str(row_dict.get(COLUMN_ID_NUMBER, '') or '').strip().rstrip('.0')
+                name_val   = str(row_dict.get(COLUMN_NAME, '') or '').strip().lower()
+
+                if rnokpp_val and len(rnokpp_val) >= 8:
+                    db_by_rnokpp[rnokpp_val] = entry
+                if name_val:
+                    db_by_name.setdefault(name_val, entry)
+
+        # --- Крок 3: порівняння рядків файлу з індексом ---
+        results = []
+        for file_row in file_rows:
+            # Нормалізуємо дати у file_row
+            normalized_file: dict[str, str] = {}
+            for col, val in file_row.items():
+                normalized_file[col] = format_to_excel_date(val)
+
+            # Пошук — спочатку РНОКПП, потім ПІБ
+            db_entry = None
+            if key_rnokpp_col:
+                rnokpp_raw = str(file_row.get(key_rnokpp_col, '') or '').strip().rstrip('.0')
+                if rnokpp_raw and len(rnokpp_raw) >= 8:
+                    db_entry = db_by_rnokpp.get(rnokpp_raw)
+
+            if not db_entry and key_name_col:
+                name_raw = str(file_row.get(key_name_col, '') or '').strip().lower()
+                if name_raw:
+                    db_entry = db_by_name.get(name_raw)
+
+            found = db_entry is not None
+            db_data_normalized = {
+                gf: format_to_excel_date(db_entry['data'].get(gf)) if db_entry else ''
+                for gf in sel_general
+            }
 
             results.append({
-                'file_data': {col: row.get(col, '') for col in sel_upload},
-                'db_data':   {gf: str(db_data.get(gf) or '') for gf in sel_general},
-                'found':     bool(match),
-                'has_diff':  has_diff,
+                'found':        found,
+                'file_data':    normalized_file,
+                'db_data':      db_data_normalized,
+                # db_logical_id — значення колонки A (те, що приймає update_row_by_id)
+                # НЕ плутати з db_row_idx (фактичний рядок Excel)
+                'db_logical_id': int(db_entry['data'].get(COLUMN_INCREMENTAL, 0)) if db_entry else None,
+                'db_mil_unit':   db_entry['mil_unit'] if db_entry else None,
             })
 
+        self.logger.info(
+            f"UI:{ctx.user_name}: порівняння завершено — "
+            f"{sum(1 for r in results if r['found'])}/{len(results)} знайдено"
+        )
         return results
+
 
     def is_admin(self):
         return self.auth_manager.has_access(MODULE_ADMIN, PERM_READ)
@@ -303,7 +321,8 @@ class ReportController:
                 destination_path = f"{config.REPORT_DAILY_DESERTION}{client.get_separator()}{file_name}"
                 buffer = io.BytesIO(file_bytes)
                 client.save_file_from_buffer(destination_path, buffer)
-                self.log_manager.get_logger().debug(f"✅ Звіт СЗЧ успішно збережено в архів: {destination_path}")
+                self.log_manager.get_logger().info(f"✅ Звіт СЗЧ успішно збережено в архів: {destination_path}")
         except Exception as e:
             self.log_manager.get_logger().error(f"❌ Не вдалося зберегти звіт в архівну папку: {e}")
         return file_bytes, file_name
+
