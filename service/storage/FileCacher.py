@@ -1,17 +1,18 @@
 import re
 
 from gui.services.request_context import RequestContext
+from service.storage.LoggerManager import LoggerManager
 from service.storage.StorageFactory import StorageFactory
 from dics.deserter_xls_dic import *
 from service.processing.processors.DocProcessor import DocProcessor
-from service.storage.LoggerManager import LoggerManager
 import tempfile
 import os
 from utils.regular_expressions import extract_name
 import time
+import logging
 
 class FileCacheManager:
-    def __init__(self, cache_filepath: str, log_manager):
+    def __init__(self, cache_filepath: str, log_manager: LoggerManager):
         self.cache_filepath = cache_filepath
         self.cache_data: List[Dict] = []
         self.client = StorageFactory.create_client(cache_filepath, log_manager)
@@ -20,12 +21,15 @@ class FileCacheManager:
         self.current_stats = {}
         self.start_time = None
         self.total_count = 0
+        self.log_manager = log_manager
 
     def get_file_separator(self):
         return self.client.get_separator()
 
     def build_cache(self, ctx: RequestContext, root_folder: str, progress_callback=None):
         print(f"📡 Починаю глибоке сканування папки: {root_folder}...")
+        previous_level = self.log_manager.get_logger().getEffectiveLevel()
+        self.log_manager.get_logger().setLevel(logging.ERROR)
         new_cache = []
         yearly_stats = {}
         self.is_indexing = True  # Встановлюємо статус відразу
@@ -93,7 +97,7 @@ class FileCacheManager:
                                     temp_file.flush()  # ВАЖЛИВО! Примусово скидаємо дані на диск
                                     temp_local_path = temp_file.name  # Отримуємо локальний шлях
 
-                                processor = DocProcessor(LoggerManager(), temp_local_path, filename, use_ml=False)
+                                processor = DocProcessor(self.log_manager, temp_local_path, filename, use_ml=False)
 
                                 raw_piece_3 = processor.engine.extract_text_between(
                                     PATTERN_PIECE_3_START,
@@ -130,6 +134,7 @@ class FileCacheManager:
             raise e  # Прокидаємо далі, щоб UI показав notify
         finally:
             self.is_indexing = False
+            self.log_manager.get_logger().setLevel(previous_level)
 
     def load_cache(self):
         """Завантажує індекс з файлу через абстрактний клієнт"""

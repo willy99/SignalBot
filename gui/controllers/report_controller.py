@@ -326,3 +326,9 @@ class ReportController:
             self.log_manager.get_logger().error(f"❌ Не вдалося зберегти звіт в архівну папку: {e}")
         return file_bytes, file_name
 
+
+    def get_awol_heatmap_data(self):
+        return self.reporter.get_awol_heatmap_data()
+
+    def get_monthly_dynamics_data(self):
+        return self.reporter.get_monthly_dynamics_data()

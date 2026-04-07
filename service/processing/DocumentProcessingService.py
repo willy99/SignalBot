@@ -129,8 +129,8 @@ class DocumentProcessingService:
 
                     try:
                         client.copy_file(file_path, local_temp_path)
-                        log_manager = LoggerManager(logging_level=logging.ERROR)
-                        doc_processor = DocProcessor(log_manager, local_temp_path, filename)
+                        # log_manager = Logger Manager(logging_level=logging.ERROR)
+                        doc_processor = DocProcessor(self.log_manager, local_temp_path, filename)
                         parsed_data_list = doc_processor.process()
 
                         if parsed_data_list:

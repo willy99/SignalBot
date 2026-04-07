@@ -27,6 +27,8 @@ from gui.views.report.compare_report_view import render_compare_report_page
 from gui.views.report.logs_view import render_logs_page
 from gui.views.report import daily_report_view
 from gui.views.report import general_state_report_view
+from gui.views.report import monthly_dynamic_report_view
+from gui.views.report import heatmap_report_view
 from gui.views.inbox import inbox_triage_view
 from gui.views.task import task_list_view, task_edit_view
 from gui.views.calendar import calendar_view
@@ -46,6 +48,7 @@ import config
 from service.storage.FileCacher import FileCacheManager
 
 def init_nicegui(workflow_obj):
+
     current_dir = Path(__file__).parent.absolute()
     static_dir = current_dir / 'static'
     templates_form = current_dir / '../resources/templates'
@@ -133,6 +136,18 @@ def init_nicegui(workflow_obj):
     def report_daily():
         app_menu.render(auth_manager)
         daily_report_view.render_daily_report_page(report_ctrl, task_ctrl, person_ctrl, auth_manager)
+
+    @ui.page('/report_heatmap')
+    @require_access(auth_manager, MODULE_REPORT_GENERAL, PERM_READ)
+    def report_heatmap():
+        app_menu.render(auth_manager)
+        heatmap_report_view.render_heatmap_page(report_ctrl)
+
+    @ui.page('/report_monthly')
+    @require_access(auth_manager, MODULE_REPORT_GENERAL, PERM_READ)
+    def report_montly_dynamics():
+        app_menu.render(auth_manager)
+        monthly_dynamic_report_view.render_monthly_dynamics(report_ctrl)
 
 
     @ui.page('/report_erdr_kram')

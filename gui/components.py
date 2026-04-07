@@ -25,6 +25,7 @@ class AppMenu:
         self.person_ctrl = person_controller
 
     def render(self, auth_manager: AuthManager):
+        dark = ui.dark_mode()
         """Цей метод викликається на кожній сторінці для малювання меню"""
         ui.add_head_html('<link rel="stylesheet" href="/static/style.css">')
         ui.add_head_html(
@@ -57,6 +58,10 @@ class AppMenu:
                     props = 'flat'
                 ui.button(title, on_click=lambda: ui.navigate.to('/')) \
                     .props(props).classes('font-bold text-xl text-white normal-case')
+
+                #with ui.button(on_click=dark.toggle).props('flat round color="white"'):
+                #    ui.icon('dark_mode').bind_visibility_from(dark, 'value', value=False)
+                #    ui.icon('light_mode').bind_visibility_from(dark, 'value', value=True)
 
                 # ==========================================
                 # 🔄 ІКОНКА СИНХРОНІЗАЦІЇ (Refresh Excel)
@@ -226,8 +231,14 @@ class AppMenu:
                 """Створює пункт меню з іконкою зліва та текстом."""
                 with ui.menu_item(on_click=lambda: ui.navigate.to(route)):
                     with ui.row().classes('items-center gap-3 w-full'):
-                        ui.icon(icon_name, size='sm').classes('text-gray-500')
-                        ui.label(title).classes('text-gray-800 font-medium')
+                        ui.icon(icon_name, size='sm').classes('text-primary')
+                        ui.label(title).classes('font-medium')
+
+            def make_menu_label(title: str):
+                """Створює неклікабельний заголовок-розділювач у меню."""
+                ui.separator().classes('my-1')
+                with ui.menu_item().props('disabled').classes('q-py-none'):
+                    ui.label(title).classes('text-xs font-bold text-gray-500 uppercase tracking-wider ml-1')
 
             with ui.row():
 
@@ -276,26 +287,37 @@ class AppMenu:
                 can_report_general_edit = self.auth_manager.has_access(MODULE_REPORT_GENERAL, PERM_EDIT)
                 if can_report_units or can_report_general:
                     with ui.button('Звіти', icon='analytics').props('flat text-white icon-right="expand_more"'):
-                        with ui.menu():
-                            if can_report_general:
-                                make_menu_item('Щоденний звіт', 'event_available', '/report_daily')
-                            if can_report_units:
-                                make_menu_item('Звіт по підрозділам', 'bar_chart', '/report_units')
-                            if can_report_general:
-                                make_menu_item('Звіт по рокам', 'event_note', '/report_yearly')
-                            if can_report_general:
-                                make_menu_item('Загальний стан', 'fact_check', '/report_general_state')
-                            if can_report_general:
-                                make_menu_item('Дублікати прізвищ', 'people_outline', '/report_name_dups')
-                            if can_report_general:
-                                make_menu_item('Чекаємо на ЄРДР', 'pending_actions', '/report_waiting_erdr')
-                            if can_report_general_edit:
-                                make_menu_item('РНОКПП!=Дата Народження', 'free_cancellation', '/report_error_birthday')
-                            if can_report_general_edit:
-                                make_menu_item('ЄРДР КРАМ', 'library_books', '/report_erdr_kram')
-                            if can_report_general_edit:
-                                make_menu_item('Порівняння пісюлек', 'difference', '/report_compare')
+                        with ui.menu().classes('w-72'):  # Трохи розширив, щоб заголовки не тиснули
 
+                            # --- БЛОК 2: ЗАГАЛЬНІ ЗВІТИ ---
+                            if can_report_general or can_report_units:
+                                make_menu_label('Загальні звіти')
+                                if can_report_general:
+                                    make_menu_item('Щоденний звіт', 'event_available', '/report_daily')
+                                if can_report_units:
+                                    make_menu_item('Звіт по підрозділам', 'bar_chart', '/report_units')
+                                if can_report_general:
+                                    make_menu_item('Звіт по рокам', 'event_note', '/report_yearly')
+
+                            # --- БЛОК 1: АНАЛІТИКА ---
+                            if can_report_general:
+                                make_menu_label('Аналітика та прогнози')
+                                make_menu_item('Загальний стан', 'fact_check', '/report_general_state')
+                                make_menu_item('Теплова карта СЗЧ', 'gradient', '/report_heatmap')
+                                make_menu_item('Помісячна дінамика', 'ssid_chart', '/report_monthly')
+
+                            # --- БЛОК 3: ПРИВОДИМО В ПОРЯДОК (Валідація) ---
+                            if can_report_general or can_report_general_edit:
+                                make_menu_label('Приводимо в порядок (БД)')
+                                if can_report_general:
+                                    make_menu_item('Дублікати прізвищ', 'people_outline', '/report_name_dups')
+                                if can_report_general:
+                                    make_menu_item('Чекаємо на ЄРДР', 'pending_actions', '/report_waiting_erdr')
+
+                                if can_report_general_edit:
+                                    make_menu_item('РНОКПП != Дата Нар.', 'free_cancellation', '/report_error_birthday')
+                                    make_menu_item('ЄРДР КРАМ', 'library_books', '/report_erdr_kram')
+                                    make_menu_item('Порівняння документів', 'difference', '/report_compare')
 
                 # 5. Адмінка
                 if self.auth_manager.has_access(MODULE_ADMIN, PERM_READ):

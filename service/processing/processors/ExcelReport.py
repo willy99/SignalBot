@@ -1273,3 +1273,84 @@ class ExcelReporter:
 
         return results
 
+
+    def get_awol_heatmap_data(self):
+        """Формує матрицю: День тижня (0-6) та Число місяця (1-31)"""
+        des_date_idx = self.excelProcessor.header.get(COLUMN_DESERTION_DATE, 1) - 1
+        name_idx = self.excelProcessor.header.get(COLUMN_NAME, 1) - 1
+        matrix = [[0 for _ in range(32)] for _ in range(7)]
+
+        try:
+            sheet = self.excelProcessor.sheet.book.sheets['А0224']
+            last_row = self.excelProcessor.get_last_row()
+            data = sheet.range(f"A2:BB{last_row}").value
+
+            for row in data:
+                if not row or len(row) <= des_date_idx: continue
+
+                raw_date = row[des_date_idx]
+                if not raw_date:
+                    continue
+
+                try:
+                    if isinstance(raw_date, datetime):
+                        dt = raw_date
+                    else:
+                        dt = datetime.strptime(str(raw_date).strip(), config.EXCEL_DATE_FORMAT)
+
+                    weekday = dt.weekday()  # 0 = Пн, 6 = Нд
+                    day = dt.day  # 1-31
+
+                    matrix[weekday][day] += 1
+                except Exception as e:
+                    continue  # Пропускаємо биті дати
+
+        except Exception as e:
+            print(f"Помилка Heatmap: {e}")
+
+        return matrix
+
+    def get_monthly_dynamics_data(self):
+        """Групує СЗЧ та Повернення по місяцях за весь період"""
+        des_date_idx = self.excelProcessor.header.get(COLUMN_DESERTION_DATE, 1) - 1
+        ret_date_idx = self.excelProcessor.header.get(COLUMN_RETURN_DATE, 1) - 1
+        ret_res_idx = self.excelProcessor.header.get(COLUMN_RETURN_TO_RESERVE_DATE, 1) - 1
+
+        stats = defaultdict(lambda: {'awol': 0, 'returned': 0})
+
+        try:
+            sheet = self.excelProcessor.sheet.book.sheets['А0224']
+            last_row = self.excelProcessor.get_last_row()
+            data = sheet.range(f"A2:BB{last_row}").value
+
+            for row in data:
+                if not row: continue
+
+                # 1. Рахуємо СЗЧ
+                if len(row) > des_date_idx and row[des_date_idx]:
+                    dt = datetime.strptime(format_to_excel_date(row[des_date_idx]), config.EXCEL_DATE_FORMAT)
+                    if dt:
+                        key = dt.strftime('%Y-%m')
+                        stats[key]['awol'] += 1
+
+                # 2. Рахуємо Повернення (з обох можливих колонок)
+                has_return = (len(row) > ret_date_idx and row[ret_date_idx]) or \
+                             (len(row) > ret_res_idx and row[ret_res_idx])
+
+                if has_return:
+                    # Беремо дату повернення для таймлайну
+                    r_dt = datetime.strptime(format_to_excel_date(row[ret_date_idx] or row[ret_res_idx]), config.EXCEL_DATE_FORMAT)
+                    if r_dt:
+                        key = r_dt.strftime('%Y-%m')
+                        stats[key]['returned'] += 1
+
+        except Exception as e:
+            print(f"Error in monthly dynamics: {e}")
+
+        # Сортуємо по ключу (даті), щоб графік йшов хронологічно
+        sorted_keys = sorted(stats.keys())
+        return {
+            'labels': sorted_keys,
+            'awol_counts': [stats[k]['awol'] for k in sorted_keys],
+            'ret_counts': [stats[k]['returned'] for k in sorted_keys]
+        }
