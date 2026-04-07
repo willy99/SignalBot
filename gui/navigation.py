@@ -76,18 +76,19 @@ def init_nicegui(workflow_obj):
 
     @ui.page('/')
     @ui.page('/home')
+    @require_access(auth_manager, MODULE_SEARCH, PERM_READ)
     def index():
-        render_home_page(auth_manager)
+        render_home_page(auth_manager, report_ctrl)
 
     # Визначаємо сторінки
     @ui.page('/search')
-    @require_access(auth_manager, MODULE_SEARCH, PERM_READ)  # Наприклад, головна - це пошук
+    @require_access(auth_manager, MODULE_SEARCH, PERM_READ)
     def search():
         app_menu.render(auth_manager)
         search_view.search_page(person_ctrl, auth_manager)
 
     @ui.page('/batch_search')
-    @require_access(auth_manager, MODULE_SEARCH, PERM_READ)  # Наприклад, головна - це пошук
+    @require_access(auth_manager, MODULE_SEARCH, PERM_READ)
     def batch_search():
         app_menu.render(auth_manager)
         batch_search_view.render_bulk_search_page(person_ctrl, auth_manager)

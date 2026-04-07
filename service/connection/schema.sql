@@ -123,3 +123,15 @@ CREATE TABLE IF NOT EXISTS sys_config (
     validation_rule TEXT
 );
 
+
+
+CREATE TABLE daily_dashboard (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_date DATE UNIQUE,          -- Дата, за яку зібрано статистику
+    total_awol INTEGER DEFAULT 0,     -- Здійснили СЗЧ
+    in_search INTEGER DEFAULT 0,      -- Знаходяться в розшуку
+    returned INTEGER DEFAULT 0,       -- Повернулися з СЗЧ
+    res_returned INTEGER DEFAULT 0,   -- Повернулися в БРЕЗ
+    in_disposal INTEGER DEFAULT 0,    -- В розпорядженні
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

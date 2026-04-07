@@ -98,6 +98,15 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
             target_date = datetime.strptime(date_filter.value, '%d.%m.%Y').date()
 
             cmd_summary = await auth_manager.execute(report_ctrl.get_brief_report, auth_manager.get_current_context())
+
+            if cmd_summary:
+                stats_to_save = cmd_summary[0] if isinstance(cmd_summary, list) else cmd_summary
+                report_ctrl.save_daily_stats(
+                    auth_manager.get_current_context(),
+                    stats_to_save,
+                    target_date
+                )
+
             state['cmd_summary'] = cmd_summary
 
             # 1. СЗЧ

@@ -11,6 +11,7 @@ from domain.person_filter import PersonSearchFilter
 from gui.auth_routes import refresh_session_method
 from gui.services.auth_manager import AuthManager
 from gui.services.request_context import RequestContext
+from service.docworkflow.DashboardService import DashboardService
 from service.processing.DocumentProcessingService import DocumentProcessingService
 from service.processing.MyWorkFlow import MyWorkFlow
 from service.processing.processors.DocTemplator import DocTemplator
@@ -29,6 +30,7 @@ class ReportController:
         self.auth_manager:  AuthManager   = auth_manager
         self.log_manager:   LoggerManager = worklow.log_manager
         self.logger = worklow.log_manager.get_logger()
+        self.dashboard_service = DashboardService(self.workflow.db)
 
     @refresh_session_method
     def do_subunit_desertion_report(self, ctx: RequestContext, search_filter: PersonSearchFilter):
@@ -53,6 +55,12 @@ class ReportController:
         self.logger.debug('UI:' + ctx.user_name + ': Генеруємо щоденний репорт daily: ' + str(target_date))
         results = self.reporter.get_daily_report(target_date)
         return results
+
+    def save_daily_stats(self, ctx: RequestContext, stats_to_save, target_date: date = None):
+        self.dashboard_service.save_daily_stats(stats_to_save, target_date)
+
+    def get_latest_dashboard_stats(self, ctx):
+        return self.dashboard_service.get_latest_stats()
 
     @refresh_session_method
     def get_daily_returns_report(self, ctx: RequestContext, target_date: date = None, exclude_names: List[str] = None, pre_fetched_archive=None):
@@ -291,6 +299,12 @@ class ReportController:
                 gf: format_to_excel_date(db_entry['data'].get(gf)) if db_entry else ''
                 for gf in sel_general
             }
+            raw_id = db_entry['data'].get(COLUMN_INCREMENTAL) if db_entry else None
+            try:
+                # Перетворюємо на int тільки якщо там не порожньо
+                db_logical_id = int(raw_id) if raw_id and str(raw_id).strip() else None
+            except (ValueError, TypeError):
+                db_logical_id = None
 
             results.append({
                 'found':        found,
@@ -298,7 +312,7 @@ class ReportController:
                 'db_data':      db_data_normalized,
                 # db_logical_id — значення колонки A (те, що приймає update_row_by_id)
                 # НЕ плутати з db_row_idx (фактичний рядок Excel)
-                'db_logical_id': int(db_entry['data'].get(COLUMN_INCREMENTAL, 0)) if db_entry else None,
+                'db_logical_id': db_logical_id,
                 'db_mil_unit':   db_entry['mil_unit'] if db_entry else None,
             })
 
