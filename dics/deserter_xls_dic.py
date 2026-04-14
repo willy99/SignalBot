@@ -424,7 +424,7 @@ PATTERN_LOCALITY: Final[str] = r'(?:пункт[і|у]|н\.п\.|міста|м.|\s
 PATTERN_PIECE_HEADER_START : Final[str] = 'ДОПОВІДЬ'
 PATTERN_PIECE_HEADER_END : Final[str] = r'1\.\s+Дата\s+і\s+час\s+скоєння'
 
-PATTERN_PIECE_1_START : Final[str] = r'матеріальна\s+та\s+моральна\s+шкода\)\.'
+PATTERN_PIECE_1_START : Final[str] = r'матеріальна\s+т[а|и]\s+моральна\s+шкода\)\.'
 PATTERN_PIECE_1_END : Final[str] = r'2\.\s+Коли,\s+яким\s+органом'
 
 PATTERN_PIECE_3_START : Final[str] = r'(?:Стислі демографічні да[н|п]і|Адреса проживання.*?Близькі родичі|Близькі родичі.*?Адреса проживання|призваний на військову службу, освіта, сімейний стан)'

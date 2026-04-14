@@ -12,6 +12,7 @@ from gui.controllers.task_controller import TaskController
 from gui.controllers.inbox_controller import InboxController
 from gui.controllers.config_controller import ConfigController
 from gui.controllers.user_controller import UserController
+from gui.views.admin.admin_column_converter_view import AdminColumnConverterView
 
 from gui.views.person import search_view
 from gui.views.person import batch_search_view
@@ -286,6 +287,13 @@ def init_nicegui(workflow_obj):
     async def admin_file_index():
         app_menu.render(auth_manager)
         await render_indexing_page(file_manager, auth_manager)
+
+    @ui.page('/admin/convert_columns')
+    @require_access(auth_manager, MODULE_ADMIN, PERM_EDIT)
+    async def admin_column_converter():
+        app_menu.render(auth_manager)
+        view = AdminColumnConverterView(person_controller=person_ctrl, ctx=auth_manager.get_current_context())
+        view.show()
 
     @ui.page('/user_settings_2fa')
     @require_access(auth_manager,MODULE_SEARCH, PERM_READ)

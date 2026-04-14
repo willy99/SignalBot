@@ -330,6 +330,7 @@ class AppMenu:
                             make_menu_item('Логи', 'history', '/logs')
                             make_menu_item('Конфіг Системи', 'build', '/admin/settings')
                             make_menu_item('Індексація файлів', 'cached', '/admin/file_index')
+                            make_menu_item('Конвертація стовпців', 'cached', '/admin/convert_columns')
 
                 # === ПРОФІЛЬ ТА ВИХІД ===
                 ui.separator().props('vertical dark').classes('mx-2 h-8')

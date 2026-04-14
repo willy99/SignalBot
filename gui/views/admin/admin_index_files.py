@@ -6,7 +6,6 @@ import time
 from gui.services.auth_manager import AuthManager
 from service.storage.FileCacher import FileCacheManager
 
-
 async def render_indexing_page(manager: FileCacheManager, auth_manager: AuthManager):
     chart_options = {
         'title': {'text': 'Прогрес індексації за роками та папками'},
