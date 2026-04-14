@@ -8,7 +8,19 @@ from typing import Any, Tuple, Dict
 from dics.deserter_xls_dic import NA
 from domain.person_key import PersonKey
 from service.constants import DB_DATE_FORMAT
+import sys
 
+if sys.platform == "win32":
+    try:
+        import pythoncom
+    except ImportError:
+        pythoncom = None
+else:
+    pythoncom = None
+
+def pythoncom_initialize():
+    if sys.platform == "win32" and pythoncom:
+        pythoncom.CoInitialize()
 
 def clean_text(text):
     if text is None: return None

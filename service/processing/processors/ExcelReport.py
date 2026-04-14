@@ -4,18 +4,40 @@ import traceback
 import config
 from collections import defaultdict
 from service.processing.DocumentProcessingService import DocumentProcessingService
+from service.processing.processors.ExcelProcessor import ExcelProcessor
 from service.storage.LoggerManager import LoggerManager
-from utils.utils import get_strint_fromfloat, get_year_safe, calculate_days_between
+from utils.utils import get_strint_fromfloat, get_year_safe, calculate_days_between, pythoncom_initialize
 from domain.person_filter import PersonSearchFilter
 from utils.regular_expressions import *
+from functools import wraps
+import xlwings as xw
+
+
+def ensure_com(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        # 1. Ініціалізація COM для потоку
+        pythoncom_initialize()
+
+        # 2. Примусове оновлення зв'язків у процесорі
+        if hasattr(self, 'excelProcessor'):
+            self.excelProcessor._refresh_com_connection()
+
+        try:
+            return func(self, *args, **kwargs)
+        except Exception as e:
+            # Логуємо тут, щоб бачити, де саме впало всередині методу
+            if hasattr(self, 'logger'):
+                self.logger.error(f"❌ Помилка в {func.__name__}: {e}")
+            raise
+
+    return wrapper
 
 class ExcelReporter:
     def __init__(self, excelProcessor, log_manager: LoggerManager):
         self.excelProcessor = excelProcessor
         self.logger = log_manager.get_logger()
         self.log_manager = log_manager
-
-
 
     def _is_today(self, cell_value: Any, today_date: datetime.date) -> bool:
         """Перевіряє, чи збігається дата в клітинці з сьогоднішньою."""
@@ -766,9 +788,12 @@ class ExcelReporter:
             traceback.print_exc()
             return {}
 
+    @ensure_com
     def get_daily_report(self, target_date: date = None) -> List[Dict[str, Any]]:
         if target_date is None:
             target_date = datetime.now().date()
+
+        self.excelProcessor.switch_to_sheet(MIL_UNITS[0])
 
         id_idx = self.excelProcessor.header.get(COLUMN_INCREMENTAL, 1) - 1
         name_idx = self.excelProcessor.header.get(COLUMN_NAME, 1) - 1
@@ -786,7 +811,7 @@ class ExcelReporter:
         des_conditions_idx = self.excelProcessor.header.get(COLUMN_DESERT_CONDITIONS, 1) - 1
 
         results = []
-        target_sheets = ['А0224', 'А7018']
+        target_sheets = [MIL_UNITS[0], MIL_UNITS[1]]
         for sheet_name in target_sheets:
             try:
                 sheet = self.excelProcessor.sheet.book.sheets[sheet_name]
@@ -863,6 +888,7 @@ class ExcelReporter:
 
         return results
 
+    @ensure_com
     def get_daily_returns_report(self, target_date: date, exclude_names: List[str] = None, pre_fetched_archive: list = None) -> List[Dict[str, Any]]:
         if exclude_names is None:
             exclude_names = []
@@ -968,7 +994,9 @@ class ExcelReporter:
         return final_returns
 
     # from 2022-up to now, the total brief summary, - desertion number, returns number
+    @ensure_com
     def get_brief_summary(self) -> list[dict]:
+        self.excelProcessor.switch_to_sheet(MIL_UNITS[0])
         """Рахує загальну макро-статистику для таблиці командувача (ВЧ А0224)"""
         des_date_idx = self.excelProcessor.header.get(COLUMN_DESERTION_DATE, 1) - 1
         return_date_idx = self.excelProcessor.header.get(COLUMN_RETURN_DATE, 1) - 1
@@ -1013,7 +1041,9 @@ class ExcelReporter:
             'in_disposal': 0
         }]
 
+    @ensure_com
     def get_dupp_names_report(self) -> Dict[str, List[Dict[str, Any]]]:
+        self.excelProcessor.switch_to_sheet(MIL_UNITS[0])
         # Отримуємо індекси колонок (переконайтеся, що константи імпортовані)
         name_idx = self.excelProcessor.header.get(COLUMN_NAME) - 1
         id_idx = self.excelProcessor.header.get(COLUMN_ID_NUMBER) - 1
@@ -1062,7 +1092,9 @@ class ExcelReporter:
 
         return dupp_names
 
+    @ensure_com
     def get_inn_birthday_mismatch_report(self, search_filter: PersonSearchFilter) -> List[Dict[str, Any]]:
+        self.excelProcessor.switch_to_sheet(MIL_UNITS[0])
         inc_idx = self.excelProcessor.header.get(COLUMN_INCREMENTAL) - 1
         name_idx = self.excelProcessor.header.get(COLUMN_NAME) - 1
         id_idx = self.excelProcessor.header.get(COLUMN_ID_NUMBER) - 1

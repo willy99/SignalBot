@@ -4,7 +4,7 @@ from gui.services.request_context import RequestContext
 
 
 class AdminColumnConverterView:
-    def __init__(self, person_controller, ctx:RequestContext):
+    def __init__(self, person_controller, ctx: RequestContext):
         self.person_controller = person_controller
         self.ctx = ctx
 

@@ -8,16 +8,32 @@ import config
 from dics.deserter_xls_dic import *
 from dics.deserter_xls_dic import NA
 from typing import List, Dict, Any
-from utils.utils import format_ukr_date, get_typed_value, format_to_excel_date, get_strint_fromfloat
+from utils.utils import format_ukr_date, get_typed_value, format_to_excel_date, get_strint_fromfloat, pythoncom_initialize
 import traceback
 from service.storage.LoggerManager import LoggerManager
 from datetime import date, datetime
 import threading
 from domain.person_filter import PersonSearchFilter
 from domain.person_key import PersonKey
+from functools import wraps
+
+def ensure_com(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs): # Додаємо self, щоб мати доступ до об'єкта
+        pythoncom_initialize()
+        try:
+            # Перед виконанням функції перевіряємо/відновлюємо зв'язок з Excel
+            self._refresh_com_connection()
+            return func(self, *args, **kwargs)
+        finally:
+            # Для Windows потоків з NiceGUI краще не робити Uninitialize занадто агресивно
+            pass
+    return wrapper
+
 
 class ExcelProcessor:
     def __init__(self, file_path, log_manager: LoggerManager, batch_processing=False, is_test_mode=False):
+        pythoncom_initialize()
         self.is_test_mode = is_test_mode
         self.file_path: str = file_path
         self.workbook = None
@@ -29,13 +45,38 @@ class ExcelProcessor:
 
         warnings.filterwarnings("ignore", category=UserWarning)
         self.abs_path = os.path.abspath(file_path)
-        self.app = xw.App(visible=False, add_book=False)
+        # На Windows краще спочатку перевірити, чи файл взагалі існує
+        if not os.path.exists(self.abs_path):
+            self.logger.error(f"Файл не знайдено: {self.abs_path}")
+            raise FileNotFoundError(f"Excel файл відсутній за шляхом {self.abs_path}")
+
+        self.app = xw.App(visible=True, add_book=False)
         self._load_workbook(config.DESERTER_TAB_NAME) #default tab name
         self.lock = threading.RLock()
 
         self.column_values: Dict[str, List[str]] = {} # для комбіков
         self._build_global_column_values()
 
+    def _refresh_com_connection(self):
+        """Метод для 'оживлення' зв'язку з Excel у новому потоці"""
+        try:
+            _ = self.app.api
+        except Exception:
+            self.logger.debug("🔄 Оновлення COM-зв'язку для нового потоку (Daily/Yearly Report)...")
+            pythoncom_initialize()
+            if xw.apps.count > 0:
+                self.app = xw.apps.active
+            else:
+                self.app = xw.App(visible=True, add_book=False)
+
+            file_name = os.path.basename(self.abs_path)
+            try:
+                self.workbook = self.app.books[file_name]
+            except Exception:
+                self.workbook = self.app.books.open(self.abs_path)
+            self.sheet = self.workbook.sheets.active
+
+    @ensure_com
     def get_correct_sheet_name(self, mil_unit):
         sheet_name = config.DESERTER_TAB_NAME
         if mil_unit is None:
@@ -44,6 +85,8 @@ class ExcelProcessor:
             return config.DESERTER_RESERVE_TAB_NAME
         return sheet_name
 
+
+    @ensure_com
     def upsert_record(self, records_list: List[Dict[str, Any]]) -> bool:
         if not records_list:
             False
@@ -114,44 +157,38 @@ class ExcelProcessor:
                 # --- СТВОРЕННЯ НОВОГО ---
                 current_id += 1
 
-                # Вставляємо новий рядок через native Excel API
-                try:
-                    self.sheet.range((target_insert_row, 1)).api.entire_row.insert()
-                    self.app.api.cut_copy_mode = False
-                except Exception as e:
-                    self.sheet.range(f'{target_insert_row - 1}:{target_insert_row - 1}').copy()
-                    self.sheet.range(f'{target_insert_row}:{target_insert_row}').insert(shift='down')
-                    self.app.api.cut_copy_mode = False
+                # 1. Вставляємо порожній рядок
+                # Це гарантує, що ми не копіюємо старі дані
+                row_to_fill = self.sheet.range(f'{target_insert_row}:{target_insert_row}')
+                row_to_fill.insert(shift='down')
 
-                # Зачистка строки від сміття
-                new_row_range = self.sheet.range((target_insert_row, 1), (target_insert_row, last_col_idx))
-                new_row_range.color = (255, 255, 255)  # Робимо білим
-                new_row_range.clear_contents()
+                # Перехоплюємо цей же рядок (бо старий сованувся вниз)
+                new_row_ref = self.sheet.range(f'{target_insert_row}:{target_insert_row}')
+                new_row_ref.clear_contents()  # Повна зачистка
 
-                # 1. Записуємо ID в першу колонку
-                self.sheet.range((target_insert_row, id_col_idx)).value = current_id
+                # 2. Готуємо "болванку" рядка (масив порожніх значень довжиною в к-ть колонок)
+                row_data = [None] * last_col_idx
 
-                # 2. Записуємо всі інші дані
+                # 3. Заповнюємо масив даними
+                # (Excel використовує 1-індексацію, масив 0-індексацію, тому idx-1)
+                row_data[id_col_idx - 1] = current_id
+
                 for col_name, value in data_dict.items():
                     idx = self.column_map.get(col_name.lower())
-                    if idx == id_col_idx:
-                        continue
-                    if idx:
-                        self.sheet.range((target_insert_row, idx)).value = get_typed_value(value)
+                    if idx and idx != id_col_idx and idx < len(row_data):
+                        row_data[idx - 1] = get_typed_value(value)
 
-                # 3. Додаткове налаштування (висота та вирівнювання, якщо Excel не підхопив сам)
-                new_row_range = self.sheet.range(f'{target_insert_row}:{target_insert_row}')
-                new_row_range.row_height = 15
-                # На Маці api.VerticalAlignment для центру (Excel constant: -4108)
+                # 4. ПИШЕМО ВЕСЬ РЯДОК ОДНИМ МАХОМ (це в 10 разів швидше і надійніше)
+                self.sheet.range((target_insert_row, 1)).value = row_data
+
+                # 5. Косметика (білий колір та висота)
+                new_row_ref.color = (255, 255, 255)
+                new_row_ref.row_height = 15
+
                 try:
                     if sys.platform == "win32":
-                        # Код для Windows (pywin32)
-                        new_row_range.api.VerticalAlignment = -4108
-                        new_row_range.api.WrapText = False
-                    else:
-                        # Код для Mac (appscript)
-                        new_row_range.api.vertical_alignment = -4108
-                        new_row_range.api.wrap_text = False
+                        new_row_ref.api.VerticalAlignment = -4108  # Центрування
+                        new_row_ref.api.WrapText = False
                 except:
                     pass
 
@@ -290,9 +327,9 @@ class ExcelProcessor:
 
         for s_name in target_sheets:
             try:
-                sheet = self.workbook.sheets[s_name]
+                self.sheet = self.workbook.sheets[s_name]
                 # Отримуємо заголовки конкретного листа
-                headers = sheet.range('A1').expand('right').value
+                headers = self.sheet.range('A1').expand('right').value
                 header_to_idx = {name: i for i, name in enumerate(headers)}
 
                 # Визначаємо останній рядок на цьому листі
@@ -304,12 +341,12 @@ class ExcelProcessor:
                     if col_name in header_to_idx:
                         col_idx = header_to_idx[col_name] + 1
                         # Зчитуємо стовпець
-                        values = sheet.range((2, col_idx), (last_row, col_idx)).value
+                        values = self.sheet.range((2, col_idx), (last_row, col_idx)).value
 
                         if not isinstance(values, list):
                             values = [values]
 
-                        for v in values:
+                        for i, v in enumerate(values):
                             if v is None or str(v).strip() == "":
                                 continue
                             if isinstance(v, (datetime, date)):
@@ -345,13 +382,67 @@ class ExcelProcessor:
             traceback.print_exc()
             raise BaseException(f"⚠️ Помилка ініціалізації Excel: {e}")
 
+    def _refresh_com_connection(self):
+        """Агресивне оновлення зв'язку, яке не боїться чужих потоків"""
+        pythoncom_initialize()
+
+        # Замість перевірки self.workbook (яка може бути 'битою'),
+        # ми просто намагаємося знайти або підключити книгу заново.
+        try:
+            # 1. Отримуємо доступ до Excel (чистий виклик)
+            if xw.apps.count > 0:
+                app = xw.apps.active
+            else:
+                app = xw.App(visible=True, add_book=False)
+
+            # 2. Підключаємося до книги за назвою файлу
+            file_name = os.path.basename(self.abs_path)
+
+            # ВАЖЛИВО: Отримуємо свіжий проксі-об'єкт для поточного потоку
+            self.app = app
+            self.workbook = app.books[file_name]
+
+            # Тестуємо зв'язок
+            _ = self.workbook.name
+
+        except Exception as e:
+            self.logger.debug(f"🔄 [COM RECOVERY] Спроба через повне відкриття: {e}")
+            try:
+                # Якщо книга не знайдена в активних — відкриваємо її явно
+                self.workbook = xw.Book(self.abs_path)
+                self.app = self.workbook.app
+            except Exception as final_e:
+                self.logger.error(f"❌ Критична помилка COM: {final_e}")
+
+
+    @ensure_com
     def switch_to_sheet(self, sheet_name, silent=False):
         if not sheet_name:
             raise ValueError(f"Військова частина не визначена!")
-        self.sheet = self.workbook.sheets[sheet_name]
+
+        try:
+            # Спроба звернутися до поточного аркуша
+            _ = self.sheet.name
+            # Якщо потік той самий, ми просто перемикаємо на потрібний
+            self.sheet = self.workbook.sheets[sheet_name]
+        except Exception:
+            # Якщо вилетіла помилка маршалінгу — перепідключаємо книгу
+            self.logger.debug(f"🔄 Потік змінився. Перепідключаю книгу для аркуша {sheet_name}")
+
+            # Підключаємося до активного додатка Excel
+            if xw.apps.count > 0:
+                self.app = xw.apps.active
+            else:
+                self.app = xw.App(visible=True, add_book=False)
+
+            # Відкриваємо або підключаємося до книги
+            self.workbook = self.app.books[os.path.basename(self.abs_path)]
+            self.sheet = self.workbook.sheets[sheet_name]
+
         if not silent:
             self._build_column_map()
 
+    @ensure_com
     def save(self) -> None:
         if self.workbook is None:
             self.logger.error("⚠️ Спроба зберегти порожній воркбук. Скасовано.")
@@ -382,10 +473,11 @@ class ExcelProcessor:
         except:
             pass
 
-
+    @ensure_com
     def get_column_options(self) -> Dict[str, List[str]]:
         return self.column_values
 
+    @ensure_com
     def search_people(self, filter_obj: PersonSearchFilter) -> list:
         with self.lock:
             self.switch_to_sheet(filter_obj.mil_unit if filter_obj.mil_unit else config.DESERTER_TAB_NAME , silent=True)
@@ -516,6 +608,7 @@ class ExcelProcessor:
 
             return results
 
+    @ensure_com
     def find_persons(self, keys: list[PersonKey]) -> dict[str, dict]:
         """
         Шукає групу людей за один прохід по Excel.
@@ -600,6 +693,7 @@ class ExcelProcessor:
 
         return results
 
+    @ensure_com
     def find_persons_by_ids(
         self,
         ids: list[int],
@@ -690,7 +784,7 @@ class ExcelProcessor:
 
         return results
 
-
+    @ensure_com
     def find_person(self, key: PersonKey) -> dict:
         with self.lock:
             if key.mil_unit:
@@ -756,6 +850,7 @@ class ExcelProcessor:
                 cell = str(cell).strip()
             serialized_row.append(cell)
 
+    @ensure_com
     def delete_record(self, row_id: int, mil_unit: str) -> bool:
         try:
             with self.lock:
@@ -780,6 +875,7 @@ class ExcelProcessor:
             self.logger.debug(f"❌ EXCEL, Помилка видалення xlwings: {e}")
             return False
 
+    @ensure_com
     def update_row_by_id(self, row_id: int, updated_data: dict, paint_with_color=None):
         try:
             with self.lock:
@@ -828,6 +924,7 @@ class ExcelProcessor:
         """Зафарбовує весь рядок (від A до BB) вказаним кольором."""
         range.color = hex_color
 
+    @ensure_com
     def batch_search_names(self, names_list: List[str]) -> List[Dict[str, Any]]:
         self.switch_to_sheet(config.DESERTER_TAB_NAME, silent=True)
 
@@ -871,6 +968,7 @@ class ExcelProcessor:
         results.sort(key=lambda x: x['found'])
         return results
 
+    @ensure_com
     def update_total_formula(self):
         """
         Вставляє формулу =SUBTOTAL(...) у колонку 'I' під останнім записом.
@@ -892,10 +990,12 @@ class ExcelProcessor:
         except Exception as e:
             self.logger.error(f"❌ Помилка при оновленні формули SUBTOTAL: {e}")
 
+    @ensure_com
     def get_last_col(self):
         headers = self.sheet.range('A1').expand('right').value
         return len(headers)
 
+    @ensure_com
     def get_last_row(self):
         # last_row = self.sheet.used_range.last_cell.row
         last_row = self.sheet.range('A1048576').end('up').row

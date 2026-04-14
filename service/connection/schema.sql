@@ -125,7 +125,7 @@ CREATE TABLE IF NOT EXISTS sys_config (
 
 
 
-CREATE TABLE daily_dashboard (
+CREATE TABLE IF NOT EXISTS daily_dashboard (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     report_date DATE UNIQUE,          -- Дата, за яку зібрано статистику
     total_awol INTEGER DEFAULT 0,     -- Здійснили СЗЧ

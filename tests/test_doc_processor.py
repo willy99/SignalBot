@@ -708,6 +708,10 @@ def test_desertion_locality_extraction(processor_factory, mock_logger):
     res = extract_locality(text)
     assert res == 'Павлоград'
 
+    text = "Пошук військовослужбовця в районі зосередження підрозділом в н.п. Мар’янівка Дніпропетровської області позитивного результату не приніс. Місцезнаходження військовослужбовця невідоме. Решта обставин з'ясовується."
+    res = extract_locality(text)
+    assert res == 'Мар’янівка'
+
 
 def test_conscription_date(processor_factory, mock_logger):
     processor = processor_factory("any.docx")
