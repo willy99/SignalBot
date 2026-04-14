@@ -110,7 +110,7 @@ def main() -> None:
             workflow.signalClient.close()
 
         if workflow.excelProcessor is not None:
-            if config.SAVE_EXCEL_AT_CLOSE:
+            if True: # config.SAVE_EXCEL_AT_CLOSE:
                 try:
                     workflow.excelProcessor.save()
                 except Exception:

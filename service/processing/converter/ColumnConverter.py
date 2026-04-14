@@ -1,19 +1,34 @@
 import xlwings as xw
 import traceback
 from dics.deserter_xls_dic import *
+from service.processing.processors import ExcelProcessor
 from service.processing.processors.DocProcessor import DocProcessor
 from service.storage.LoggerManager import LoggerManager
 from utils.utils import format_ukr_date
 from datetime import datetime, timedelta
 from utils.regular_expressions import *
+import pythoncom
+from functools import wraps
+
+def ensure_com(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        pythoncom.CoInitialize()
+        try:
+            return func(self, *args, **kwargs)
+        finally:
+            # Не деініціалізуємо агресивно, щоб не порушити роботу інших потоків
+            pass
+    return wrapper
 
 class ColumnConverter:
-    def __init__(self, excel_file_path, log_manager: LoggerManager):
+    def __init__(self, excel_file_path, log_manager: LoggerManager, excel_processor=None):
         self.file_path = excel_file_path
         # Ініціалізуємо DocProcessor (без прив'язки до файлу, просто як двигун)
         self.docProcessor = DocProcessor(log_manager, None, None)
         self.app = None
         self.wb = None
+        self.excelProcessor = excel_processor
 
     def _get_column_index(self, sheet, col_name):
         """Допоміжний метод для пошуку індексу колонки за назвою (1-based)"""
@@ -25,10 +40,68 @@ class ColumnConverter:
             print(f"Колонку '{col_name}' не знайдено в хедері.")
             return None
 
+    @ensure_com
     def convert(self):
         # Тут можна викликати всі методи конвертації
+        self._convert_my_field()
         return
         # self._convert_region()
+
+    def _convert_my_field(self):
+        print("--- Початок конвертації ---")
+
+        try:
+            # Підключаємось до Excel (видимим чи невидимим)
+            self.excelProcessor.switch_to_sheet(MIL_UNITS[0])
+
+            # Отримуємо індекси колонок
+            title_col: Final[int] = self.excelProcessor.header.get(COLUMN_TITLE)
+            title_2_col: Final[int] = self.excelProcessor.header.get(COLUMN_TITLE_2)
+
+            print('1: ' + str(title_col) + ' 2: ' + str(title_2_col))
+
+            if not all([title_col, title_2_col]):
+                print("!!! Необхідні колонки для мапінгу відсутні!")
+                return
+
+            # Визначаємо останній рядок
+            last_row = self.excelProcessor.get_last_row()
+            print(f"Обробка {last_row - 1} рядків...")
+
+            # Для швидкості зчитуємо цілі діапазони в пам'ять (list of lists)
+
+            title_values = self.excelProcessor.sheet.range((2, title_col), (last_row, title_col)).value
+            title_2_values = self.excelProcessor.sheet.range((2, title_2_col), (last_row, title_2_col)).value
+
+            #print('>>> titles ' + str(len(title_values)))
+            #print('>>> title_2 ' + str(len(title_2_values)))
+
+            # Список для результатів, які ми запишемо одним махом
+            results = []
+
+            for i in range(len(title_values)):
+                title = str(title_values[i] or "").strip()
+                title_2 = str(title_2_values[i] or "").strip()
+
+                # Логіка підсвічування порожніх даних
+                if not title:
+                    results.append([''])
+                    continue
+
+                title_2_new = extract_title_2(title)
+
+                print('>> ' + str(title) + ' перероблено на ' + str(title_2_new))
+
+                target_cell = self.excelProcessor.sheet.range((i+2, title_2_col))
+                target_cell.options(transpose=True).value = title_2_new
+
+            self.excelProcessor.save()
+            print("✅ Конвертацію завершено успішно.")
+
+        except Exception as e:
+            print(f"🔴 КРИТИЧНА ПОМИЛКА: {e}")
+            print(traceback.format_exc())
+
 
     def _convert_region(self):
         print("--- Початок конвертації ---")

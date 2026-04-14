@@ -6,7 +6,10 @@ from domain.person_filter import PersonSearchFilter
 from domain.person_key import PersonKey
 from gui.services.request_context import RequestContext
 from gui.services.auth_manager import AuthManager
+from service.docworkflow.DbrService import DbrService
 from service.processing.MyWorkFlow import MyWorkFlow
+from service.processing.converter.ColumnConverter import ColumnConverter
+from service.storage import FileCacher
 
 
 class PersonController:
@@ -14,6 +17,9 @@ class PersonController:
         self.processor = worklow.excelProcessor
         self.auth_manager = auth_manager
         self.logger = worklow.log_manager.get_logger()
+        self.log_manager = worklow.log_manager
+        self.excelFilePath = worklow.excelFilePath
+        self.excelProcessor = worklow.excelProcessor
 
     def save_person(self, ctx: RequestContext, person_model, paint_color=None):
         self.logger.debug(f'UI:{ctx.user_name}: Зберігаємо персону {person_model.name}')
@@ -80,6 +86,10 @@ class PersonController:
         self.logger.debug(f'UI:{ctx.user_name}: Сінхронізуємо базу')
         self.processor.save()
         return True
+
+    def convert_columns(self, ctx:RequestContext):
+        converter = ColumnConverter(self.excelFilePath, self.log_manager, self.excelProcessor)
+        converter.convert()
 
     def save_persons(self, ctx: RequestContext, person_list: list, partial_update=False, paint_color=None):
         self.logger.debug(f'UI:{ctx.user_name}: Зберігаємо пакет персон ({len(person_list)} шт.)')
