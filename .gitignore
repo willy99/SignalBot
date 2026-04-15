@@ -11,3 +11,5 @@ __pycache__/
 /.nicegui/
 
 /tests/tests_tmp
+
+config.py

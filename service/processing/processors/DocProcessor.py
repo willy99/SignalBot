@@ -76,9 +76,9 @@ class DocProcessor:
 
         if text is not None:
             fields[col.COLUMN_DESERT_CONDITIONS] = extract_desert_conditions(text)
-            fields[col.COLUMN_DESERTION_REGION] =extract_desertion_region(fields[col.COLUMN_DESERT_CONDITIONS])
             fields[col.COLUMN_DESERTION_DATE] = extract_desertion_date(fields[col.COLUMN_DESERT_CONDITIONS])
             fields[col.COLUMN_DESERTION_PLACE] = extract_desertion_place(clean_text(text), get_file_name(self.original_filename))
+            fields[col.COLUMN_DESERTION_REGION] = extract_desertion_region(fields[col.COLUMN_DESERT_CONDITIONS])
             fields[col.COLUMN_RETURN_DATE] = extract_return_date(fields[col.COLUMN_DESERT_CONDITIONS])
             fields[col.COLUMN_DESERTION_TYPE] = extract_desertion_type(text, fields[col.COLUMN_DESERTION_PLACE])
             fields[col.COLUMN_CC_ARTICLE] = extract_cc_article(fields[col.COLUMN_DESERTION_TYPE])

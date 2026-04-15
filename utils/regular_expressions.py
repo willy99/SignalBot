@@ -291,6 +291,12 @@ def extract_desertion_region(text):
 
     if desertion_place:
         return extract_region(desertion_place)
+    desertion_place = extract_desertion_place(text)
+    if desertion_place:
+        if 'ППД' == desertion_place:
+            return 'Миколаївська область'
+        if 'НЦ' == desertion_place:
+            return 'Житомирська область'
     return NA
 
 
