@@ -1,8 +1,9 @@
+from utils.utils import is_win
 from .BaseFileParser import BaseFileParser
 import fitz  # PyMuPDF
 import pytesseract
-import sys
-if sys.platform == "win32":
+
+if is_win():
     try:
         import pythoncom
     except ImportError:
@@ -10,7 +11,7 @@ if sys.platform == "win32":
 else:
     pythoncom = None
 
-if sys.platform == "win32" and pythoncom:
+if is_win() and pythoncom:
     pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 from PIL import Image
 

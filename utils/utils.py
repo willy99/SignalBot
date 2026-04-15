@@ -10,7 +10,10 @@ from domain.person_key import PersonKey
 from service.constants import DB_DATE_FORMAT
 import sys
 
-if sys.platform == "win32":
+def is_win()->bool:
+    return sys.platform == "win32"
+
+if is_win():
     try:
         import pythoncom
     except ImportError:
@@ -19,7 +22,7 @@ else:
     pythoncom = None
 
 def pythoncom_initialize():
-    if sys.platform == "win32" and pythoncom:
+    if is_win() and pythoncom:
         pythoncom.CoInitialize()
 
 def clean_text(text):
@@ -546,3 +549,7 @@ def normalize_phone(phone: str) -> str:
     if not phone:
         return ''
     return re.sub(r'\D', '', phone)  # залишаємо тільки цифри
+
+def get_env_bool(var_name: str, default: bool = False) -> bool:
+    val = os.getenv(var_name, str(default)).lower()
+    return val in ("true", "1", "yes", "on")

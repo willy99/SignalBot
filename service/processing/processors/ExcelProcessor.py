@@ -1,14 +1,12 @@
 import xlwings as xw
 import os
-import sys
-
 import warnings
 from domain.person_filter import YES
 import config
 from dics.deserter_xls_dic import *
 from dics.deserter_xls_dic import NA
 from typing import List, Dict, Any
-from utils.utils import format_ukr_date, get_typed_value, format_to_excel_date, get_strint_fromfloat, pythoncom_initialize
+from utils.utils import format_ukr_date, get_typed_value, format_to_excel_date, get_strint_fromfloat, pythoncom_initialize, is_win
 import traceback
 from service.storage.LoggerManager import LoggerManager
 from datetime import date, datetime
@@ -186,7 +184,7 @@ class ExcelProcessor:
                 new_row_ref.row_height = 15
 
                 try:
-                    if sys.platform == "win32":
+                    if is_win():
                         new_row_ref.api.VerticalAlignment = -4108  # Центрування
                         new_row_ref.api.WrapText = False
                 except:
@@ -981,7 +979,7 @@ class ExcelProcessor:
             cell = self.sheet.range(f'I{last_data_row}')
             cell.formula = formula_str
             try:
-                if sys.platform == "win32":
+                if is_win():
                     cell.api.Font.Bold = True
                 else:
                     cell.api.font_object.bold = True
