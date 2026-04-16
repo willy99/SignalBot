@@ -105,6 +105,13 @@ class BaseDocumentService(Generic[T]):
             query += " AND status = ?"
             params.append(doc_filter.status)
 
+        if doc_filter.last_name:
+            query += """ AND EXISTS (
+                    SELECT 1 FROM json_each(s.payload) 
+                    WHERE UPPER(json_extract(value, '$.name')) LIKE ?
+                )"""
+            params.append(f"%{doc_filter.last_name.upper()}%")
+
         if doc_filter.out_number:
             query += " AND out_number LIKE ?"
             params.append(f"%{doc_filter.out_number}%")
@@ -124,6 +131,8 @@ class BaseDocumentService(Generic[T]):
                 params.append(iso_to)
             except ValueError:
                 pass
+        print(str(query))
+        print(str(params))
         return query, params
 
     def is_existing_num(self, out_number: str, exclude_id: Optional[int] = None) -> bool:

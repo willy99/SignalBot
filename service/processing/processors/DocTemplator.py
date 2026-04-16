@@ -176,8 +176,7 @@ class DocTemplator:
         byte_io = io.BytesIO()
         doc.save(byte_io)
         byte_io.seek(0)
-
-        file_name = f"Пакет_Супроводів_{city}_{len(formatted_docs)}шт.docx"
+        file_name = f"Пакет_Супроводів_{city}_{supp_number.replace('/', '_')}_({supp_date.replace('.', '_')})_{len(formatted_docs)}шт.docx"
         return byte_io.getvalue(), file_name
 
 

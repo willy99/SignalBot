@@ -21,7 +21,8 @@ def render_drafts_list_page(controller: SupportController, auth_manager: AuthMan
         'date_from': '',
         'date_to': '',
         'out_number': '',
-        'status': 'Всі'
+        'status': 'Всі',
+        'last_name': ''
     }
 
     # Визначаємо колонки
@@ -52,6 +53,8 @@ def render_drafts_list_page(controller: SupportController, auth_manager: AuthMan
 
                 ui.input('Номер супроводу').bind_value(filter_state, 'out_number').classes('w-32').props('dense outlined clearable')
 
+                ui.input('Прізвище').bind_value(filter_state, 'last_name').classes('w-40').props('dense outlined clearable')
+
                 status_options = {'Всі': 'Всі', DOC_STATUS_DRAFT: 'Чернетка', DOC_STATUS_COMPLETED: 'Відправлено'}
                 ui.select(status_options, label='Статус').bind_value(filter_state, 'status').classes('w-36').props('dense outlined')
 
@@ -67,6 +70,7 @@ def render_drafts_list_page(controller: SupportController, auth_manager: AuthMan
                             date_to=filter_state['date_to'] or None,
                             out_number=filter_state['out_number'].strip() if filter_state['out_number'] else None,
                             status=filter_state['status'] if filter_state['status'] != 'Всі' else None,
+                            last_name=filter_state['last_name'].strip() if filter_state['last_name'] else None,
                             limit=pager.limit,
                             offset=pager.offset
                         )
