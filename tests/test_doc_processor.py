@@ -35,9 +35,14 @@ def processor_factory(mock_logger):
     """Фабрика для створення процесора з різними файлами"""
 
     def _create_processor(file_name):
-        # Шлях до тестових файлів у папці tests/data
-        base_path = Path(__file__).parent / "data" / file_name
-        return DocProcessor(mock_logger, str(base_path), file_name)
+        # .resolve() знайде правильний шлях з урахуванням особливостей ОС
+        base_path = (Path(__file__).parent / "data" / file_name).resolve()
+
+        # Якщо файл не знайдено, ми побачимо це ДО того, як впаде docx
+        if not base_path.exists():
+            raise FileNotFoundError(f"Тестовий файл не знайдено: {base_path}")
+
+        return DocProcessor(mock_logger, base_path, file_name)
 
     return _create_processor
 
@@ -255,7 +260,7 @@ def test_desertion_date_is_correct(processor_factory, mock_logger):
 
 
 def test_402_refusal(processor_factory, mock_logger):
-    filename = "10_02.03.2026  відмова ДУМБЄКОВ С.А. 8 дшр 2 дшб.doc"
+    filename = "10_02.03.2026 відмова ДУМБЄКОВ С.А. 8 дшр 2 дшб.doc"
     processor = processor_factory(filename)
     result = processor.process()
     assert isinstance(result, list)
@@ -282,7 +287,7 @@ def test_402_refusal(processor_factory, mock_logger):
 
 
 def test_return_data_is_correct(processor_factory, mock_logger):
-    filename = "11_03.03.2026  повернення БУЙКО Д.В Танкова рота.docx"
+    filename = "11_03_03_2026_повернення_БУЙКО_Д_В_Танкова_рота.docx"
     processor = processor_factory(filename)
     result = processor.process()
     assert isinstance(result, list)
@@ -295,7 +300,7 @@ def test_return_data_is_correct(processor_factory, mock_logger):
     assert person[COLUMN_DESERTION_REGION] == NA
 
 def test_return_data_is_correct_2(processor_factory, mock_logger):
-    filename = "12_27.02.2026  повернення БУЙКО Д.В. 8 дшр 2 дшб.doc"
+    filename = "12_27_02_2026_повернення_БУЙКО_Д_В_8_дшр_2_дшб.doc"
     processor = processor_factory(filename)
     result = processor.process()
     assert isinstance(result, list)
