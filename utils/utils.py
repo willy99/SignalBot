@@ -2,7 +2,6 @@ import datetime
 import re
 from datetime import timedelta
 from datetime import datetime, date
-import config
 import os
 from typing import Any, Tuple, Dict
 from dics.deserter_xls_dic import NA
@@ -20,6 +19,8 @@ if is_win():
         pythoncom = None
 else:
     pythoncom = None
+
+import config
 
 def pythoncom_initialize():
     if is_win() and pythoncom:
@@ -549,7 +550,3 @@ def normalize_phone(phone: str) -> str:
     if not phone:
         return ''
     return re.sub(r'\D', '', phone)  # залишаємо тільки цифри
-
-def get_env_bool(var_name: str, default: bool = False) -> bool:
-    val = os.getenv(var_name, str(default)).lower()
-    return val in ("true", "1", "yes", "on")

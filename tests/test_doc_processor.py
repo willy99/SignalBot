@@ -39,7 +39,7 @@ def processor_factory(mock_logger):
         base_path = (Path(__file__).parent / "data" / file_name).resolve()
 
         # Якщо файл не знайдено, ми побачимо це ДО того, як впаде docx
-        if not base_path.exists():
+        if not base_path.exists() and "any.docx" != file_name:
             raise FileNotFoundError(f"Тестовий файл не знайдено: {base_path}")
 
         return DocProcessor(mock_logger, base_path, file_name)
@@ -355,7 +355,6 @@ def test_incorrect_headings_without_numbers(processor_factory, mock_logger):
 #################### загальне модульне тестування регекспів ##############################
 
 def test_military_unit(processor_factory, mock_logger):
-    processor = processor_factory("any.docx")
     text = "ДОПОВІДЬ про факт не прибуття до місця несення служби військовослужбовця військової частини А0224 (Командування ДШВ) Десантно-штурмових військ Збройних Сил України"
     res = extract_mil_unit(text)
     assert res == 'А0224'
@@ -368,9 +367,12 @@ def test_military_unit(processor_factory, mock_logger):
     res = extract_mil_unit(text)
     assert res == 'А7018'
 
+    text = "ДОПОВІДЬ про факт самовільного залишення району виконання завдання за призначенням військовослужбовців зарахованих до тимчасово прибулого особового складу військової частини А7019, що був відряджений до військової частини А0224 (Командування ДШВ) Десантно-штурмових військ Збройних Сил України "
+    res = extract_mil_unit(text)
+    assert res == 'А7018'
+
 
 def test_name_extraction(processor_factory, mock_logger):
-    processor = processor_factory("any.docx")
     text = "ГАВНОВЄЗЕРСЬКИЙ Олег Вікторович, старший солдат, військовослужбовець військової служби за призивом, "
     res = extract_name(text)
     assert "ГАВНОВЄЗЕРСЬКИЙ Олег Вікторович" in res
@@ -443,7 +445,6 @@ def test_name_lowercase_extraction(processor_factory, mock_logger):
 
 
 def test_title_extraction(processor_factory, mock_logger):
-    processor = processor_factory("any.docx")
     text = "ПУНДІК Олег Вікторович, старший солдат, військовослужбовець військової служби за призовом, "
     res = extract_title(text)
     assert "старший солдат" in res
@@ -478,7 +479,6 @@ def test_title_extraction(processor_factory, mock_logger):
 
 
 def test_rtzk_extraction(processor_factory, mock_logger):
-    processor = processor_factory("any.docx")
     text = "Призваний Слов'янським ТЦК 10.09.2025. РНОКПП 1234567890"
     res = extract_rtzk(text)
     assert "Слов'янським ТЦК" in res
@@ -578,7 +578,6 @@ def test_rtzk_extraction(processor_factory, mock_logger):
     assert res == ("Вознесенським РТЦК та СП Миколаївська обл")
 
 def test_rtzk_region_extraction(processor_factory, mock_logger):
-    processor = processor_factory("any.docx")
 
     text = "Призваний Центральним РТЦК та СП м. Київ 06.12.2024 року. "
     res = extract_region(text)
@@ -636,7 +635,6 @@ def test_rtzk_region_extraction(processor_factory, mock_logger):
 
 
 def test_desertion_region_extraction(processor_factory, mock_logger):
-    processor = processor_factory("any.docx")
 
     text = "26.02.2026 року близько 08:00 години, під час перевірки наявності особового складу був відсутній солдат БУЙКО Олександр Васильович, який самовільно залишив район тимчасового місця розосередження підрозділу військової частини А0224 під час повітряної тривоги. Пошук військовослужбовця в районі зосередження підрозділу поблизу міста Миколаєва, Миколаївської області позитивного результату не приніс. Місцезнаходження військовослужбовця невідоме. Решта обставин з'ясовується. "
     res = extract_desertion_region(text)
@@ -719,7 +717,6 @@ def test_desertion_locality_extraction(processor_factory, mock_logger):
 
 
 def test_conscription_date(processor_factory, mock_logger):
-    processor = processor_factory("any.docx")
 
     text = "БУЙНОВ Олег Леонідович, Одружений. неодружений. Призваний Салтівським ВТТЦК та СП м. Харків. РНОКПП відомості не надано"
     res = extract_conscription_date(text)
@@ -750,7 +747,6 @@ def test_conscription_date(processor_factory, mock_logger):
 
 
 def test_address_extraction(processor_factory, mock_logger):
-    processor = processor_factory("any.docx")
     text = "телефону +38(096)-896-7925. Близькі родичі: Батьки померли. Адреса реєстрації військовослужбовця: Запорізька обл, м. Василівка, вул. Кірова буд. 25."
     res = extract_address(text)
     assert res == 'Запорізька обл, м. Василівка, вул. Кірова буд. 25'
@@ -768,7 +764,6 @@ def test_address_extraction(processor_factory, mock_logger):
     assert res == 'Дніпропетровська область, м. Дніпро, вул. Новокримська 7 кв 9'
 
 def test_phone_extraction(processor_factory, mock_logger):
-    processor = processor_factory("any.docx")
     text = "номер мобільного телефону (095) 64 73225. Адреса "
     res = extract_phone(text)
     assert res == '0956473225'
@@ -778,7 +773,6 @@ def test_phone_extraction(processor_factory, mock_logger):
     assert res == '0505184441'
 
 def test_where_desertion_extraction(processor_factory, mock_logger):
-    processor = processor_factory("any.docx")
     text = "30.01.2026 від тимчасово виконуючого обов’язки командира 4 аеромобільної роти аеромобільного батальйону надійшла доповідь про факт неповернення з лікування до району виконання завдання за призначенням військовослужбовця військової частини А0224 (без зброї)."
     file_name = '30.01.2026 СЗЧ з лікування ГАВНОВ Р.О. 4 аемр аемб.docx'
     res = extract_desertion_place(text, file_name)
@@ -840,7 +834,6 @@ def test_where_desertion_extraction(processor_factory, mock_logger):
     assert res == 'НЦ'
 
 def test_milsubunit_extraction(processor_factory, mock_logger):
-    processor = processor_factory("any.docx")
 
     text = "ГАВНОВ Віталій Сергійович, солдат, військовослужбовець військової служби за призовом, розвідник-санітар 2 розвідувального відділення розвідувального взводу 1 десантно-штурмового батальйону військової частини А0224, 30.07.1986 року народження, українець, освіта середня . Призваний"
     file_name = '09.02.2026 СЗЧ РВБЗ ГАВНОВ А. С. РВ 1ДШБ.docx'
@@ -919,7 +912,6 @@ def test_milsubunit_extraction(processor_factory, mock_logger):
     assert res == 'Зап рота'
 
 def test_desertion_type_extraction(processor_factory, mock_logger):
-    processor = processor_factory("any.docx")
 
     text = "16.02.2026 близько 14:00 солдат БУЙНОВ Антон Олександрович, солдат БАРАНЧУК Максим Володимирович та солдат СКАЧКУК Сергій Іванович здійснили самовільне залишення району виконання бойового завдання підрозділом поблизу населеного пункту Шевченко Добропільської міської громади Покровського району Донецької області. Військовослужбовець: солдат БУЙНОВ Антон Олександрович з особистою зброєю (5,45 x 39 мм автомат АК-74, номер зброї 6811118, набої 5,45 x 39 в кількості 400 шт., граната DM52 – 2 шт.) солдат БАРАНЧУК Максим Володимирович з особистою зброєю (5,45 x 39 мм автомат АК-74, номер зброї 6811119, набої 5,45 x 45 в кількості 400 шт., граната DM52 – 2 шт.) солдат СКАЧКУК Сергій Іванович з особистою зброєю (5,45 x 39 мм автомат АК-74, номер зброї 6722224, набої 5,45 x 39 в кількості 400 шт"
     where = extract_desertion_place(text)

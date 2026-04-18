@@ -47,60 +47,59 @@ class ColumnConverter:
         # self._convert_region()
 
     def _convert_my_field(self):
-        print("--- Початок конвертації ---")
-
+        print("--- Початок конвертації (заміна формул на значення) ---")
         try:
-            # Підключаємось до Excel (видимим чи невидимим)
-            self.excelProcessor.switch_to_sheet(MIL_UNITS[0])
+            self.excelProcessor.switch_to_sheet(MIL_UNITS[1])
 
-            # Отримуємо індекси колонок
-            title_col: Final[int] = self.excelProcessor.header.get(COLUMN_TITLE)
-            title_2_col: Final[int] = self.excelProcessor.header.get(COLUMN_TITLE_2)
-
-            print('1: ' + str(title_col) + ' 2: ' + str(title_2_col))
+            title_col = self.excelProcessor.header.get(COLUMN_TITLE)
+            title_2_col = self.excelProcessor.header.get(COLUMN_TITLE_2)
 
             if not all([title_col, title_2_col]):
-                print("!!! Необхідні колонки для мапінгу відсутні!")
+                print("!!! Колонки не знайдені!")
                 return
 
-            # Визначаємо останній рядок
             last_row = self.excelProcessor.get_last_row()
-            print(f"Обробка {last_row - 1} рядків...")
 
-            # Для швидкості зчитуємо цілі діапазони в пам'ять (list of lists)
-
+            # 1. Зчитуємо вхідні дані в масив
             title_values = self.excelProcessor.sheet.range((2, title_col), (last_row, title_col)).value
-            title_2_values = self.excelProcessor.sheet.range((2, title_2_col), (last_row, title_2_col)).value
 
-            #print('>>> titles ' + str(len(title_values)))
-            #print('>>> title_2 ' + str(len(title_2_values)))
+            # 2. Готуємо два вертикальні масиви (список списків) для запису
+            # Це важливо: кожен елемент має бути [значення]
+            new_titles_col = []
+            new_title_2_col = []
 
-            # Список для результатів, які ми запишемо одним махом
-            results = []
+            for val in title_values:
+                title = str(val or "").strip()
 
-            for i in range(len(title_values)):
-                title = str(title_values[i] or "").strip()
-                title_2 = str(title_2_values[i] or "").strip()
-
-                # Логіка підсвічування порожніх даних
                 if not title:
-                    results.append([''])
+                    new_titles_col.append([None])
+                    new_title_2_col.append([None])
                     continue
 
-                title_2_new = extract_title_2(title)
+                # Обробляємо дані
+                res_title_2 = extract_title_2(title)
 
-                print('>> ' + str(title) + ' перероблено на ' + str(title_2_new))
+                # Додаємо у форматі рядка для Excel
+                new_titles_col.append([title])
+                new_title_2_col.append([res_title_2])
 
-                target_cell = self.excelProcessor.sheet.range((i+2, title_2_col))
-                target_cell.options(transpose=True).value = title_2_new
+            # 3. КРИТИЧНИЙ МОМЕНТ: Очищуємо старі формули перед записом (опціонально, але надійно)
+            # self.excelProcessor.sheet.range((2, title_2_col), (last_row, title_2_col)).clear_contents()
 
-            self.excelProcessor.save()
-            print("✅ Конвертацію завершено успішно.")
+            # 4. ЗАПИСУЄМО МАСИВОМ
+            # Це перезапише будь-яку формулу, незалежно від того, чи була там помилка
+            range_title = self.excelProcessor.sheet.range((2, title_col), (last_row, title_col))
+            range_title_2 = self.excelProcessor.sheet.range((2, title_2_col), (last_row, title_2_col))
+
+            self.excelProcessor.sheet.range((2, title_col)).value = new_titles_col
+
+            range_title_2.value = new_title_2_col
+
+            # self.excelProcessor.save()
+            print(f"✅ Успішно оброблено {len(new_titles_col)} рядків. Формули замінено на значення.")
 
         except Exception as e:
-            print(f"🔴 КРИТИЧНА ПОМИЛКА: {e}")
-            print(traceback.format_exc())
-
+            print(f"🔴 Помилка: {e}")
 
     def _convert_region(self):
         print("--- Початок конвертації ---")

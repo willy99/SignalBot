@@ -4,13 +4,24 @@ import os
 import re
 import shutil
 import tempfile
-from .BaseFileParser import BaseFileParser
 
+from config import is_win
+from .BaseFileParser import BaseFileParser
+import config
 
 class DocOldParser(BaseFileParser):
+
     def get_full_text(self):
-        # 1. Спробуємо Antiword (швидко)
-        text = self._try_antiword()
+
+        text = self._try_textutil()
+
+        # Якщо textutil повернув сміття (немає кирилиці або забагато дивних символів)
+        if not text or self._is_garbage(text):
+            self.logger.warning("⚠️ textutil не впорався, пробуємо antiword...")
+            if config.is_win():
+                text = self._try_antiword_win()
+            else:
+                text = self._try_antiword()
 
         # 2. Якщо Antiword не зміг (наприклад, файл пошкоджений) — резервний Word
         if not text or self._is_garbage(text):
@@ -19,9 +30,31 @@ class DocOldParser(BaseFileParser):
 
         return text
 
+    def _try_textutil(self):
+        try:
+            result = subprocess.run(
+                ['textutil', '-convert', 'txt', '-stdout', self.file_path],
+                capture_output=True
+            )
+            return result.stdout.decode('utf-8', errors='replace')
+        except:
+            return ""
+
     def _try_antiword(self):
+        try:
+            # antiword чудово витягує текст зі старих .doc
+            result = subprocess.run(
+                ['antiword', '-m', 'UTF-8', self.file_path],
+                capture_output=True
+            )
+            return result.stdout.decode('utf-8', errors='replace')
+        except Exception as e:
+            self.logger.error(f"❌ antiword не встановлено або помилка: {e}")
+            return ""
+
+    def _try_antiword_win(self):
         # Шлях до папки, де лежить antiword.exe
-        base_dir = r"C:\work\install\antiword"
+        base_dir = config.PACKAGES_ANTIWORD_HOME_PATH
         exe_path = os.path.join(base_dir, "bin", "antiword.exe")
 
         # Вказуємо Antiword, де шукати таблиці кодувань (Mapping tables)
@@ -35,10 +68,8 @@ class DocOldParser(BaseFileParser):
         try:
             shutil.copy2(os.path.abspath(self.file_path), temp_file)
 
-            # Налаштовуємо змінні оточення для процесу
             env = os.environ.copy()
             env["ANTIWORDHOME"] = antiword_home
-            # Для надійності вказуємо і HOME, деякі версії шукають там
             env["HOME"] = antiword_home
 
             result = subprocess.run(
@@ -50,7 +81,6 @@ class DocOldParser(BaseFileParser):
             )
 
             if result.returncode == 0:
-                # Декодуємо результат (кирилиця в UTF-8)
                 return result.stdout.decode('utf-8', errors='replace')
             else:
                 stderr = result.stderr.decode(errors='replace')
@@ -68,6 +98,7 @@ class DocOldParser(BaseFileParser):
 
     def _try_windows_word(self):
         """Резервний метод через COM (тільки якщо Antiword підвів)"""
+        if not is_win(): return None
         import win32com.client
         import pythoncom
 

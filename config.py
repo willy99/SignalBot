@@ -4,9 +4,14 @@ from typing import Final
 from dotenv import load_dotenv
 import sys
 
-from utils.utils import is_win, get_env_bool
-
 load_dotenv()
+
+def get_env_bool(var_name: str, default: bool = False) -> bool:
+    val = os.getenv(var_name, str(default)).lower()
+    return val in ("true", "1", "yes", "on")
+
+def is_win()->bool:
+    return sys.platform == "win32"
 
 def _validate_env_win() -> None:
     env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
@@ -190,6 +195,8 @@ if is_win():
     # Якщо чистий Windows — вкажи реальний шлях, куди signal-cli складає файли.
     SIGNAL_ATTACHMENTS_DIR : Final = "C:/work/signalBot/attachments"
 
+    PACKAGES_ANTIWORD_HOME_PATH="C:/work/install/antiword"
+
 else:
     EXCEL_DIR: Final[str] = '/Volumes/exchange/projekt407'
     DOC_DIR : Final[str] = "/Volumes/exchange/дд"
@@ -198,12 +205,12 @@ else:
 
     DESERTER_XLSX_FILE_PATH:Final = f"{EXCEL_DIR}/{DESERTER_XLSX}" # if using xlwings, actual one
     ROOT_STORAGE_PATH: Final = f"\\\\{NET_SERVER_IP}"
-    DOCUMENT_STORAGE_PATH: Final = f"\\\\{NET_SERVER_IP}\\{DOC_DIR}"
-    BACKUP_STORAGE_PATH: Final = f"\\\\{NET_SERVER_IP}\\{BACKUP_DIR}"
-    INBOX_DIR_PATH: Final[str] = f"\\\\{NET_SERVER_IP}\\{DOC_DIR}\\inbox"
-    OUTBOX_DIR_PATH: Final[str] = f"\\\\{NET_SERVER_IP}\\{DOC_DIR}\\outbox"
-    CACHE_FILE_PATH: Final = f"\\\\{NET_SERVER_IP}\\{DOC_DIR}\\file_cache.json"
-    CACHE_FOLDER_PATH: Final = f"\\\\{NET_SERVER_IP}\\{DOC_DIR}"
+    DOCUMENT_STORAGE_PATH: Final = f"\\\\{NET_SERVER_IP}\\exchange\\дд"
+    BACKUP_STORAGE_PATH: Final = f"\\\\{NET_SERVER_IP}\\exchange\\projekt407\\backups"
+    INBOX_DIR_PATH: Final[str] = f"\\\\{NET_SERVER_IP}\\exchange\\дд\\inbox"
+    OUTBOX_DIR_PATH: Final[str] = f"\\\\{NET_SERVER_IP}\\exchange\\дд\\outbox"
+    CACHE_FILE_PATH: Final = f"\\\\{NET_SERVER_IP}\\exchange\\дд\\file_cache.json"
+    CACHE_FOLDER_PATH: Final = f"\\\\{NET_SERVER_IP}\\exchange\\дд"
     INBOX_LOCAL_DIR_PATH = f"{DOC_DIR}/inbox"
     OUTBOX_LOCAL_DIR_PATH = f"{DOC_DIR}/outbox"
     REPORT_DAILY_DESERTION = f"{DOC_DIR}/{REPORT_DIR}"

@@ -120,16 +120,40 @@ def extract_title_2(canonical_title):
     if canonical_title is None: return NA
     parts = canonical_title.split()
     part = parts[-1] if parts else NA
-    if part == 'лейтенант':
+    if part == 'лейтенант' or 'майор' in canonical_title or 'капітан' in canonical_title:
         part = 'офіцер'
+    if 'сержант' in canonical_title:
+        part = 'сержант'
+    if 'матрос' in canonical_title or 'старшина' in canonical_title or 'прапорщик' in canonical_title:
+        part = 'солдат'
     return part
 
-def extract_mil_unit(text):
-    match = re.search(PATTERN_MIL_UNIT, text)
-    if match:
-        return match.group(0).upper()
-    return NA
 
+def extract_mil_unit(text):
+    UNIT_ALIASES = {
+        'А7019': 'А7018',
+        'А7017': 'А7018'
+    }
+    matches = re.findall(PATTERN_MIL_UNIT, text)
+
+    if not matches:
+        return NA
+
+    # 1. Спершу перевіряємо, чи є в тексті "прикомандировані" частини (7018, 7019 тощо)
+    # Ми робимо це пріоритетом, бо А0224 буде в кожному документі як отримувач
+    for m in matches:
+        unit = m.upper()
+
+        # Якщо частина є в списку аліасів (7019 -> 7018)
+        if unit in UNIT_ALIASES:
+            return UNIT_ALIASES[unit]
+
+        # Якщо це безпосередньо 7018
+        if unit == 'А7018':
+            return unit
+
+    # 2. Якщо частин 701x не знайдено, повертаємо першу ліпшу (наприклад, А0224)
+    return matches[0].upper()
 
 def extract_bio(text, full_name):
     if not full_name or full_name == NA:

@@ -21,6 +21,7 @@ class FileCacheManager:
         self.current_stats = {}
         self.start_time = None
         self.total_count = 0
+        self.total_persons = 0
         self.log_manager = log_manager
 
     def get_file_separator(self):
@@ -36,6 +37,7 @@ class FileCacheManager:
         self.start_time = time.time()
         self.current_stats = {}  # Очищуємо стару статситику
         self.total_count = 0
+        self.total_persons = 0
 
         try:
             # Створюємо мок-воркфлоу один раз для всіх файлів, щоб не перевантажувати пам'ять
@@ -68,10 +70,9 @@ class FileCacheManager:
                     if current_year and filenames:
                         # Рахуємо тільки валідні документи
                         valid_files_count = sum(1 for f in filenames if f.lower().endswith(('.doc', '.docx', '.pdf')) and not f.startswith(('._', '~$')))
-
                         if valid_files_count > 0:
-                            self.current_stats[current_year] = self.current_stats.get(current_year, 0) + valid_files_count
-                            self.total_count += valid_files_count
+                            # self.current_stats[current_year] = self.current_stats.get(current_year, 0) + valid_files_count
+                            # self.total_count += valid_files_count
 
                             if progress_callback:
                                 progress_callback(self.current_stats)
@@ -124,6 +125,10 @@ class FileCacheManager:
                             'path': display_path,
                             'names': extracted_names
                         })
+                        if extracted_names:
+                            self.total_persons += len(extracted_names)  # Додаємо кількість знайдених прізвищ
+                        self.total_count += 1
+                        self.current_stats[current_year] = self.current_stats.get(current_year, 0) + 1
 
                 self.client.save_json(self.cache_filepath, new_cache)
 

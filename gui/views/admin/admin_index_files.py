@@ -46,28 +46,32 @@ async def render_indexing_page(manager: FileCacheManager, auth_manager: AuthMana
             return 0
 
         stats = manager.current_stats or {}
-        available_years = sorted(stats.keys())
+        available_years = sorted([str(y) for y in stats.keys() if y is not None])
 
-        chart.options['xAxis']['data'] = available_years
-        chart.options['series'][0]['data'] = [stats.get(y, 0) for y in available_years]
-        chart.update()
+        chart_data = [stats.get(y, 0) for y in available_years]
 
-        total = sum(stats.values())
+        if available_years:
+            chart.options['xAxis']['data'] = available_years
+            chart.options['series'][0]['data'] = chart_data
+            chart.update()
+
+        total_f = getattr(manager, 'total_count', 0)
+        total_p = getattr(manager, 'total_persons', 0)
 
         if manager.is_indexing and manager.start_time:
             elapsed = int(time.time() - manager.start_time)
             timer_str = time.strftime('%H:%M:%S', time.gmtime(elapsed))
-            active_stats.set_text(f'⏱ {timer_str} | 📂 Знайдено: {total}')
+            active_stats.set_text(f'⏱ {timer_str} | 📂 Файлів: {total_f} | 👥 Осіб: {total_p}')
             index_btn.loading = True
             index_btn.props('loading')
         else:
             index_btn.loading = False
             index_btn.props(remove='loading')
             active_stats.set_text('')
-            if total > 0:
-                stats_label.set_text(f'📊 Результат: {total} файлів.')
+            if total_f > 0:
+                stats_label.set_text(f'📊 Результат: {total_f} файлів | 👥 Знайдено осіб: {total_p}')
 
-        return total
+        return total_f
 
     async def start_indexing():
         if manager.is_indexing:
