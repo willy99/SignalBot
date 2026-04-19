@@ -258,6 +258,7 @@ class AppMenu:
                     with ui.button('Пошук', icon='search').props('flat text-white icon-right="expand_more"'):
                         with ui.menu():
                             make_menu_item('Пошук подій', 'search', '/search')
+                            make_menu_item('Розширедний пошук', 'filter_alt', '/enhanced_search')
                             make_menu_item('Батч пошук людей', 'manage_search', '/batch_search')
                             if can_doc_support:
                                 make_menu_item('Швидкий пошук документів', 'find_in_page', '/doc_files')

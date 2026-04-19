@@ -493,6 +493,8 @@ class ExcelProcessor:
             q_des_date_from = date.fromisoformat(filter_obj.des_date_from) if filter_obj.des_date_from else None
             q_des_date_to = date.fromisoformat(filter_obj.des_date_to) if filter_obj.des_date_to else None
 
+            q_des_place = filter_obj.desertion_place.lower().strip() if filter_obj.desertion_place else None
+
             q_order = filter_obj.o_ass_num
             q_title2 = filter_obj.title2
             q_service = filter_obj.service_type
@@ -506,7 +508,8 @@ class ExcelProcessor:
             review_status_idx = self.header.get(COLUMN_REVIEW_STATUS, 1) - 1
             des_region_idx = self.header.get(COLUMN_DESERTION_REGION, 1) - 1
             article_idx = self.header.get(COLUMN_CC_ARTICLE, 1) - 1
-
+            des_place_idx = self.header.get(COLUMN_DESERTION_PLACE, 1) - 1
+            bio_idx = self.header.get(COLUMN_BIO, 1) - 1
 
             for i, row in enumerate(data):
                 if not row[pib_idx]: continue
@@ -522,6 +525,35 @@ class ExcelProcessor:
                     des_date_year = str(des_date.year)
 
                 # === ЛОГІКА ФІЛЬТРАЦІЇ ===
+                match_place = True
+                if q_des_place:
+                    row_place = str(row[des_place_idx]).lower() if row[des_place_idx] else ""
+                    match_place = q_des_place in row_place
+
+                match_voc = True
+                matched_voc_keyword = ""
+                if filter_obj.voc_codes:
+                    # Початково вважаємо, що не співпало
+                    match_voc = False
+                    bio_val = str(row[bio_idx]).lower() if row[bio_idx] else ""
+
+                    found_any = False
+                    for code in filter_obj.voc_codes:
+                        # 1. Спершу перевіряємо пряме входження коду
+                        #if code in bio_val:
+                        #    matched_voc_keyword = f"Код {code}"
+                        #    found_any = True
+                        #    break
+
+                        keywords = VOC_KEYWORDS_MAPPING.get(code, [])
+                        for kw in keywords:
+                            if kw.lower() in bio_val:
+                                matched_voc_keyword = kw.capitalize()
+                                found_any = True
+                                break
+                        if found_any: break
+
+                    match_voc = found_any
 
                 match_text = True
                 if q_text:
@@ -594,14 +626,18 @@ class ExcelProcessor:
                     match_des_region = desertion_region == filter_obj.desertion_region.lower()
 
                 if (match_text and match_des_year and match_des_year_from and match_des_year_to and
-                        match_order and match_title2 and match_service and match_kpp and match_status and match_des_region and match_402_article):
+                        match_order and match_title2 and match_service and
+                        match_kpp and match_status and match_des_region and
+                        match_402_article and match_voc and match_place):
                     serialized_row = []
                     for cell in row:
                         self._transform_cell(cell, serialized_row)
 
+                    data_dict = dict(zip(self.header, serialized_row))
+                    data_dict['matched_voc_info'] = matched_voc_keyword
                     results.append({
                         'row_idx': i + 2,
-                        'data': dict(zip(self.header, serialized_row))
+                        'data': data_dict
                     })
 
             return results

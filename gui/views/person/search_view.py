@@ -27,6 +27,7 @@ def results_ui(data, person_ctrl, auth_manager: AuthManager, refresh_callback):
     can_edit = auth_manager.has_access(MODULE_PERSON, PERM_EDIT)
     columns = [
         {'name': 'pib', 'label': COLUMN_NAME, 'field': 'pib', 'align': 'left', 'sortable': True, 'classes': 'whitespace-normal min-w-[150px]'},
+        {'name': 'voc_info', 'label': 'Посада (ВОС)', 'field': 'voc_info', 'align': 'left'},
         {'name': 'title2', 'label': COLUMN_TITLE_2, 'field': 'title2', 'sortable': True},
         {'name': 'rnokpp', 'label': COLUMN_ID_NUMBER, 'field': 'rnokpp', 'sortable': True},
         {'name': 'unit', 'label': COLUMN_SUBUNIT, 'field': 'unit', 'sortable': True, 'classes': 'whitespace-normal min-w-[120px]'},
@@ -42,6 +43,7 @@ def results_ui(data, person_ctrl, auth_manager: AuthManager, refresh_callback):
     for person in data:
         rows.append({
             'pib': person.name,
+            'voc_info': getattr(person, 'matched_voc_info', ''),
             'title2': person.title2,
             'rnokpp': person.rnokpp,
             'unit': person.subunit,

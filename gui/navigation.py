@@ -15,6 +15,7 @@ from gui.controllers.user_controller import UserController
 from gui.views.admin.admin_column_converter_view import AdminColumnConverterView
 
 from gui.views.person import search_view
+from gui.views.person import enhanced_search_view
 from gui.views.person import batch_search_view
 from gui.views.home_view import render_home_page
 from gui.views.documentation import support_doc_standart_view, support_doc_detailed_view, notif_doc_list_view, notif_doc_edit_view, support_doc_list_view, dbr_doc_list_view, dbr_doc_edit_view
@@ -87,6 +88,12 @@ def init_nicegui(workflow_obj):
     def search():
         app_menu.render(auth_manager)
         search_view.search_page(person_ctrl, auth_manager)
+
+    @ui.page('/enhanced_search')
+    @require_access(auth_manager, MODULE_SEARCH, PERM_READ)
+    async def enhanced_search():
+        app_menu.render(auth_manager)
+        await enhanced_search_view.enhanced_search_page(person_ctrl, auth_manager)
 
     @ui.page('/batch_search')
     @require_access(auth_manager, MODULE_SEARCH, PERM_READ)

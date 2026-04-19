@@ -32,3 +32,6 @@ class PersonSearchFilter:
 
     include_402:[str] = None
     main_units: List[str] = None
+
+    voc_codes: Optional[List[str]] = None
+    desertion_place: Optional[str] = None   # Місто/локація

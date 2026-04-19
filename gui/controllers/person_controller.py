@@ -134,7 +134,7 @@ class PersonController:
             self.logger.error(f"Помилка при пакетному збереженні: {e}")
             return False
 
-
+    '''
     def search(self, ctx: RequestContext, filter_obj: PersonSearchFilter) -> List[Person]:
         self.logger.debug('UI:' + ctx.user_name + ': Шукаємо: ' + str(filter_obj))
         mil_unit = MIL_UNITS[0]
@@ -149,6 +149,37 @@ class PersonController:
             item['data'][COLUMN_MIL_UNIT] = mil_unit
         results = results_a0224 + results_a7018
         return [Person.from_excel_dict(item['data']) for item in results]
+    '''
+
+
+    def search(self, ctx: RequestContext, filter_obj: PersonSearchFilter) -> List[Person]:
+        self.logger.debug(f'UI:{ctx.user_name}: Шукаємо: {filter_obj}')
+
+        # Визначаємо список частин для пошуку
+        if filter_obj.mil_unit:
+            # Якщо в фільтрі є конкретна частина, шукаємо тільки в ній
+            units_to_search = [filter_obj.mil_unit]
+        else:
+            # Якщо ні — шукаємо по всьому списку (за замовчуванням MIL_UNITS)
+            units_to_search = MIL_UNITS
+
+        all_results = []
+
+        for unit in units_to_search:
+            # Створюємо копію фільтра або просто підміняємо unit для поточного проходу
+            filter_obj.mil_unit = unit
+            raw_data = self.processor.search_people(filter_obj)
+
+            for item in raw_data:
+                # Додаємо мітку частини в дані, щоб у таблиці було видно, звідки запис
+                item['data'][COLUMN_MIL_UNIT] = unit
+                person_obj = Person.from_excel_dict(item['data'])
+                # Передаємо інформацію про збіг з тимчасового поля в об'єкт
+                person_obj.matched_voc_info = item['data'].get('matched_voc_info', '')
+
+                all_results.append(person_obj)
+
+        return all_results
 
     def get_column_options(self) -> Dict[str, List[str]]:
         return self.processor.get_column_options()

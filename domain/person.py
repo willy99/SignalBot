@@ -62,6 +62,10 @@ class Person(BaseModel):
     bio: Optional[str] = Field("", alias=COLUMN_BIO)
 
 
+    # virtual fields
+    matched_voc_info: Optional[str] = ""
+
+
     @field_validator('o_res_num', 'o_ass_num', "kpp_num", "dbr_num", "cc_article", "erdr_notation", mode='before')
     @classmethod
     def ensure_string_or_empty(cls, v: Any):
