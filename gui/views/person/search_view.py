@@ -6,6 +6,8 @@ from gui.views.person.person_view import edit_person
 from domain.person_filter import PersonSearchFilter
 import config
 from dics.security_config import MODULE_PERSON, PERM_EDIT
+from utils.utils import format_to_excel_date
+from datetime import datetime
 
 ui.add_css('''
     .my-sticky-header-table thead tr th {
@@ -206,7 +208,16 @@ def search_page(person_ctrl, auth_manager: AuthManager):
                     async def create_new_person():
                         # Створюємо пустий об'єкт Person.
                         # Обов'язково вказуємо unit з поточного вибору селектора ВЧ
-                        new_p = Person(name="", rnokpp="", subunit="", unit=sheet_select.value)
+                        new_p = Person(
+                            insert_date=format_to_excel_date(datetime.now()),
+                            name="",
+                            rnokpp="",
+                            subunit="",
+                            mil_unit=sheet_select.value,
+                            cc_article='407',
+                            desertion_type='СЗЧ',
+                            review_status=DEFAULT_REVIEW_STATUS
+                        )
 
                         # Викликаємо ту саму форму, що і для редагування
                         edit_person(

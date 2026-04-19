@@ -10,6 +10,7 @@ from gui.tools.ui_components import date_input, fix_date, confirm_delete_dialog
 from dics.security_config import MODULE_PERSON, PERM_DELETE, PERM_EDIT
 from datetime import datetime, timedelta
 
+from utils.regular_expressions import *
 from utils.utils import calculate_days_between, check_birthday_id_number
 
 
@@ -54,12 +55,99 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
     req = {'Обов’язкове поле': lambda v: bool(v and str(v).strip())}
 
     def recalculate_days():
-        """Оновлює кількість днів та валідує результат"""
+        """Оновлює дні служби та автоматично визначає термін СЗЧ"""
+        # 1. Ваша стара логіка для COLUMN_SERVICE_DAYS (не чіпаємо)
         days = calculate_days_between(person.enlistment_date, person.desertion_date)
         person.service_days = days
 
-        # Оновлюємо UI (якщо потрібно примусово, хоча bind_value має підхопити)
+        # 2. НОВА ЛОГІКА для COLUMN_DESERTION_TERM
+        if person.desertion_date:
+            # За замовчуванням, якщо пішов у СЗЧ — то вже більше 3 діб
+            person.desertion_term = "більше 3 діб"
+
+            # Перевіряємо дату повернення (будь-яку з двох)
+            ret_date = person.return_date or person.return_reserve_date
+
+            if ret_date:
+                try:
+                    # Рахуємо тривалість самого СЗЧ
+                    term_days = calculate_days_between(person.desertion_date, ret_date)
+
+                    if term_days <= 3:
+                        person.desertion_term = "до 3 діб"
+                    else:
+                        person.desertion_term = "більше 3 діб"
+                except:
+                    pass
+        else:
+            person.desertion_term = ""
+
+        # Оновлюємо відображення в UI
         service_days_input.update()
+        term_select.update()
+
+    def auto_fill_tzk_region():
+        """Автоматично визначає область на основі введеного ТЦК"""
+        if person.tzk:
+            # Викликаємо вашу існуючу функцію
+            region = extract_desertion_region(person.tzk)
+            if region:
+                person.tzk_region = region
+                # Оновлюємо UI селекта області
+                tzk_region_select.update()
+
+    def auto_fill_titles():
+        """Автоматично вираховує коротке звання (title2) на основі повного (title)"""
+        if person.title:
+            # Викликаємо вашу функцію вирахування
+            short_title = extract_title_2(person.title)
+            if short_title:
+                person.title2 = short_title
+                # Оновлюємо UI для title2
+                title2_select.update()
+
+    async def run_bio_parser():
+        """Парсинг тексту біографії та заповнення полів особи"""
+        if not person.bio:
+            ui.notify('Поле біографії порожнє', type='warning')
+            return
+
+        # Виклик вашої функції парсингу (імпортуйте її заздалегідь)
+        person.name = extract_name(person.bio)
+        person.rnokpp = extract_id_number(person.bio)
+        person.title = extract_title(person.bio)
+        person.title2 = extract_title_2(person.title)
+        person.service_type = extract_service_type(person.bio)
+        person.subunit = extract_military_subunit(person.bio, mapping=PATTERN_SUBUNIT_MAPPING)
+        person.subunit2 = extract_military_subunit(person.bio, mapping=PATTERN_SUBUNIT2_MAPPING)
+        person.birthday = extract_birthday(person.bio)
+
+        person.phone = extract_phone(person.bio)
+        person.tzk = extract_rtzk(person.bio)
+        person.tzk_region = extract_region(person.tzk)
+        person.enlistment_date = extract_conscription_date(person.bio)
+        person.address = extract_address(person.bio)
+
+        refresh_validation()
+        ui.notify('Дані біографії розпарсено', type='positive')
+
+    async def run_desertion_parser():
+        """Парсинг обставин СЗЧ (з поля desertion_conditions або desertion_term)"""
+        # Використовуємо текст з поля обставин (desertion_conditions)
+        text_to_parse = person.desertion_conditions
+        if not text_to_parse:
+            ui.notify('Опишіть обставини СЗЧ для парсингу', type='warning')
+            return
+
+        person.desertion_place = extract_desertion_place(person.desertion_conditions)
+        person.desertion_date = extract_desertion_date(person.desertion_conditions)
+        person.desertion_type = extract_desertion_type(person.desertion_conditions, person.desertion_place)
+        person.desertion_region = extract_desertion_region(person.desertion_conditions)
+        person.cc_article = extract_cc_article(person.desertion_type)
+        person.experience = extract_experience(person.service_days)
+
+        refresh_validation()
+        ui.notify('Дані СЗЧ розпарсено', type='positive')
 
     def validate_date_sequence(person: Person) -> bool:
         """Перевіряє, чи дата СЗЧ не раніше дати призову"""
@@ -211,14 +299,18 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
                             rnokpp_inp.on('blur', refresh_validation)
 
                         with ui.row().classes('w-full gap-6 mt-4'):
-                            title = search_select(ui_options.get(COLUMN_TITLE, []), COLUMN_TITLE, person, 'title').classes('flex-grow').props('rules="[val => !!val || \'Обов’язково\']"')
-                            search_select(ui_options.get(COLUMN_TITLE_2, []), COLUMN_TITLE_2, person, 'title2').classes('flex-grow')
+                            title_select = search_select(ui_options.get(COLUMN_TITLE, []), COLUMN_TITLE, person, 'title').classes('flex-grow').props('rules="[val => !!val || \'Обов’язково\']"')
+                            title_select.on_value_change(auto_fill_titles)
+
+                            title2_select = search_select(ui_options.get(COLUMN_TITLE_2, []), COLUMN_TITLE_2, person, 'title2')
+                            title2_select.classes('flex-grow')
+
                             subunit = search_select(ui_options.get(COLUMN_SUBUNIT, []), COLUMN_SUBUNIT, person,'subunit').classes('w-48').props('rules="[val => !!val || \'Обов’язково\']"')
-                            search_select(ui_options.get(COLUMN_SUBUNIT2, []), COLUMN_SUBUNIT2, person,'subunit2').classes('w-48')
+                            subunit2 = search_select(ui_options.get(COLUMN_SUBUNIT2, []), COLUMN_SUBUNIT2, person,'subunit2').classes('w-48')
 
                         with ui.row().classes('w-full gap-6 mt-4'):
                             address_input = ui.input(COLUMN_ADDRESS, validation=req).bind_value(person, 'address').classes('flex-grow')
-                            ui.input(COLUMN_PHONE, placeholder='0xxxxxxxxx', validation={
+                            phone_input = ui.input(COLUMN_PHONE, placeholder='0xxxxxxxxx', validation={
                                 'Формат має бути 0xxxxxxxxx': lambda v: bool(re.match(VALID_PATTERN_PHONE, v.strip())) if v else True
                             }).bind_value(person, 'phone').classes('w-48')
 
@@ -239,6 +331,7 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
                     with ui.card().classes('w-full max-w-5xl mx-auto p-6 shadow-sm border border-gray-200'):
                         with ui.row().classes('w-full gap-6'):
                             tzk_input = ui.input(COLUMN_TZK, validation=req).bind_value(person, 'tzk').classes('flex-grow')
+                            tzk_input.on('blur', auto_fill_tzk_region)
                             enlist_inp = date_input(COLUMN_ENLISTMENT_DATE, person, 'enlistment_date', blur_handler=lambda e: [fix_date(e), refresh_validation()]).classes('w-1/3')
                             enlist_inp.props(f'validation-rules="{date_rules}"')
                             enlist_inp.validation = date_rules
@@ -246,12 +339,12 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
 
                             service_days_input = ui.input(COLUMN_SERVICE_DAYS, validation={
                                 '⚠️ Нелогічна кількість днів служби. Перевірте дати.':
-                                    lambda v: 0 <= (int(v) if str(v).isdigit() else 0) <= 4000
+                                    lambda v: 0 <= (int(v) if str(v).isdigit() else 0) <= 6000
                             }).bind_value(person, 'service_days').classes('flex-grow')
 
                         with ui.row().classes('w-full gap-6 mt-4'):
-                            search_select(ui_options.get(COLUMN_TZK_REGION, []), COLUMN_TZK_REGION, person,'tzk_region').classes('w-1/3').props('rules="[val => !!val || \'Виберіть регіон\']"')
-
+                            tzk_region_select = search_select(ui_options.get(COLUMN_TZK_REGION, []), COLUMN_TZK_REGION, person, 'tzk_region')
+                            tzk_region_select.classes('w-1/3').props('rules="[val => !!val || \'Виберіть регіон\']"')
                 # ПАНЕЛЬ 3: СЗЧ
                 with ui.tab_panel(des_tab):
                     with ui.card().classes('w-full max-w-5xl mx-auto p-6 shadow-sm border border-gray-200'):
@@ -261,24 +354,36 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
                             search_select(ui_options.get(COLUMN_DESERTION_REGION, []), COLUMN_DESERTION_REGION, person,'desertion_region').classes('flex-grow')
 
                         with ui.row().classes('w-full gap-6 mt-4'):
-                            desert_inp = date_input(COLUMN_DESERTION_DATE, person, 'desertion_date', blur_handler=lambda e: [fix_date(e), refresh_validation()]).classes('w-1/3')
+                            desert_inp = date_input(COLUMN_DESERTION_DATE, person, 'desertion_date',
+                                                    blur_handler=lambda e: [fix_date(e), refresh_validation()]).classes('w-1/3')
                             desert_inp.validation = date_rules
-                            ui.input(COLUMN_DESERTION_TERM).bind_value(person, 'desertion_term').classes('flex-grow')
+
+                            term_select = ui.select(
+                                options=["до 3 діб", "більше 3 діб"],
+                                label=COLUMN_DESERTION_TERM
+                            ).bind_value(person, 'desertion_term').classes('flex-grow')
 
                         with ui.row().classes('w-full mt-4'):
                             ui.input(COLUMN_EXECUTOR).bind_value(person, 'executor').classes('flex-grow')
 
                         with ui.row().classes('w-full gap-6 mt-4'):
-                            date_input(COLUMN_RETURN_DATE, person, 'return_date', blur_handler=fix_date).classes('w-1/3')
-                            date_input(COLUMN_RETURN_TO_RESERVE_DATE, person, 'return_reserve_date',blur_handler=fix_date).classes('w-1/3')
-
+                            date_input(COLUMN_RETURN_DATE, person, 'return_date',
+                                       blur_handler=lambda e: [fix_date(e), refresh_validation()]).classes('w-1/3')
+                            date_input(COLUMN_RETURN_TO_RESERVE_DATE, person, 'return_reserve_date',
+                                       blur_handler=lambda e: [fix_date(e), refresh_validation()]).classes('w-1/3')
                         with ui.row().classes('w-full mt-4'):
-                            ui.textarea(COLUMN_DESERT_CONDITIONS).bind_value(person, 'desertion_conditions').classes('w-full')
+                            with ui.textarea(COLUMN_DESERT_CONDITIONS).bind_value(person, 'desertion_conditions').classes('w-full') as cond_area:
+                                with cond_area.add_slot('append'):
+                                    ui.button(icon='psychology', on_click=run_desertion_parser) \
+                                        .props('flat round color=orange').tooltip('Витягти дату, місце та регіон з тексту')
 
                 # ПАНЕЛЬ 4: Біографія
                 with ui.tab_panel(bio_tab):
                     with ui.card().classes('w-full max-w-5xl mx-auto p-6 shadow-sm border border-gray-200'):
-                        ui.textarea(COLUMN_BIO).bind_value(person, 'bio').classes('w-full min-h-[300px]')
+                        with ui.textarea(COLUMN_BIO).bind_value(person, 'bio').classes('w-full min-h-[400px]') as bio_area:
+                            with bio_area.add_slot('append'):
+                                ui.button(icon='auto_fix_high', on_click=run_bio_parser) \
+                                    .props('flat round').tooltip('Розпарсити дані з тексту біографії')
 
                 # ПАНЕЛЬ 5: ЕРДР, КПП (ОНОВЛЕНО З ДВОМА КОЛОНКАМИ)
                 with ui.tab_panel(erdr_tab):

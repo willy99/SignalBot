@@ -61,10 +61,10 @@ class FileCacheManager:
 
                     relative_path = dirpath.lower().replace(normalized_root, "").lstrip('\\/')
                     path_parts = relative_path.split('\\') if '\\' in relative_path else relative_path.split('/')
+                    path_parts = [p for p in path_parts if p]
+                    # print(f"DEBUG: path_parts = {path_parts}")
+                    current_year = next((p for p in path_parts if re.match(r'^\d{4}', p)), None)
 
-                    current_year = None
-                    if len(path_parts) > 3:
-                        current_year = path_parts[3] if path_parts[3] and re.match(r'^\d{4}', path_parts[3]) else None
                     # 3. Якщо ми знайшли файли в будь-якій підпапці цього року
 
                     if current_year and filenames:
@@ -95,7 +95,7 @@ class FileCacheManager:
                                 ext = '.docx' if filename.lower().endswith('.docx') else '.pdf' if filename.lower().endswith('.pdf') else '.doc'
                                 with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as temp_file:
                                     temp_file.write(file_buffer.read())
-                                    temp_file.flush()  # ВАЖЛИВО! Примусово скидаємо дані на диск
+                                    temp_file.flush()
                                     temp_local_path = temp_file.name  # Отримуємо локальний шлях
 
                                 processor = DocProcessor(self.log_manager, temp_local_path, filename, use_ml=False)
