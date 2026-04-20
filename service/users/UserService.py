@@ -125,6 +125,7 @@ class UserService:
           - use_2fa = 1 (підтверджений Signal-контакт)
         Якщо user не пройшов 2FA-верифікацію — phone порожній, доступу немає.
         """
+        print('>>>> getting user by phone' + str(phone_number))
         if not phone_number:
             return None
 
@@ -139,8 +140,10 @@ class UserService:
         rows = self.db.__execute_fetchall__(
             f"SELECT * FROM {DB_TABLE_USER} WHERE phone IS NOT NULL AND phone != '' AND is_active = 1 AND use_2fa = 1"
         )
+        print('>>> suffix ' + str(suffix))
         for row in rows:
             stored_digits = normalize_phone(str(row['phone']))
+            print('>>> checking with ' + str(stored_digits))
             if stored_digits[-9:] == suffix:
                 return self.auth_service._map_to_user(row)
 

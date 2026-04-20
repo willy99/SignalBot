@@ -19,6 +19,15 @@ class SignalClient:
 
     def _send_rpc(self, method, params):
         """Універсальний метод для відправки JSON-RPC запитів."""
+
+        if self.client is None:
+            print(f"Перепідключення клієнту")
+            try:
+                self.connect()
+            except Exception as e:
+                print("Помилка з'єднання")
+                return
+
         payload = {
             "jsonrpc": "2.0",
             "method": method,
