@@ -3,6 +3,7 @@ from functools import wraps
 import asyncio
 
 import config
+from config import PROJECT_TITLE
 from dics.security_config import PERM_READ
 from gui.services.auth_manager import AuthManager
 from gui.services.request_context import RequestContext
@@ -30,7 +31,7 @@ def create_login_page(auth_manager, user_ctrl, log_manager):
 
         with (ui.column().classes('w-full h-screen items-center justify-center bg-slate-100')):
             with ui.card().classes('w-96 p-6 shadow-xl rounded-xl') as card:
-                ui.label('А0224, 🏃‍♂️ВТІКАЧІ 👨‍🚀').classes('text-2xl font-bold mb-6 text-center w-full text-slate-800')
+                ui.label('🏃‍' + PROJECT_TITLE + ' 👨‍🚀').classes('text-2xl font-bold mb-6 text-center w-full text-slate-800')
 
                 # --- БЛОК 1: ЛОГІН/ПАРОЛЬ ---
                 login_container = ui.column().classes('w-full')

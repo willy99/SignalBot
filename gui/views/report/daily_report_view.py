@@ -375,7 +375,7 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
 
                     if data_A0224:
                         with ui.row().classes('w-full bg-blue-50 p-3 border-b border-t items-center justify-between mt-4'):
-                            ui.label(f'ВЧ А0224 | Додано записів: {len(data_A0224)}').classes('font-bold text-blue-800 text-lg')
+                            ui.label(f'ВЧ A0224| Додано записів: {len(data_A0224)}').classes('font-bold text-blue-800 text-lg')
                         # Додаємо клас table-fixed для строгого дотримання заданої ширини
                         ui.table(columns=columns_gone, rows=data_A0224, row_key='name').classes('w-full table-fixed').props('flat bordered dense')
 

@@ -14,7 +14,6 @@ class ConfigService:
         SysConfig(key_name='PROCESS_DOC',       category='Основні', value='True',  value_type='bool', description='Копіювати документ з Signal у цільову папку'),
         SysConfig(key_name='PROCESS_XLS',       category='Основні', value='True',  value_type='bool', description='Одразу записувати дані в Excel'),
         SysConfig(key_name='DAILY_BACKUPS',      category='Основні', value='True',  value_type='bool', description='Робити щоденні бекапи БД та Excel'),
-        SysConfig(key_name='SIGNAL_BOT',         category='Основні', value='False', value_type='bool', description='Підключатися до Signal та обробляти вкладення'),
         SysConfig(key_name='SAVE_EXCEL_AT_CLOSE',category='Основні', value='False', value_type='bool', description='Зберігати всі зміни в Excel при закритті програми'),
 
         # Шляхи

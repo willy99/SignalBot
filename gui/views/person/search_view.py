@@ -34,6 +34,7 @@ def results_ui(data, person_ctrl, auth_manager: AuthManager, refresh_callback):
         {'name': 'desertion_date', 'label': COLUMN_DESERTION_DATE, 'field': 'desertion_date', 'sortable': True},
         {'name': 'return_date', 'label': COLUMN_RETURN_DATE, 'field': 'return_date', 'sortable': True},
         {'name': 'return_reserve_date', 'label': COLUMN_RETURN_TO_RESERVE_DATE, 'field': 'return_reserve_date', 'sortable': True},
+        {'name': 'desertion_type', 'label': COLUMN_DESERTION_TYPE, 'field': 'desertion_type', 'sortable': True},
         {'name': 'erdr_date', 'label': COLUMN_ERDR_DATE, 'field': 'erdr_date', 'sortable': True},
         {'name': 'erdr_notation', 'label': COLUMN_ERDR_NOTATION, 'field': 'erdr_notation', 'sortable': True, 'classes': 'whitespace-normal min-w-[150px]'},
         {'name': 'action', 'label': 'Дія', 'field': 'action', 'align': 'center'},
@@ -50,6 +51,7 @@ def results_ui(data, person_ctrl, auth_manager: AuthManager, refresh_callback):
             'desertion_date': person.desertion_date,
             'return_date': person.return_date,
             'return_reserve_date': person.return_reserve_date,
+            'desertion_type': person.desertion_type,
             'erdr_date': person.erdr_date,
             'erdr_notation': person.erdr_notation,
             'raw_model': person.model_dump()

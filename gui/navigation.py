@@ -42,11 +42,13 @@ from gui.views.admin.admin_index_files import render_indexing_page
 from gui.views.admin.user_setting_form import render_user_settings_2fa, render_profile_settings
 from gui.auth_routes import create_login_page, require_access
 from gui.views.documentation.file_search_view import render_file_search_page
+from gui.views.documentation.erdr_file_search_view import render_erdr_search_page
 from pathlib import Path
 from service.processing.processors.DocTemplator import DocTemplator
 from gui.services.auth_manager import AuthManager
 import os
 import config
+from service.storage.ErdrCacher import ErdrCacheManager
 from service.storage.FileCacher import FileCacheManager
 
 def init_nicegui(workflow_obj):
@@ -55,6 +57,7 @@ def init_nicegui(workflow_obj):
     static_dir = current_dir / 'static'
     templates_form = current_dir / '../resources/templates'
     file_manager = FileCacheManager(config.CACHE_FILE_PATH, log_manager=workflow_obj.log_manager)
+    erdr_manager = ErdrCacheManager(config.ERDR_CACHE_FILE_PATH, log_manager=workflow_obj.log_manager)
 
     app.add_static_files('/static', str(static_dir))
     # app.add_static_files('/templates', str(templates_form))
@@ -293,7 +296,7 @@ def init_nicegui(workflow_obj):
     @require_access(auth_manager, MODULE_ADMIN, PERM_EDIT)
     async def admin_file_index():
         app_menu.render(auth_manager)
-        await render_indexing_page(file_manager, auth_manager)
+        render_indexing_page(file_manager, erdr_manager, auth_manager)
 
     @ui.page('/admin/convert_columns')
     @require_access(auth_manager, MODULE_ADMIN, PERM_EDIT)
@@ -316,9 +319,15 @@ def init_nicegui(workflow_obj):
 
     @ui.page('/doc_files')
     @require_access(auth_manager, MODULE_SEARCH, PERM_READ)
-    def file_search_route():
+    def doc_file_search_route():
         app_menu.render(auth_manager)
         render_file_search_page(file_manager, auth_manager)
+
+    @ui.page('/erdr_files')
+    @require_access(auth_manager, MODULE_SEARCH, PERM_READ)
+    def erdr_file_search_route():
+        app_menu.render(auth_manager)
+        render_erdr_search_page(erdr_manager, auth_manager)
 
     @ui.page('/download/template/{template_path:path}')
     @require_access(auth_manager, MODULE_DOC_SUPPORT, PERM_READ)

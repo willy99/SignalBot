@@ -81,7 +81,7 @@ if is_win():
 else:
     _validate_env_mac()
 
-PROJECT_TITLE = "A0224 Втікачі"
+PROJECT_TITLE = "Тревел-Блогери"
 IS_DEV = '--dev' in sys.argv
 
 NET_SERVER_IP = os.getenv("NET_SERVER_IP", "192.168.0.53")
@@ -153,11 +153,13 @@ if is_win():
     #DOCUMENT_STORAGE_PATH: Final = f"\\\\{NET_SERVER_IP}\\exchange\\ДД"
     ROOT_STORAGE_PATH: Final = fr"\\{NET_SERVER_IP}"
     DOCUMENT_STORAGE_PATH: Final = fr"\\{NET_SERVER_IP}\exchange\ДД"
-
+    ERDR_DOCUMENT_STORAGE_PATH: Final = fr"\\{NET_SERVER_IP}\exchange\ERDR\ЄРДР-и"
     BACKUP_STORAGE_PATH: Final = fr"\\{NET_SERVER_IP}\exchange\projekt407\backups"
     INBOX_DIR_PATH: Final[str] = fr"\\{NET_SERVER_IP}\exchange\ДД\inbox"
     OUTBOX_DIR_PATH: Final[str] = fr"\\{NET_SERVER_IP}\exchange\ДД\outbox"
     CACHE_FILE_PATH: Final = fr"\\{NET_SERVER_IP}\exchange\\ДД\file_cache.json"
+    ERDR_CACHE_FILE_PATH = fr"\\{NET_SERVER_IP}\exchange\ERDR\erdr_file_cacher.json"
+
     CACHE_FOLDER_PATH: Final = fr"\\{NET_SERVER_IP}\exchange\ДД"
     INBOX_LOCAL_DIR_PATH = f"c:/exchange/дд/inbox"
     OUTBOX_LOCAL_DIR_PATH = f"c:/exchange/дд/outbox"
@@ -206,10 +208,12 @@ else:
     DESERTER_XLSX_FILE_PATH:Final = f"{EXCEL_DIR}/{DESERTER_XLSX}" # if using xlwings, actual one
     ROOT_STORAGE_PATH: Final = f"\\\\{NET_SERVER_IP}"
     DOCUMENT_STORAGE_PATH: Final = f"\\\\{NET_SERVER_IP}\\exchange\\дд"
+    ERDR_DOCUMENT_STORAGE_PATH: Final = f"\\\\{NET_SERVER_IP}\\exchange\\ERDR\\ЄРДР-и"
     BACKUP_STORAGE_PATH: Final = f"\\\\{NET_SERVER_IP}\\exchange\\projekt407\\backups"
     INBOX_DIR_PATH: Final[str] = f"\\\\{NET_SERVER_IP}\\exchange\\дд\\inbox"
     OUTBOX_DIR_PATH: Final[str] = f"\\\\{NET_SERVER_IP}\\exchange\\дд\\outbox"
     CACHE_FILE_PATH: Final = f"\\\\{NET_SERVER_IP}\\exchange\\дд\\file_cache.json"
+    ERDR_CACHE_FILE_PATH = f"\\\\{NET_SERVER_IP}\\exchange\\ERDR\\erdr_file_cacher.json"
     CACHE_FOLDER_PATH: Final = f"\\\\{NET_SERVER_IP}\\exchange\\дд"
     INBOX_LOCAL_DIR_PATH = f"{DOC_DIR}/inbox"
     OUTBOX_LOCAL_DIR_PATH = f"{DOC_DIR}/outbox"

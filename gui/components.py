@@ -1,6 +1,7 @@
 from nicegui import app
 import urllib.parse
 
+from config import PROJECT_TITLE
 from gui.controllers.inbox_controller import InboxController
 from gui.controllers.person_controller import PersonController
 from gui.controllers.task_controller import TaskController
@@ -54,7 +55,7 @@ class AppMenu:
                     title = 'DEVMODE!!!'
                     props = 'color="red" stack'
                 else:
-                    title = 'А0224, 🏃‍♂️ВТІКАЧІ 👨‍🚀'
+                    title = '🏃‍♂️' + PROJECT_TITLE + ' 👨‍🚀'
                     props = 'flat'
                 ui.button(title, on_click=lambda: ui.navigate.to('/')) \
                     .props(props).classes('font-bold text-xl text-white normal-case')
@@ -259,9 +260,9 @@ class AppMenu:
                         with ui.menu():
                             make_menu_item('Пошук подій', 'search', '/search')
                             make_menu_item('Розширедний пошук', 'filter_alt', '/enhanced_search')
-                            make_menu_item('Батч пошук людей', 'manage_search', '/batch_search')
-                            if can_doc_support:
-                                make_menu_item('Швидкий пошук документів', 'find_in_page', '/doc_files')
+                            make_menu_item('Батч пошук', 'manage_search', '/batch_search')
+                            make_menu_item('Швидкий пошук ДД', 'find_in_page', '/doc_files')
+                            make_menu_item('Швидкий пошук ЄРДР', 'policy', '/erdr_files')
 
                 # 2. Плани (Задачі та Календар)
                 with ui.button('Плани', icon='follow_the_signs').props('flat text-white icon-right="expand_more"'):

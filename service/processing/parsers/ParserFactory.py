@@ -3,6 +3,7 @@ from pathlib import Path
 from service.storage.LoggerManager import LoggerManager
 from .DocxParser import DocxParser
 from .DocOldParser import DocOldParser
+from .ImgParser import ImgParser
 from .PdfParser import PdfParser
 from .TxtParser import TxtParser
 
@@ -16,7 +17,11 @@ class ParserFactory:
             '.docx': DocxParser,
             '.doc': DocOldParser,
             '.pdf': PdfParser,
-            '.txt': TxtParser
+            '.txt': TxtParser,
+            '.jpg': ImgParser,
+            '.jpeg': ImgParser,
+            '.png': ImgParser
+
         }
 
         parser_class = parsers.get(extension)
