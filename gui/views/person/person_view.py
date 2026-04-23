@@ -96,6 +96,25 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
                 # Оновлюємо UI селекта області
                 tzk_region_select.update()
 
+    def auto_fill_desertion_place_fields():
+        des_place_val = des_place.value
+        if des_place_val == 'НЦ':
+            person.review_status = DEFAULT_REVIEW_STATUS_FOR_EDU_CENTER
+            person.desertion_type = DEFAULT_DESERTION_TYPE_FOR_EDU_CENTER
+            desertion_type.update()
+            person.o_ass_num = 'НЦ'
+            person.o_ass_date = desert_inp.value
+            person.kpp_num = 'НЦ'
+            person.kpp_date = desert_inp.value
+        else:
+            person.review_status = DEFAULT_REVIEW_STATUS
+            person.desertion_type = DEFAULT_DESERTION_TYPE
+            desertion_type.update()
+            person.kpp_num = None
+            person.kpp_date = None
+            person.o_ass_num = None
+            person.o_ass_date = None
+
     def auto_fill_titles():
         """Автоматично вираховує коротке звання (title2) на основі повного (title)"""
         if person.title:
@@ -349,10 +368,10 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
                 with ui.tab_panel(des_tab):
                     with ui.card().classes('w-full max-w-5xl mx-auto p-6 shadow-sm border border-gray-200'):
                         with ui.row().classes('w-full gap-6'):
-                            search_select(ui_options.get(COLUMN_DESERTION_PLACE, []), COLUMN_DESERTION_PLACE, person,'desertion_place').classes('w-48')
-                            search_select(ui_options.get(COLUMN_DESERTION_TYPE, []), COLUMN_DESERTION_TYPE, person,'desertion_type').classes('w-48')
+                            des_place = search_select(ui_options.get(COLUMN_DESERTION_PLACE, []), COLUMN_DESERTION_PLACE, person,'desertion_place').classes('w-48')
+                            desertion_type = search_select(ui_options.get(COLUMN_DESERTION_TYPE, []), COLUMN_DESERTION_TYPE, person,'desertion_type').classes('w-48')
                             search_select(ui_options.get(COLUMN_DESERTION_REGION, []), COLUMN_DESERTION_REGION, person,'desertion_region').classes('flex-grow')
-
+                            des_place.on('blur', auto_fill_desertion_place_fields)
                         with ui.row().classes('w-full gap-6 mt-4'):
                             desert_inp = date_input(COLUMN_DESERTION_DATE, person, 'desertion_date',
                                                     blur_handler=lambda e: [fix_date(e), refresh_validation()]).classes('w-1/3')
@@ -393,7 +412,7 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
                             ui.label('Документальне оформлення').classes('text-xl font-bold text-gray-800 mb-4 border-b pb-2 w-full')
 
                             with ui.row().classes('w-full gap-4'):
-                                search_select(ui_options.get(COLUMN_REVIEW_STATUS, []), COLUMN_REVIEW_STATUS, person,'review_status').classes('flex-grow')
+                                review_status = search_select(ui_options.get(COLUMN_REVIEW_STATUS, []), COLUMN_REVIEW_STATUS, person,'review_status').classes('flex-grow')
                                 ui.input(COLUMN_CC_ARTICLE).bind_value(person, 'cc_article').classes('w-1/3')
 
                             with ui.row().classes('w-full gap-4 mt-4'):
@@ -405,8 +424,8 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
                                 date_input(COLUMN_ORDER_RESULT_DATE, person, 'o_res_date',blur_handler=fix_date).classes('w-1/3')
 
                             with ui.row().classes('w-full gap-4 mt-4'):
-                                ui.input(COLUMN_KPP_NUMBER).bind_value(person, 'kpp_num').classes('flex-grow')
-                                date_input(COLUMN_KPP_DATE, person, 'kpp_date', blur_handler=fix_date).classes('w-1/3')
+                                kpp_num = ui.input(COLUMN_KPP_NUMBER).bind_value(person, 'kpp_num').classes('flex-grow')
+                                kpp_date = date_input(COLUMN_KPP_DATE, person, 'kpp_date', blur_handler=fix_date).classes('w-1/3')
 
                             with ui.row().classes('w-full gap-4 mt-4'):
                                 ui.input(COLUMN_DBR_NUMBER).bind_value(person, 'dbr_num').classes('flex-grow')

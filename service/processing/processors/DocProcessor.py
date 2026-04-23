@@ -112,7 +112,14 @@ class DocProcessor:
             if subunit2 is NA:
                 subunit2 = extract_military_subunit(text_pieces[self.__PIECE_1],get_file_name(self.original_filename), mapping=PATTERN_SUBUNIT2_MAPPING)
             fields[col.COLUMN_SUBUNIT2] = subunit2
-            fields[col.COLUMN_REVIEW_STATUS] = DEFAULT_REVIEW_STATUS_FOR_EDU_CENTER if fields[col.COLUMN_DESERTION_PLACE] == 'НЦ' else DEFAULT_REVIEW_STATUS
+            fields[col.COLUMN_REVIEW_STATUS] = DEFAULT_REVIEW_STATUS
+            if fields[col.COLUMN_DESERTION_PLACE] == 'НЦ':
+                fields[col.COLUMN_REVIEW_STATUS] = DEFAULT_REVIEW_STATUS_FOR_EDU_CENTER
+                fields[col.COLUMN_ORDER_ASSIGNMENT_NUMBER] = 'НЦ'
+                fields[col.COLUMN_ORDER_ASSIGNMENT_DATE] = fields[col.COLUMN_DESERTION_DATE]
+                fields[col.COLUMN_KPP_NUMBER] = 'НЦ'
+                fields[col.COLUMN_KPP_DATE] = fields[col.COLUMN_DESERTION_DATE]
+                fields[col.COLUMN_DESERTION_TYPE] = DEFAULT_DESERTION_TYPE_FOR_EDU_CENTER
 
         fields[col.COLUMN_SERVICE_DAYS] = self._calculate_service_days(fields[col.COLUMN_ENLISTMENT_DATE], fields[col.COLUMN_DESERTION_DATE])
 

@@ -61,6 +61,10 @@ class FileStorageClient(ABC):
     def exists(self, path: str) -> bool:
         pass
 
+    @abstractmethod
+    def get_file_mtime(self, filepath: str) -> float:
+        pass
+
     def __enter__(self):
         return self
 

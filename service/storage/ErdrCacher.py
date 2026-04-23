@@ -4,7 +4,7 @@ import time
 import logging
 import tempfile
 from typing import List, Dict
-
+from datetime import datetime
 from dics.deserter_xls_dic import PATTERN_PIECE_3_START, PATTERN_ERDR_CONDITIONS_START, PATTERN_ERDR_CONDITIONS_END, PATTERN_ERDR_CONDITIONS_NAME
 from gui.services.request_context import RequestContext
 from service.processing.processors.DocProcessor import DocProcessor
@@ -22,6 +22,7 @@ class ErdrCacheManager:
         self.start_time = None
         self.total_count = 0
         self.total_persons = 0
+        self.status_color = "text-gray-600"
         self.log_manager = log_manager
 
     def build_cache(self, ctx: RequestContext, root_folder: str, progress_callback=None):
@@ -142,11 +143,37 @@ class ErdrCacheManager:
         return extracted_names
 
     def load_cache(self):
+
         try:
             if not self.cache_data:
+                self.total_count = 0
+                self.total_persons = 0
+                self.last_indexed_date = "Ніколи"
+                self.status_color = "text-gray-600"
+
                 with self.client:
                     self.cache_data = self.client.load_json(self.cache_filepath)
-                print(f"📦 Кеш ЄРДР завантажено. Всього записів: {len(self.cache_data)}")
+
+                self.total_count = len(self.cache_data)
+                self.total_persons = sum(len(item.get('names', [])) for item in self.cache_data)
+                try:
+                    if self.client.exists(self.cache_filepath):
+                        mtime = self.client.get_file_mtime(self.cache_filepath)
+                        diff_seconds = time.time() - mtime
+                        diff_days = diff_seconds / (24 * 3600)
+
+                        # Визначаємо колір за вашою умовою
+                        if diff_days > 7:
+                            self.status_color = "text-red-600 font-bold"
+                        elif diff_days > 3:
+                            self.status_color = "text-orange-500 font-bold"
+                        else:
+                            self.status_color = "text-green-600"
+                        self.last_indexed_date = datetime.fromtimestamp(mtime).strftime('%d.%m.%Y %H:%M')
+                except Exception as e:
+                    print(f"Не вдалося отримати дату файлу: {e}")
+
+                print(f"📦 Кеш ЄРДР завантажено. Всього записів: {self.total_count}")
         except Exception as e:
             print(f"⚠️ Файл кешу ЄРДР не знайдено.")
 

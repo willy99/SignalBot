@@ -135,3 +135,12 @@ class LocalFileClient(FileStorageClient):
 
     def close(self):
         pass
+
+    def get_file_mtime(self, filepath: str) -> float:
+        """Повертає час останньої модифікації файлу (UNIX timestamp)"""
+        try:
+            # Для smbclient використовуємо stat:
+            return os.path.getmtime(filepath)
+        except Exception as e:
+            self.logger.warning(f"Не вдалося отримати mtime для {filepath}: {e}")
+            return 0.0

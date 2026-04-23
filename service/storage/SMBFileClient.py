@@ -211,3 +211,13 @@ class SMBFileClient(FileStorageClient):
     def close(self):
         """Явне закриття сесії (якщо не використовується 'with')."""
         self.disconnect()
+
+    def get_file_mtime(self, filepath: str) -> float:
+        """Повертає час останньої модифікації файлу (UNIX timestamp)"""
+        try:
+            # Для smbclient використовуємо stat:
+            stat_info = smbclient.stat(filepath)
+            return stat_info.st_mtime
+        except Exception as e:
+            self.logger.warning(f"Не вдалося отримати mtime для {filepath}: {e}")
+            return 0.0

@@ -12,6 +12,8 @@ def render_indexing_page(doc_manager: FileCacheManager, erdr_manager: ErdrCacheM
     # Зберігаємо посилання на те, який менеджер працював останнім,
     # щоб графік не зникав після завершення. За замовчуванням - документи.
     state = {'last_active_manager': doc_manager, 'last_type': 'doc'}
+    doc_manager.load_cache()
+    erdr_manager.load_cache()
 
     chart_options = {
         'title': {'text': 'Прогрес індексації за роками'},
@@ -29,20 +31,28 @@ def render_indexing_page(doc_manager: FileCacheManager, erdr_manager: ErdrCacheM
 
     with ui.column().classes('w-full p-8 gap-4'):
         ui.label('Керування індексами бази даних').classes('text-2xl font-bold')
+        with ui.row().classes('w-full gap-6 mb-4'):
+            # Картка для документів
+            with ui.card().classes('bg-blue-50 border-blue-200 border shadow-sm p-4 w-128'):
+                ui.label('Звичайні документи').classes('text-sm text-blue-800 font-bold mb-1')
+                ui.label(f'Оновлено: {getattr(doc_manager, "last_indexed_date", "Ніколи")}').classes('text-xs text-gray-600')
+                ui.label(f'📁 Файлів: {getattr(doc_manager, "total_count", 0)}').classes('text-sm')
+                ui.label(f'👥 Осіб: {getattr(doc_manager, "total_persons", 0)}').classes('text-sm')
+                doc_index_btn = ui.button('ІНДЕКСАЦІЯ ДОКУМЕНТІВ', icon='folder_open',
+                                          on_click=lambda: start_doc_indexing())
+                doc_index_btn.loading = False
+                ui.spinner(size='lg').bind_visibility_from(doc_index_btn, 'loading')
 
-        with ui.row().classes('items-center gap-4 w-full'):
-            # Кнопка для звичайних документів
-            doc_index_btn = ui.button('ІНДЕКСАЦІЯ ДОКУМЕНТІВ', icon='folder_open',
-                                      on_click=lambda: start_doc_indexing())
-            doc_index_btn.loading = False
-
-            # Кнопка для ЄРДР (інший колір)
-            erdr_index_btn = ui.button('ІНДЕКСАЦІЯ ЄРДР', icon='gavel', color='indigo',
-                                       on_click=lambda: start_erdr_indexing())
-            erdr_index_btn.loading = False
-
-            ui.spinner(size='lg').bind_visibility_from(doc_index_btn, 'loading')
-            ui.spinner(size='lg', color='indigo').bind_visibility_from(erdr_index_btn, 'loading')
+            # Картка для ЄРДР
+            with ui.card().classes('bg-indigo-50 border-indigo-200 border shadow-sm p-4 w-128'):
+                ui.label('Витяги ЄРДР').classes('text-sm text-indigo-800 font-bold mb-1')
+                ui.label(f'Оновлено: {getattr(erdr_manager, "last_indexed_date", "Ніколи")}').classes('text-xs text-gray-600')
+                ui.label(f'📁 Файлів: {getattr(erdr_manager, "total_count", 0)}').classes('text-sm')
+                ui.label(f'👥 Осіб: {getattr(erdr_manager, "total_persons", 0)}').classes('text-sm')
+                erdr_index_btn = ui.button('ІНДЕКСАЦІЯ ЄРДР', icon='gavel', color='indigo',
+                                           on_click=lambda: start_erdr_indexing())
+                erdr_index_btn.loading = False
+                ui.spinner(size='lg', color='indigo').bind_visibility_from(erdr_index_btn, 'loading')
 
         with ui.row().classes('items-center gap-4 w-full mt-2'):
             status_text = ui.label('Готовий до роботи').classes('text-gray-500 font-medium')

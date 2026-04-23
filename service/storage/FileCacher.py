@@ -1,5 +1,5 @@
 import re
-
+from datetime import datetime
 from gui.services.request_context import RequestContext
 from service.storage.LoggerManager import LoggerManager
 from service.storage.StorageFactory import StorageFactory
@@ -22,6 +22,7 @@ class FileCacheManager:
         self.start_time = None
         self.total_count = 0
         self.total_persons = 0
+        self.status_color = "text-gray-600"
         self.log_manager = log_manager
 
     def get_file_separator(self):
@@ -145,10 +146,34 @@ class FileCacheManager:
         """Завантажує індекс з файлу через абстрактний клієнт"""
         try:
             if not self.cache_data:
+                self.total_count = 0
+                self.total_persons = 0
+                self.last_indexed_date = "Ніколи"
+                self.status_color = "text-gray-600"  # дефолтний колір
+
                 with self.client:
                     # === ОНОВЛЕНО: Делегуємо читання клієнту ===
                     self.cache_data = self.client.load_json(self.cache_filepath)
-                print(f"📦 Кеш файлів завантажено. Всього записів: {len(self.cache_data)}")
+                    self.total_count = len(self.cache_data)
+                    self.total_persons = sum(len(item.get('names', [])) for item in self.cache_data)
+                    try:
+                        if self.client.exists(self.cache_filepath):
+                            mtime = self.client.get_file_mtime(self.cache_filepath)
+                            diff_seconds = time.time() - mtime
+                            diff_days = diff_seconds / (24 * 3600)
+
+                            # Визначаємо колір за вашою умовою
+                            if diff_days > 7:
+                                self.status_color = "text-red-600 font-bold"
+                            elif diff_days > 3:
+                                self.status_color = "text-orange-500 font-bold"
+                            else:
+                                self.status_color = "text-green-600"
+
+                            self.last_indexed_date = datetime.fromtimestamp(mtime).strftime('%d.%m.%Y %H:%M')
+                    except Exception as e:
+                        print(f"Не вдалося отримати дату файлу: {e}")
+                print(f"📦 Кеш файлів завантажено. Всього записів: {self.total_count}")
         except Exception as e:
             print(f"⚠️ Файл кешу не знайдено або сталася помилка. Потрібно запустити build_cache(). Деталі: {e}")
 

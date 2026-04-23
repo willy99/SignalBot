@@ -123,7 +123,7 @@ def test_process_doc_maly_simple(processor_factory, mock_logger):
     assert "Дніпропетровська обл., м. Кривий Ріг, вул. Ф. Караманиця, буд. 11А, кв 12" in fields[COLUMN_ADDRESS]
     assert fields[COLUMN_RETURN_DATE] is None
     assert fields[COLUMN_EXECUTOR] == "БОЙКО Віктор Олександрович"
-    assert fields[COLUMN_DESERTION_TYPE] == 'СЗЧ'
+    assert fields[COLUMN_DESERTION_TYPE] == DEFAULT_DESERTION_TYPE
 
 # tests error - missing one of the part in the document
 def test_process_doc_maly_error_missing_4(processor_factory, mock_logger):
@@ -933,7 +933,7 @@ def test_desertion_type_extraction(processor_factory, mock_logger):
     where = extract_desertion_place(text)
     assert where == 'РВБЗ'
     res = extract_desertion_type(text, where)
-    assert res == 'СЗЧ'
+    assert res == DEFAULT_DESERTION_TYPE
     cc = extract_cc_article(res)
     assert cc == '407'
 

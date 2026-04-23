@@ -9,10 +9,15 @@ def render_file_search_page(file_cache_manager: FileCacheManager, auth_manager: 
 
     with ui.column().classes('w-full items-center px-8 py-4'):
         ui.label('Миттєвий пошук файлів у базі').classes('text-h4 mb-4')
+        with ui.row().classes('w-full justify-center gap-8 mb-6 py-3 bg-indigo-50 rounded-xl border border-indigo-100 shadow-sm'):
+            ui.label(f'📁 Файлів у базі: {getattr(file_cache_manager, "total_count", 0)}').classes('text-indigo-900 font-bold')
+            ui.label(f'👥 Осіб знайдено: {getattr(file_cache_manager, "total_persons", 0)}').classes('text-indigo-900 font-bold')
+            ui.label(f'Оновлено: {getattr(file_cache_manager, "last_indexed_date", "Ніколи")}') \
+                .classes(f'font-bold {getattr(file_cache_manager, "status_color", "text-gray-600")}')
 
         with ui.row().classes('w-full items-center gap-4'):
             search_field = ui.input(
-                label='Введіть прізвище або назву (напр: Максименко)') \
+                label='Введіть прізвище (напр: максименко, або макс*дмитро)') \
                 .classes('flex-grow text-lg') \
                 .props('autofocus clearable outlined')
 

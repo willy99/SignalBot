@@ -3,6 +3,10 @@ from typing import Final, Dict, List, Tuple
 # EXCEL FILE COLUMNS FOR DESERTERS (А0224 СЗЧ.XLSX)
 NA : Final[str] = '' # порожня ячейка, інформація не додана або не змогли витягнути
 
+DEFAULT_DESERTION_TYPE: Final[str] = 'СЗЧ'
+DEFAULT_DESERTION_TYPE_FOR_EDU_CENTER: Final[str] = 'СЗЧ з А2900'
+
+
 DEFAULT_REVIEW_STATUS: Final[str] = 'не призначено'
 DEFAULT_REVIEW_STATUS_FOR_EDU_CENTER: Final[str] = 'призначено'
 DEFAULT_SERVICE_TYPE: Final[str] = 'призивом'

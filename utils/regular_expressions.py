@@ -386,12 +386,12 @@ def extract_desertion_place(text, file_name=None):
     return NA
 
 def extract_desertion_type(text, desertion_where):
-    des_type = 'СЗЧ'
+    des_type = DEFAULT_DESERTION_TYPE
     for pattern, short_name in PATTERN_DESERTION_TYPE_MAPPING.items():
         if re.search(pattern, text, re.IGNORECASE):
             return short_name
     if desertion_where == 'НЦ':
-        des_type = 'СЗЧ з А2900'
+        des_type = DEFAULT_DESERTION_TYPE_FOR_EDU_CENTER
     return des_type
 
 def extract_cc_article(desertion_type):
