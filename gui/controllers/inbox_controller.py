@@ -41,19 +41,24 @@ class InboxController:
         service = InboxService(self.log_manager, ctx)
         service.upload_file_to_root(filename, file_data)
 
-    def archive_file(self, ctx, filename: str) -> bool:
+    def archive_file(self, ctx, personal_folder: str, filename: str) -> bool:
         """Тільки копіює файл у щоденну папку."""
         client = StorageFactory.create_client(config.INBOX_DIR_PATH, self.log_manager)
-        source_file = f"{config.INBOX_DIR_PATH}{client.get_separator()}{filename}"  # Або шлях до персональної папки
+        folder_str = f"{client.get_separator()}{personal_folder}" if personal_folder else ''
+        source_file = f"{config.INBOX_DIR_PATH}{folder_str}{client.get_separator()}{filename}"  # Або шлях до персональної папки
 
         dservice = DocumentProcessingService(self.log_manager)
         return dservice.archive_document(source_file, filename) is not None
 
 
-    def process_file_to_excel(self, ctx, filename: str) -> list[str]:
+    def process_file_to_excel(self, ctx, personal_folder:str, filename: str) -> list[str]:
         """Повна обробка: архівація + парсинг + Excel."""
         client = StorageFactory.create_client(config.INBOX_DIR_PATH, self.log_manager)
-        source_file = f"{config.INBOX_DIR_PATH}{client.get_separator()}{filename}"  # Або шлях до персональної папки
+        folder_str = f"{client.get_separator()}{personal_folder}" if personal_folder else ''
+        source_file = f"{config.INBOX_DIR_PATH}{folder_str}{client.get_separator()}{filename}"  # Або шлях до персональної папки
+
+        if not client.exists(source_file):  # Якщо це мережевий шлях, os.path.exists може брехати, але залишимо для сумісності
+            print(f"⚠️ Шлях {source_file} недоступний локально. Спробуємо завантажити через клієнт.")
 
         # Нам потрібен доступ до ExcelProcessor у Web-шарі
         excel_processor = self.workflow.excelProcessor
@@ -62,10 +67,11 @@ class InboxController:
 
         return processor.process_full_workflow(source_file, filename)
 
-    def parse_file_for_review(self, ctx, filename: str) -> tuple[list[dict], list[str]]:
+    def parse_file_for_review(self, ctx, personal_folder:str, filename: str) -> tuple[list[dict], list[str]]:
         """Бекап, архівація та повернення розпарсених даних для рев'ю в UI."""
         client = StorageFactory.create_client(config.INBOX_DIR_PATH, self.log_manager)
-        source_file = f"{config.INBOX_DIR_PATH}{client.get_separator()}{filename}"
+        folder_str = f"{client.get_separator()}{personal_folder}" if personal_folder else ''
+        source_file = f"{config.INBOX_DIR_PATH}{folder_str}{client.get_separator()}{filename}"
 
         excel_processor = self.workflow.excelProcessor
         backuper = self.workflow.backuper

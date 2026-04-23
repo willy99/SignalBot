@@ -47,11 +47,11 @@ class InboxService:
 
         return result
 
-    def download_file(self, user_login: str, filename: str, root_dir: str) -> io.BytesIO:
+    def download_file(self, personal_folder: str, filename: str, root_dir: str) -> io.BytesIO:
         """Завантажує файл з SMB та повертає його як BytesIO буфер."""
         client = StorageFactory.create_client(root_dir, self.log_manager)
-        if user_login:
-            target_path = f"{root_dir}{client.get_separator()}{user_login}{client.get_separator()}{filename}"
+        if personal_folder:
+            target_path = f"{root_dir}{client.get_separator()}{personal_folder}{client.get_separator()}{filename}"
         else:
             target_path = f"{root_dir}{client.get_separator()}{filename}"
 
@@ -64,15 +64,15 @@ class InboxService:
                 self.logger.error(f"Помилка завантаження файлу {target_path}: {e}")
                 raise
 
-    def assign_file(self, source_user: str, filename: str, target_user: str, source_folder=None):
+    def assign_file(self, personal_folder: str, filename: str, target_user: str, source_folder=None):
         if not source_folder:
             source_folder = config.INBOX_DIR_PATH  # дефолт
         """Переміщує файл до папки target_user."""
         root_dir = source_folder
 
         client = StorageFactory.create_client(root_dir, self.log_manager)
-        if source_user:
-            src_path = f"{root_dir}{client.get_separator()}{source_user}{client.get_separator()}{filename}"
+        if personal_folder:
+            src_path = f"{root_dir}{client.get_separator()}{personal_folder}{client.get_separator()}{filename}"
         else:
             src_path = f"{root_dir}{client.get_separator()}{filename}"
 
@@ -87,11 +87,11 @@ class InboxService:
                 self.logger.error(f"Помилка призначення файлу {filename} для {target_user}: {e}")
                 raise
 
-    def delete_file(self, user_login: str, folder:str, filename: str):
+    def delete_file(self, personal_folder: str, folder:str, filename: str):
         """Видаляє файл з персональної папки користувача на SMB сервері."""
         client = StorageFactory.create_client(config.INBOX_DIR_PATH, self.log_manager)
-        if user_login:
-            target_path = f"{folder}{client.get_separator()}{user_login}{client.get_separator()}{filename}"
+        if personal_folder:
+            target_path = f"{folder}{client.get_separator()}{personal_folder}{client.get_separator()}{filename}"
         else:
             target_path = f"{folder}{client.get_separator()}{filename}"
         with client:

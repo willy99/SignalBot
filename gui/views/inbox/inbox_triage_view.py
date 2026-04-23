@@ -1,6 +1,6 @@
 from nicegui import ui, run, events
 
-from dics.security_config import PERM_DELETE
+from dics.security_config import PERM_DELETE, MODULE_TASK, MODULE_PERSON, PERM_EDIT
 from gui.controllers.inbox_controller import InboxController
 from gui.controllers.task_controller import TaskController
 from gui.services.auth_manager import AuthManager
@@ -45,7 +45,8 @@ def _safe_filename(name: str) -> str:
     return name
 
 def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, person_ctrl:PersonController, auth_manager:AuthManager):
-    can_assign = auth_manager.has_access('task', PERM_DELETE)
+    can_assign = auth_manager.has_access(MODULE_TASK, PERM_DELETE)
+    can_edit = auth_manager.has_access(MODULE_PERSON, PERM_EDIT)
     users_list = task_ctrl.get_available_users()
     user_options = {u['username']: u.get('full_name') or u['username'] for u in users_list if 'username' in u}
 
@@ -89,10 +90,11 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
                 try:
                     if atype == 'archive':
                         ui.notify(f'⏳ Архів: збереження {fname}...', type='info')
-                        success = await auth_manager.execute(inbox_ctrl.archive_file, auth_manager.get_current_context(), fname)
+                        u_login = auth_manager.get_current_context().user_login if action.get('is_personal') else None
+                        success = await auth_manager.execute(inbox_ctrl.archive_file, auth_manager.get_current_context(), u_login, fname)
                         if success:
                             ui.notify(f'✅ {fname} архівовано!', type='positive')
-                            await auth_manager.execute(inbox_ctrl.delete_file, auth_manager.get_current_context(), None, folder, fname)
+                            await auth_manager.execute(inbox_ctrl.delete_file, auth_manager.get_current_context(), u_login, folder, fname)
                         else:
                             ui.notify(f'❌ Помилка архівації {fname}', type='negative')
 
@@ -290,10 +292,10 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
                                 ui.icon(icon_name, color=icon_color)
                                 ui.label(f).classes('text-sm truncate flex-grow font-medium' if is_sel or in_queue else 'text-sm truncate flex-grow text-gray-700')
 
-    async def on_process_excel_click(filename: str):
+    async def on_process_excel_click(filename: str, folder: str):
         ui.notify('⏳ Розпізнаю документ...', type='info')
         try:
-            parsed_data_list, messages = await auth_manager.execute(inbox_ctrl.parse_file_for_review, auth_manager.get_current_context(), filename)
+            parsed_data_list, messages = await auth_manager.execute(inbox_ctrl.parse_file_for_review, auth_manager.get_current_context(), folder, filename)
 
             if messages:
                 for msg in messages:
@@ -360,6 +362,11 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
                                 ui.button('Призначити', icon='switch_account',
                                           on_click=lambda: add_to_queue('assign', config.INBOX_DIR_PATH, f_name, target=sel_assign.value, is_personal=True)) \
                                     .props('color="blue" size="sm" stack').classes('w-24 h-14')
+                            if can_edit:
+                                ui.button('Архів', icon='archive', on_click=lambda: add_to_queue('archive', config.INBOX_DIR_PATH, f_name)) \
+                                    .props('color="blue" size="sm" stack').classes('w-24 h-14')
+                                ui.button('В базу', icon='person_add', on_click=lambda: on_process_excel_click(f_name, auth_manager.get_current_context().user_login)) \
+                                    .props('color="green" size="sm" stack').classes('w-24 h-14')
 
                             ui.button('Видалити', icon='delete', on_click=lambda: confirm_and_queue_delete(config.INBOX_DIR_PATH, f_name, True)) \
                                 .props('color="red" size="sm" stack').classes('w-20 h-14')
@@ -369,7 +376,7 @@ def render_inbox_page(inbox_ctrl: InboxController, task_ctrl:TaskController, per
                                 .props('color="blue" size="sm" stack').classes('w-24 h-14')
                             ui.button('Архів', icon='archive', on_click=lambda: add_to_queue('archive', config.INBOX_DIR_PATH, f_name)) \
                                 .props('color="blue" size="sm" stack').classes('w-24 h-14')
-                            ui.button('В базу', icon='person_add', on_click=lambda: on_process_excel_click(f_name)) \
+                            ui.button('В базу', icon='person_add', on_click=lambda: on_process_excel_click(f_name, None)) \
                                 .props('color="green" size="sm" stack').classes('w-24 h-14')
                             #ui.button('Ексель', icon='table_chart', on_click=lambda: add_to_queue('excel', config.INBOX_DIR_PATH, f_name)) \
                             #    .props('color="green" size="sm" stack').classes('w-24 h-14')

@@ -150,6 +150,7 @@ def test_process_doc_two_persons(processor_factory):
     assert person1[COLUMN_ID_NUMBER] == '3151262222'
     assert person1[COLUMN_BIRTHDAY] == '03.12.1991'
     assert person1[COLUMN_SUBUNIT] == '2 дшб'
+    assert person1[COLUMN_SUBUNIT2] == '7 дшр'
     assert person1[COLUMN_SERVICE_TYPE] == 'призивом'
     assert person1[COLUMN_PHONE] == '0962522526'
     assert person1[COLUMN_ADDRESS] == "с. Майори, вул. Паркова буд. 12 кв.1-А, Біляївський р-н, Одеська обл."
@@ -172,6 +173,9 @@ def test_process_doc_two_persons(processor_factory):
     assert person2[COLUMN_ENLISTMENT_DATE] == '25.10.2025'
     assert person2[COLUMN_SERVICE_DAYS] == 98
     assert person2[COLUMN_DESERTION_PLACE] == 'РВБЗ'
+    assert person2[COLUMN_SUBUNIT] == '3 дшб'
+    assert person2[COLUMN_SUBUNIT2] == '10 дшр'
+
     assert "31.01.2026 о 16:00 під час перевірки особового складу 7 десантно-штурмової роти 2 десантно-штурмового батальйону командиром підрозділу капітаном БЕШЛЯГОЮ Р.В. було виявлено відсутність військовослужбовців солдата ІВОНЧАКА Дмитра Васильовича та солдата НЕГОЛЮКА Володимира Васильовича, які самовільно залишили район зосередження 7 десантно-штурмової роти 2 десантно-штурмового батальйону військової частини А0224 поблизу н.п. Привовчанське Дніпропетровської області" in person2[COLUMN_DESERT_CONDITIONS]
     assert "31.01.2026 року від командира 7 десантно-штурмової роти 2 десантно-штурмового батальйону надійшла доповідь про факт самовільного залишення району виконання завдання за призначенням військовослужбовця військової частини А0224 солдата ІВОНЧАКА Дмитра Васильовича та солдата НЕГОЛЮКА Володимира Васильовича (без зброї" not in person2[COLUMN_DESERT_CONDITIONS]
 

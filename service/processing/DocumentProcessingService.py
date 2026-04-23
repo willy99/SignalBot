@@ -54,9 +54,6 @@ class DocumentProcessingService:
 
     def process_to_excel(self, source_file_path: str, original_filename: str) -> list[str]:
         """3. Розпізнавання документа та запис результатів у Excel/БД."""
-        if not os.path.exists(
-                source_file_path):  # Якщо це мережевий шлях, os.path.exists може брехати, але залишимо для сумісності
-            self.logger.warning(f"⚠️ Шлях {source_file_path} недоступний локально. Спробуємо завантажити через клієнт.")
 
         local_temp_path = None
         try:

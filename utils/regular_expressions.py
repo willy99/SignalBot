@@ -324,27 +324,50 @@ def extract_desertion_region(text):
     return NA
 
 
-
 def extract_military_subunit(text, file_name=None, mapping=PATTERN_SUBUNIT_MAPPING):
-    short_values = set()
-    for val in mapping.values():
-        clean_val = val.replace(r'\1', '').strip()
-        if clean_val:
-            short_values.add(clean_val)
+    """
+    Витягує назву підрозділу.
+    Пріоритет 1: Пошук у тексті (найбільш точний).
+    Пріоритет 2: Пошук у назві файлу (якщо в тексті нічого немає).
+    """
 
-    # ЕТАП 1: Перевірка назви файлу (тепер з IGNORECASE)
+    # =========================================================================
+    # ЕТАП 1: Пошук у ТЕКСТІ (Найвищий пріоритет)
+    # =========================================================================
+    if text:
+        for pattern, abbreviation in mapping.items():
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                # Якщо в абревіатурі є маркер \1 (наприклад, для номера батальйону)
+                if r'\1' in abbreviation:
+                    # Безпечне отримання групи (якщо група не знайшлася, беремо порожній рядок)
+                    digit = match.group(1) if match.groups() and match.group(1) else ""
+                    res = abbreviation.replace(r'\1', digit).strip()
+                else:
+                    res = abbreviation
+                return res
+
+    # =========================================================================
+    # ЕТАП 2: Пошук у НАЗВІ ФАЙЛУ (Запасний варіант)
+    # =========================================================================
     if file_name:
+        short_values = set()
+        for val in mapping.values():
+            clean_val = val.replace(r'\1', '').strip()
+            if clean_val:
+                short_values.add(clean_val)
+
         # Сортуємо від найдовших до найкоротших, щоб спочатку ловити специфічні назви
         sorted_shorts = sorted(short_values, key=len, reverse=True)
 
         for short_val in sorted_shorts:
             # Паттерн шукає без урахування регістру (re.IGNORECASE)
+            # Шукаємо: (Початок рядка АБО пробіл/підкреслення) + (Опціонально цифри та пробіли/підкреслення) + Назва
             pattern = rf'(?:^|[\s_])(\d*[\s_]*)?{re.escape(short_val)}(?=[\s_]|$)'
             match = re.search(pattern, file_name, re.IGNORECASE)
 
             if match:
                 # Отримуємо цифри перед назвою (наприклад, "3" з "3 САДН")
-                # match.group(1) містить цифри та пробіли/підкреслення перед назвою
                 prefix = match.group(1) or ""
                 digits = re.sub(r'\D', '', prefix)  # Залишаємо тільки цифри
 
@@ -353,21 +376,10 @@ def extract_military_subunit(text, file_name=None, mapping=PATTERN_SUBUNIT_MAPPI
                     return f"{digits} {short_val}"
                 return short_val
 
-    # ЕТАП 2: Пошук у тексті через мапінг (якщо в файлі не знайдено)
-    found_subunits = []
-    for pattern, abbreviation in mapping.items():
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            if r'\1' in abbreviation:
-                digit = match.group(1) if match.group(1) else ""
-                res = abbreviation.replace(r'\1', digit).strip()
-            else:
-                res = abbreviation
-            found_subunits.append(res)
-            return res
-
+    # =========================================================================
+    # ЕТАП 3: Якщо нічого не знайдено
+    # =========================================================================
     return NA
-
 
 def extract_desertion_place(text, file_name=None):
     sorted_patterns = sorted(
