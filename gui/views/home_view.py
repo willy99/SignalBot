@@ -34,7 +34,7 @@ def render_home_page(auth_manager:AuthManager, report_ctrl: ReportController):
         if stats:
             with ui.card().classes('w-full max-w-7xl bg-yellow-50 border-b mb-6 p-0 overflow-hidden'):
                 with ui.row().classes('w-full p-3 items-center justify-between bg-yellow-100'):
-                    ui.label('⭐️ Загальний стан ВЧ А0224 (на основі останнього звіту)').classes('font-bold text-yellow-900 text-sm uppercase tracking-wide')
+                    ui.label('⭐️ Загальний стан Військової частини (на основі останнього звіту)').classes('font-bold text-yellow-900 text-sm uppercase tracking-wide')
                     ui.label(f"Оновлено: {stats['updated_at']}").classes('text-[10px] text-yellow-700')
 
                 # Використовуємо ту саму логіку колонок, що і в daily_report

@@ -37,7 +37,7 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
         data_A0224 = [r for r in state.get('data', []) if r.get('sheet_name') == 'А0224']
 
         if not data_A0224:
-            ui.notify('Немає нових записів по А0224 для звіту!', type='warning')
+            ui.notify('Немає нових записів для звіту!', type='warning')
             return
 
         export_word_btn.props('loading')
@@ -85,7 +85,7 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
                 .bind_visibility_from(state, 'data', backward=lambda d: len(d) > 0 or len(state['returns']) > 0 or len(state['archive']) > 0)
 
             # 💡 НОВА КНОПКА
-            export_word_btn = ui.button('У Word (А0224)', icon='description', on_click=generate_word_report) \
+            export_word_btn = ui.button('У Word (Військова частина)', icon='description', on_click=generate_word_report) \
                 .props('color="blue" outline') \
                 .bind_visibility_from(state, 'data', backward=lambda d: any(r.get('sheet_name') == 'А0224' for r in d))
 
@@ -318,7 +318,7 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
                     ]
 
                     with ui.row().classes('w-full bg-yellow-50 p-3 border-b items-center justify-between'):
-                        ui.label('⭐️ Загальний стан ВЧ А0224').classes('font-bold text-yellow-900 text-lg uppercase tracking-wide')
+                        ui.label('⭐️ Загальний стан Військової частини').classes('font-bold text-yellow-900 text-lg uppercase tracking-wide')
 
                     ui.table(columns=cmd_cols, rows=cmd_summary).classes('w-full mb-4').props('flat bordered')
 
@@ -375,13 +375,13 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
 
                     if data_A0224:
                         with ui.row().classes('w-full bg-blue-50 p-3 border-b border-t items-center justify-between mt-4'):
-                            ui.label(f'ВЧ A0224| Додано записів: {len(data_A0224)}').classes('font-bold text-blue-800 text-lg')
+                            ui.label(f'ВЧ Основна| Додано записів: {len(data_A0224)}').classes('font-bold text-blue-800 text-lg')
                         # Додаємо клас table-fixed для строгого дотримання заданої ширини
                         ui.table(columns=columns_gone, rows=data_A0224, row_key='name').classes('w-full table-fixed').props('flat bordered dense')
 
                     if data_A7018:
                         with ui.row().classes('w-full bg-green-50 p-3 border-b border-t items-center justify-between mt-4'):
-                            ui.label(f'ВЧ А7018 | Додано записів: {len(data_A7018)}').classes('font-bold text-green-800 text-lg')
+                            ui.label(f'ВЧ Брез | Додано записів: {len(data_A7018)}').classes('font-bold text-green-800 text-lg')
                         ui.table(columns=columns_gone, rows=data_A7018, row_key='name').classes('w-full table-fixed').props('flat bordered dense')
 
                     # ==============================
@@ -461,7 +461,7 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
             cmd_summary = state.get('cmd_summary')
             if cmd_summary:
                 row = cmd_summary[0]
-                details += "<br><b>⭐️ Загальний стан ВЧ А0224 (Доповідь):</b><br>"
+                details += "<br><b>⭐️ Загальний стан Військової частини (Доповідь):</b><br>"
                 details += "<table border='1' cellspacing='0' cellpadding='6' style='border-collapse: collapse; text-align: center; width: 100%;'>"
                 details += "<tr style='background:#fefce8;'><th>Здійснили СЗЧ</th><th>В розшуку</th><th>Повернулися</th><th>В розпорядженні</th></tr>"
                 details += f"<tr><td><b>{row['total_awol']}</b></td><td style='color:red;'><b>{row['in_search']}</b></td><td style='color:green;'><b>{row['returned']}</b></td><td><b>{row['in_disposal']}</b></td></tr>"
@@ -499,13 +499,13 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
                 data_A7018 = [r for r in added_data if r.get('sheet_name') == 'А7018']
 
                 if data_A0224:
-                    details += f"<p>👉 <b>ВЧ А0224 ({len(data_A0224)})</b></p><ul>"
+                    details += f"<p>👉 <b>ВЧ Основна ({len(data_A0224)})</b></p><ul>"
                     for r in data_A0224:
                         details += f"<li><b>{r['name']}</b> ({r.get('title', '')}, {r.get('subunit', '')}) — {r.get('desertion_place', '')}</li>"
                     details += "</ul>"
 
                 if data_A7018:
-                    details += f"<p>👉 <b>ВЧ А7018 ({len(data_A7018)})</b></p><ul>"
+                    details += f"<p>👉 <b>ВЧ Брез ({len(data_A7018)})</b></p><ul>"
                     for r in data_A7018:
                         details += f"<li><b>{r['name']}</b> ({r.get('title', '')}, {r.get('subunit', '')}) — {r.get('desertion_place', '')}</li>"
                     details += "</ul>"
