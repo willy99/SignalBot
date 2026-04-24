@@ -250,6 +250,7 @@ def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file
                     else:
                         search_filter = PersonSearchFilter(query=query)
 
+                    search_filter.mil_unit = None
                     results = await auth_manager.execute(person_ctrl.search, auth_manager.get_current_context(), search_filter)
 
                     state['current_search_results'].clear()

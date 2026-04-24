@@ -149,6 +149,7 @@ class PersonController:
 
         for unit in units_to_search:
             # Створюємо копію фільтра або просто підміняємо unit для поточного проходу
+            print('>>> шукаємо по ' + str(unit))
             filter_obj.mil_unit = unit
             raw_data = self.processor.search_people(filter_obj)
 

@@ -289,6 +289,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                 search_btn.disable()
                 try:
                     search_filter = PersonSearchFilter(query=query)
+                    search_filter.mil_unit = None
                     results = await auth_manager.execute(person_controller.search, auth_manager.get_current_context(), search_filter)
 
                     state['current_search_results'].clear()
