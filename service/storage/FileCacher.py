@@ -82,9 +82,21 @@ class FileCacheManager:
                         display_path = "(Коренева папка)"
 
                     for filename in filenames:
-                        print('>> processing ' + str(filename) + ' in ' + str(display_path))
                         full_path_win = f"{dirpath}\\{filename}"
+
+                        # =========================================================
+                        # ЗАХИСТ ВІД ЗАБЛОКОВАНИХ ФАЙЛІВ ТА ВАЖКИХ ДОКУМЕНТІВ
+                        # =========================================================
+                        try:
+                            # Перевіряємо, чи файл доступний і чи не занадто великий (> 50 МБ)
+                            if self.client.get_file_size(full_path_win) > 50 * 1024 * 1024:
+                                continue
+                        except (OSError, PermissionError) as e:
+                            # Якщо файл відкритий у Word, Windows кине PermissionError
+                            print(f"⚠️ Файл {filename} зайнятий іншим процесом або недоступний. Пропускаємо.")
+                            continue
                         extracted_names = []
+                        print('>> processing ' + str(filename) + ' in ' + str(display_path))
 
                         # === СМАРТ-ПАРСИНГ: Обробляємо тільки Word-документи ===
                         # Ігноруємо системні файли macOS (._) та відкриті тимчасові файли Word (~$)
@@ -141,11 +153,12 @@ class FileCacheManager:
         finally:
             self.is_indexing = False
             self.log_manager.get_logger().setLevel(previous_level)
+            self.load_cache(force=True)
 
-    def load_cache(self):
+    def load_cache(self, force=False):
         """Завантажує індекс з файлу через абстрактний клієнт"""
         try:
-            if not self.cache_data:
+            if force or not self.cache_data:
                 self.total_count = 0
                 self.total_persons = 0
                 self.last_indexed_date = "Ніколи"

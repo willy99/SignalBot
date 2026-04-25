@@ -144,3 +144,14 @@ class LocalFileClient(FileStorageClient):
         except Exception as e:
             self.logger.warning(f"Не вдалося отримати mtime для {filepath}: {e}")
             return 0.0
+
+    def get_file_size(self, filepath: str) -> int:
+        """
+        Повертає розмір файлу в байтах через мережеве SMB-сховище.
+        Якщо файл недоступний або не існує, повертає 0.
+        """
+        try:
+            return os.path.getsize(filepath)
+        except Exception as e:
+            self.logger.warning(f"Не вдалося отримати розмір для {filepath}: {e}")
+            return 0
