@@ -165,6 +165,8 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
         person.cc_article = extract_cc_article(person.desertion_type)
         person.experience = extract_experience(person.service_days)
 
+        auto_fill_desertion_place_fields()
+
         refresh_validation()
         ui.notify('Дані СЗЧ розпарсено', type='positive')
 

@@ -104,6 +104,7 @@ def render_users_page(auth_manager: AuthManager):
                     {'name': 'full_name', 'label': 'ПІБ', 'field': 'full_name', 'align': 'left'},
                     {'name': 'role', 'label': 'Роль', 'field': 'role', 'align': 'center'},
                     {'name': 'status', 'label': 'Доступ', 'field': 'is_active', 'align': 'center'},
+                    {'name': '2fa', 'label': '2-факторка', 'field': 'use_2fa', 'align': 'center'},
                     {'name': 'actions', 'label': 'Дії', 'field': 'actions', 'align': 'center'},
                 ]
 
@@ -118,6 +119,16 @@ def render_users_page(auth_manager: AuthManager):
                             dense options-dense borderless
                             @update:model-value="val => {{ props.row.role = val; $parent.$emit('role_changed', props.row) }}"
                         />
+                    </q-td>
+                ''')
+
+                table.add_slot('body-cell-2fa', '''
+                    <q-td :props="props">
+                        <q-icon :name="props.row.use_2fa ? 'security' : 'gpp_bad'" 
+                                :color="props.row.use_2fa ? 'green' : 'grey-4'" 
+                                size="sm">
+                            <q-tooltip>{{ props.row.use_2fa ? '2FA налаштовано' : '2FA не активовано' }}</q-tooltip>
+                        </q-icon>
                     </q-td>
                 ''')
 

@@ -49,12 +49,14 @@ class ExcelProcessor:
             raise FileNotFoundError(f"Excel файл відсутній за шляхом {self.abs_path}")
 
         self.app = xw.App(visible=True, add_book=False)
+        self.app_pid = self.app.pid
         self._load_workbook(config.DESERTER_TAB_NAME) #default tab name
         self.lock = threading.RLock()
 
         self.column_values: Dict[str, List[str]] = {} # для комбіков
         self._build_global_column_values()
 
+    '''
     def _refresh_com_connection(self):
         """Метод для 'оживлення' зв'язку з Excel у новому потоці"""
         try:
@@ -73,6 +75,7 @@ class ExcelProcessor:
             except Exception:
                 self.workbook = self.app.books.open(self.abs_path)
             self.sheet = self.workbook.sheets.active
+    '''
 
     @ensure_com
     def get_correct_sheet_name(self, mil_unit):
@@ -361,6 +364,7 @@ class ExcelProcessor:
 
         self.logger.debug(f">> Глобальні довідники зібрані: {len(target_sheets)} листа опрацьовано")
 
+    '''
     def _load_workbook(self, sheet_name) -> None:
         try:
             try:
@@ -379,7 +383,26 @@ class ExcelProcessor:
             # self.logger.debug(f"Помилка ініціалізації Excel: {e}")
             traceback.print_exc()
             raise BaseException(f"⚠️ Помилка ініціалізації Excel: {e}")
+    '''
 
+    def _load_workbook(self, sheet_name) -> None:
+        try:
+            self.logger.debug(f'>> Відкриття/підключення книги: {self.abs_path}')
+            book_name = os.path.basename(self.abs_path)
+
+            if book_name in [b.name for b in self.app.books]:
+                self.workbook = self.app.books[book_name]
+            else:
+                self.workbook = self.app.books.open(self.abs_path)
+
+            self.switch_to_sheet(sheet_name)
+            self.logger.debug(f'>> Книгу успішно завантажено, лист: {sheet_name}')
+
+        except Exception as e:
+            traceback.print_exc()
+            raise BaseException(f"⚠️ Помилка завантаження книги Excel: {e}")
+
+    '''
     def _refresh_com_connection(self):
         """Агресивне оновлення зв'язку, яке не боїться чужих потоків"""
         pythoncom_initialize()
@@ -411,8 +434,52 @@ class ExcelProcessor:
                 self.app = self.workbook.app
             except Exception as final_e:
                 self.logger.error(f"❌ Критична помилка COM: {final_e}")
+    '''
 
+    def _refresh_com_connection(self):
+        """Централізоване відновлення COM-зв'язку для поточного потоку (за PID)"""
+        pythoncom_initialize()
 
+        try:
+            # 1. Швидка перевірка: чи живі об'єкти в поточному потоці?
+            if self.app and self.workbook and self.sheet:
+                _ = self.app.api
+                _ = self.workbook.name
+                _ = self.sheet.name
+                return  # Все ідеально, потік не змінився, виходимо!
+        except Exception:
+            # 2. Якщо вилетіла помилка — потік змінився або Excel "відвалився".
+            self.logger.debug(f"🔄 Потік змінився. Відновлюю зв'язок через PID {self.app_pid}")
+
+        # 3. Відновлення (виконається тільки якщо блок try впав)
+        try:
+            # ШУКАЄМО ТІЛЬКИ НАШ ПРОЦЕС ЗА PID (ніяких .active!)
+            if self.app_pid in xw.apps.keys():
+                self.app = xw.apps[self.app_pid]
+            else:
+                self.logger.warning("⚠️ Excel процес втрачено! Запускаю новий...")
+                self.app = xw.App(visible=True, add_book=False)
+                self.app_pid = self.app.pid
+
+            # Шукаємо або відкриваємо нашу книгу В ЦЬОМУ ПРОЦЕСІ
+            book_name = os.path.basename(self.abs_path)
+            if book_name in [b.name for b in self.app.books]:
+                self.workbook = self.app.books[book_name]
+            else:
+                self.workbook = self.app.books.open(self.abs_path)
+
+            # Робимо активним поточний лист (або дефолтний, якщо його ще не було)
+            try:
+                _ = self.sheet.name
+                self.sheet = self.workbook.sheets[self.sheet.name]
+            except:
+                self.sheet = self.workbook.sheets.active
+
+        except Exception as e:
+            self.logger.error(f"❌ Критична помилка COM recovery: {e}")
+            raise e
+
+    '''
     @ensure_com
     def switch_to_sheet(self, sheet_name, silent=False):
         if not sheet_name:
@@ -435,6 +502,20 @@ class ExcelProcessor:
 
             # Відкриваємо або підключаємося до книги
             self.workbook = self.app.books[os.path.basename(self.abs_path)]
+            self.sheet = self.workbook.sheets[sheet_name]
+
+        if not silent:
+            self._build_column_map()
+
+    '''
+
+    @ensure_com
+    def switch_to_sheet(self, sheet_name, silent=False):
+        if not sheet_name:
+            raise ValueError(f"Військова частина не визначена!")
+
+        # Перемикаємо тільки якщо ми ще не на цьому листі
+        if self.sheet.name != sheet_name:
             self.sheet = self.workbook.sheets[sheet_name]
 
         if not silent:

@@ -198,12 +198,49 @@ def extract_conscription_date(text):
     if start_match is None:
         return NA
 
-    lookback_area = text[start_match.start():-1]
-    # 2. Шукаємо всі дати в цій зоні
-    dates = re.findall(PATTERN_DATE, lookback_area)
-    if dates:
-        found_date = dates[0]
-        return format_to_excel_date(found_date)
+    # Шукаємо дати після слова "призваний/направлений"
+    lookback_area = text[start_match.start():]
+    raw_dates = re.findall(PATTERN_DATE, lookback_area)
+
+    if not raw_dates:
+        return NA
+
+    parsed_dates = []
+    for rd in raw_dates:
+        date_str = rd[0] if isinstance(rd, tuple) else rd
+        year_match = re.search(r'\d{4}', date_str)
+        if year_match:
+            parsed_dates.append((date_str, int(year_match.group(0))))
+
+    # Якщо раптом жодна дата не містить 4-значного року, повертаємо першу
+    if not parsed_dates:
+        first_date = raw_dates[0][0] if isinstance(raw_dates[0], tuple) else raw_dates[0]
+        return format_to_excel_date(first_date)
+
+    # Знаходимо найменший та найбільший рік у знайдених датах
+    min_year = min(year for _, year in parsed_dates)
+    max_year = max(year for _, year in parsed_dates)
+
+    # Мінімальний вік призову (18 років)
+    MIN_AGE = 18
+
+    valid_conscription_dates = []
+
+    # Перевіряємо, чи є в тексті дата народження (розкид між найменшою і найбільшою датою >= 18 років)
+    has_dob_in_list = (max_year - min_year) >= MIN_AGE
+
+    for date_str, year in parsed_dates:
+        if has_dob_in_list:
+            # Якщо дата народження є, беремо тільки ті дати, що на 18+ років більші за найменшу
+            if year - min_year >= MIN_AGE:
+                valid_conscription_dates.append(date_str)
+        else:
+            # Якщо розкид дат малий (наприклад, 2022 і 2024), значить дати народження тут немає
+            valid_conscription_dates.append(date_str)
+
+    if valid_conscription_dates:
+        # Перша ж "доросла" дата після слова "призваний" є нашою ціллю
+        return format_to_excel_date(valid_conscription_dates[0])
 
     return NA
 
@@ -387,14 +424,16 @@ def extract_desertion_place(text, file_name=None):
         key=lambda item: len(item[1]),
         reverse=True
     )
+
+    for pattern, short_name in sorted_patterns:
+        if re.search(pattern, text, re.IGNORECASE):
+            return short_name
+
     if file_name:
         for pattern, mapping_value in sorted_patterns:
             if re.search(mapping_value, file_name, re.IGNORECASE):
                 return mapping_value
 
-    for pattern, short_name in sorted_patterns:
-        if re.search(pattern, text, re.IGNORECASE):
-            return short_name
     return NA
 
 def extract_desertion_type(text, desertion_where):
