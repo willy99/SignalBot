@@ -129,7 +129,7 @@ class AuthService:
         Повертає список словників для таблиці NiceGUI.
         NiceGUI зручно працює саме зі списком dict.
         """
-        query = f"SELECT id, username, role, full_name, is_active FROM {DB_TABLE_USER}"
+        query = f"SELECT id, username, role, full_name, use_2fa, is_active FROM {DB_TABLE_USER}"
         rows = self.db.__execute_fetchall__(query)
         return [
             {
