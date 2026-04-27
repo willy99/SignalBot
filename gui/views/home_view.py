@@ -5,6 +5,8 @@ from dics.security_config import PERM_READ, PERM_EDIT, MODULE_PERSON, MODULE_SEA
 from gui.auth_routes import logout
 from gui.controllers.report_controller import ReportController
 from gui.services.auth_manager import AuthManager
+from utils.utils import get_build_info
+
 
 def create_nav_card(title: str, description: str, icon_name: str, route: str, color: str = 'blue'):
     """Компактна вертикальна картка з описом"""
@@ -22,6 +24,7 @@ def render_home_page(auth_manager:AuthManager, report_ctrl: ReportController):
         logout(auth_manager)
 
     stats = report_ctrl.get_latest_dashboard_stats(auth_manager.get_current_context())
+    build_info = get_build_info()
     bg_style = 'background-image: url("/static/images/bg_home.jpg"); background-size: cover; background-position: center; background-attachment: fixed;'
 
     with ui.element('div').classes('w-full min-h-screen relative').style(bg_style):
@@ -105,7 +108,7 @@ def render_home_page(auth_manager:AuthManager, report_ctrl: ReportController):
             with ui.row().classes('w-full justify-center items-center py-6 border-t border-gray-200 mt-8'):
                 with ui.row().classes('bg-white/80 px-6 py-2 rounded-full items-center gap-2 shadow-sm'):
                     ui.icon('pets', size='2.5rem', color='slate').classes('mb-1')
-                    ui.html('''
+                    ui.html(f'''
                         <div class="text-gray-400 text-sm">
                             2026 (С) <a href="mailto:willy2005@gmail.com" 
                                         class="text-blue-400 hover:text-blue-600 transition-colors duration-200 font-medium"
@@ -113,4 +116,8 @@ def render_home_page(auth_manager:AuthManager, report_ctrl: ReportController):
                                         Pashkinson
                                      </a>
                         </div>
+                        <div class="text-gray-400 font-mono text-xs bg-gray-100/50 px-3 py-1 rounded-md border border-gray-200" 
+                             title="Остання версія збірки">
+                            {build_info}
+                        </div>                        
                     ''')

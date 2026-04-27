@@ -8,6 +8,7 @@ from dics.deserter_xls_dic import NA
 from domain.person_key import PersonKey
 from service.constants import DB_DATE_FORMAT
 import sys
+import subprocess
 
 def is_win()->bool:
     return sys.platform == "win32"
@@ -550,3 +551,14 @@ def normalize_phone(phone: str) -> str:
     if not phone:
         return ''
     return re.sub(r'\D', '', phone)  # залишаємо тільки цифри
+
+def get_build_info() -> str:
+    """Отримує хеш останнього коміту та дату з Git."""
+    try:
+        # Виконуємо git log. Формат: %h (короткий хеш) • %cd (дата у кастомному форматі)
+        cmd = ['git', 'log', '-1', '--format=%h • %cd', '--date=format:%d.%m.%Y %H:%M']
+        result = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True).strip()
+        return f"v.{result}"
+    except Exception:
+        # Якщо git не встановлено, або немає папки .git (наприклад, зібрано в Docker)
+        return "v.Dev (невідомо)"
