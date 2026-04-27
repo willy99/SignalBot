@@ -285,8 +285,10 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
 
                         if getattr(person, 'id', None) is None:
                             del_btn.disable()
+                            del_btn.tooltip('Неможливо видалити запис, який ще не збережено в базі.')
                         elif not is_delete_allowed(person):
                             del_btn.disable()
+                            del_btn.tooltip('Видалення можливе лише для записів, які були додані сьогодні або вчора.')
 
             # 3️⃣ ТАБИ (shrink-0)
             with ui.tabs().classes('w-full text-black bg-white border-b border-gray-200 shrink-0 mobile-icon-tabs').props('dense outside-arrows mobile-arrows') as tabs:
@@ -303,110 +305,122 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
                 # ПАНЕЛЬ 1: Основна інформація
                 # ==========================================
                 with ui.tab_panel(main_tab).classes('p-0 m-0 w-full h-full'):
-                    # 💥 УВАГА: Оцей div створює внутрішній скрол ТІЛЬКИ для цієї вкладки!
+                    # Цей div створює внутрішній скрол ТІЛЬКИ для цієї вкладки!
                     with ui.element('div').classes('w-full h-full overflow-y-auto overflow-x-hidden p-2 sm:p-6'):
                         with ui.card().classes('w-full max-w-5xl mx-auto p-4 sm:p-6 shadow-sm border border-gray-200 mb-8'):
 
-                            with ui.row().classes('w-full gap-4 flex-wrap items-center'):
-                                mil_unit_select = search_select(MIL_UNITS, COLUMN_MIL_UNIT, person, 'mil_unit').classes('w-full sm:w-32')
+                            # Використовуємо ЄДИНУ сітку на 12 колонок для всієї форми.
+                            # items-start гарантує, що якщо вилізе текст помилки (валідація), сусідні поля не перекосить.
+                            with ui.grid(columns=12).classes('w-full gap-4 items-start'):
+
+                                # --- РЯДОК 1 НА ПК (В/Ч, ПІБ, Дата нар., РНОКПП) = 2 + 5 + 2 + 3 = 12 колонок ---
+                                mil_unit_select = search_select(MIL_UNITS, COLUMN_MIL_UNIT, person, 'mil_unit').classes('col-span-12 sm:col-span-2')
                                 if person.id is not None:
                                     mil_unit_select.props('disable')
                                 else:
                                     mil_unit_select.value = MIL_UNITS[0]
 
-                                name_input = ui.input(COLUMN_NAME, validation=req).bind_value(person, 'name').classes('w-full sm:flex-grow')
-                                rnokpp_inp = ui.input(COLUMN_ID_NUMBER, placeholder='xxxxxxxxxx', validation={
-                                    'Обов’язкове поле': lambda v: bool(v),
-                                    'Формат має бути 10 цифр': lambda v: len(str(v)) == 10 if v else True,
-                                    id_mismatch_err: lambda _: validate_id_vs_birthday(person)
-                                }).bind_value(person, 'rnokpp').classes('w-full sm:w-48')
-                                rnokpp_inp.on('blur', refresh_validation)
+                                name_input = ui.input(COLUMN_NAME, validation=req).bind_value(person, 'name').classes('col-span-12 sm:col-span-5')
 
-                            with ui.row().classes('w-full gap-4 mt-2 sm:mt-4 flex-wrap items-center'):
-                                title_select = search_select(ui_options.get(COLUMN_TITLE, []), COLUMN_TITLE, person, 'title').classes('w-full sm:flex-grow').props(
-                                    'rules="[val => !!val || \'Обов’язково\']"')
-                                title_select.on_value_change(auto_fill_titles)
-                                title2_select = search_select(ui_options.get(COLUMN_TITLE_2, []), COLUMN_TITLE_2, person, 'title2').classes('w-full sm:flex-grow')
-
-                            with ui.row().classes('w-full gap-4 mt-2 sm:mt-4 flex-wrap items-center'):
-                                subunit = search_select(ui_options.get(COLUMN_SUBUNIT, []), COLUMN_SUBUNIT, person, 'subunit').classes('w-full sm:flex-grow').props(
-                                    'rules="[val => !!val || \'Обов’язково\']"')
-                                subunit2 = search_select(ui_options.get(COLUMN_SUBUNIT2, []), COLUMN_SUBUNIT2, person, 'subunit2').classes('w-full sm:flex-grow')
-
-                            with ui.row().classes('w-full gap-4 mt-2 sm:mt-4 flex-wrap items-center'):
-                                address_input = ui.input(COLUMN_ADDRESS, validation=req).bind_value(person, 'address').classes('w-full sm:flex-grow')
-                                phone_input = ui.input(COLUMN_PHONE, placeholder='0xxxxxxxxx', validation={
-                                    'Формат має бути 0xxxxxxxxx': lambda v: bool(re.match(VALID_PATTERN_PHONE, v.strip())) if v else True
-                                }).bind_value(person, 'phone').classes('w-full sm:w-48')
-
-                            with ui.row().classes('w-full mt-2 sm:mt-4 flex-wrap items-center'):
                                 birthday_inp = date_input(
                                     COLUMN_BIRTHDAY, person, 'birthday',
                                     blur_handler=lambda e: [fix_date(e), refresh_validation()]
-                                ).classes('w-full sm:w-1/3')
+                                ).classes('col-span-12 sm:col-span-2')
                                 birthday_inp.validation.update({
                                     id_mismatch_err: lambda _: validate_id_vs_birthday(person)
                                 })
 
+                                rnokpp_inp = ui.input(COLUMN_ID_NUMBER, placeholder='xxxxxxxxxx', validation={
+                                    'Обов’язкове поле': lambda v: bool(v),
+                                    'Формат має бути 10 цифр': lambda v: len(str(v)) == 10 if v else True,
+                                    id_mismatch_err: lambda _: validate_id_vs_birthday(person)
+                                }).bind_value(person, 'rnokpp').classes('col-span-12 sm:col-span-3')
+                                rnokpp_inp.on('blur', refresh_validation)
+
+                                # --- РЯДОК 2 НА ПК (Звання, Кор. Звання, Підр.1, Підр.2) = 4 + 2 + 3 + 3 = 12 колонок ---
+                                title_select = search_select(ui_options.get(COLUMN_TITLE, []), COLUMN_TITLE, person, 'title') \
+                                    .classes('col-span-12 sm:col-span-4').props('rules="[val => !!val || \'Обов’язково\']"')
+                                title_select.on_value_change(auto_fill_titles)
+
+                                title2_select = search_select(ui_options.get(COLUMN_TITLE_2, []), COLUMN_TITLE_2, person, 'title2').classes('col-span-12 sm:col-span-2')
+
+                                subunit = search_select(ui_options.get(COLUMN_SUBUNIT, []), COLUMN_SUBUNIT, person, 'subunit') \
+                                    .classes('col-span-12 sm:col-span-3').props('rules="[val => !!val || \'Обов’язково\']"')
+
+                                subunit2 = search_select(ui_options.get(COLUMN_SUBUNIT2, []), COLUMN_SUBUNIT2, person, 'subunit2').classes('col-span-12 sm:col-span-3')
+
+                                # --- РЯДОК 3 НА ПК (Адреса, Телефон) = 8 + 4 = 12 колонок ---
+                                address_input = ui.input(COLUMN_ADDRESS, validation=req).bind_value(person, 'address').classes('col-span-12 sm:col-span-8')
+                                phone_input = ui.input(COLUMN_PHONE, placeholder='0xxxxxxxxx', validation={
+                                    'Формат має бути 0xxxxxxxxx': lambda v: bool(re.match(VALID_PATTERN_PHONE, v.strip())) if v else True
+                                }).bind_value(person, 'phone').classes('col-span-12 sm:col-span-4')
                 # ==========================================
                 # ПАНЕЛЬ 2: ТЦК
                 # ==========================================
                 with ui.tab_panel(tzk_tab).classes('p-0 m-0 w-full h-full'):
                     with ui.element('div').classes('w-full h-full overflow-y-auto overflow-x-hidden p-2 sm:p-6'):
                         with ui.card().classes('w-full max-w-5xl mx-auto p-4 sm:p-6 shadow-sm border border-gray-200 mb-8'):
-                            with ui.row().classes('w-full gap-4 flex-wrap items-center'):
-                                tzk_input = ui.input(COLUMN_TZK, validation=req).bind_value(person, 'tzk').classes('w-full sm:flex-grow')
+                            # Використовуємо ui.grid на 12 колонок для всієї панелі
+                            with ui.grid(columns=12).classes('w-full gap-4 items-start'):
+                                # ТЦК (5 колонок)
+                                tzk_input = ui.input(COLUMN_TZK, validation=req).bind_value(person, 'tzk').classes('col-span-12 sm:col-span-5')
                                 tzk_input.on('blur', auto_fill_tzk_region)
-                                enlist_inp = date_input(COLUMN_ENLISTMENT_DATE, person, 'enlistment_date', blur_handler=lambda e: [fix_date(e), refresh_validation()]).classes(
-                                    'w-full sm:w-1/3')
+
+                                # Регіон ТЦК (3 колонки)
+                                tzk_region_select = search_select(ui_options.get(COLUMN_TZK_REGION, []), COLUMN_TZK_REGION, person, 'tzk_region') \
+                                    .classes('col-span-12 sm:col-span-3').props('rules="[val => !!val || \'Виберіть регіон\']"')
+
+                                # Дата призову (2 колонки)
+                                enlist_inp = date_input(COLUMN_ENLISTMENT_DATE, person, 'enlistment_date', blur_handler=lambda e: [fix_date(e), refresh_validation()]) \
+                                    .classes('col-span-12 sm:col-span-2')
                                 enlist_inp.props(f'validation-rules="{date_rules}"')
                                 enlist_inp.validation = date_rules
                                 enlist_inp.validation.update(req)
 
+                                # Дні служби (2 колонки)
                                 service_days_input = ui.input(COLUMN_SERVICE_DAYS, validation={
                                     'Нелогічна кількість': lambda v: 0 <= (int(v) if str(v).isdigit() else 0) <= 6000
-                                }).bind_value(person, 'service_days').classes('w-full sm:flex-grow')
-
-                            with ui.row().classes('w-full gap-4 mt-2 sm:mt-4 flex-wrap items-center'):
-                                tzk_region_select = search_select(ui_options.get(COLUMN_TZK_REGION, []), COLUMN_TZK_REGION, person, 'tzk_region').classes('w-full sm:w-1/3').props(
-                                    'rules="[val => !!val || \'Виберіть регіон\']"')
-
+                                }).bind_value(person, 'service_days').classes('col-span-12 sm:col-span-2')
                 # ==========================================
                 # ПАНЕЛЬ 3: СЗЧ
                 # ==========================================
                 with ui.tab_panel(des_tab).classes('p-0 m-0 w-full h-full'):
                     with ui.element('div').classes('w-full h-full overflow-y-auto overflow-x-hidden p-2 sm:p-6'):
                         with ui.card().classes('w-full max-w-5xl mx-auto p-4 sm:p-6 shadow-sm border border-gray-200 mb-8'):
-                            with ui.row().classes('w-full gap-4 flex-wrap items-center'):
-                                des_place = search_select(ui_options.get(COLUMN_DESERTION_PLACE, []), COLUMN_DESERTION_PLACE, person, 'desertion_place').classes('w-full sm:w-48')
-                                desertion_type = search_select(ui_options.get(COLUMN_DESERTION_TYPE, []), COLUMN_DESERTION_TYPE, person, 'desertion_type').classes('w-full sm:w-48')
-                                search_select(ui_options.get(COLUMN_DESERTION_REGION, []), COLUMN_DESERTION_REGION, person, 'desertion_region').classes('w-full sm:flex-grow')
+                            with ui.grid(columns=12).classes('w-full gap-4 items-start'):
+                                # --- РЯДОК 1: Звідки, Тип, Область (4 + 4 + 4 = 12) ---
+                                des_place = search_select(ui_options.get(COLUMN_DESERTION_PLACE, []), COLUMN_DESERTION_PLACE, person, 'desertion_place').classes(
+                                    'col-span-12 sm:col-span-4')
                                 des_place.on('blur', auto_fill_desertion_place_fields)
 
-                            with ui.row().classes('w-full gap-4 mt-2 sm:mt-4 flex-wrap items-center'):
+                                desertion_type = search_select(ui_options.get(COLUMN_DESERTION_TYPE, []), COLUMN_DESERTION_TYPE, person, 'desertion_type').classes(
+                                    'col-span-12 sm:col-span-4')
+
+                                search_select(ui_options.get(COLUMN_DESERTION_REGION, []), COLUMN_DESERTION_REGION, person, 'desertion_region').classes('col-span-12 sm:col-span-4')
+
+                                # --- РЯДОК 2: Дата, Термін (4 + 8 = 12) ---
                                 desert_inp = date_input(COLUMN_DESERTION_DATE, person, 'desertion_date',
-                                                        blur_handler=lambda e: [fix_date(e), refresh_validation()]).classes('w-full sm:w-1/3')
+                                                        blur_handler=lambda e: [fix_date(e), refresh_validation()]).classes('col-span-12 sm:col-span-4')
                                 desert_inp.validation = date_rules
 
                                 term_select = ui.select(
                                     options=["до 3 діб", "більше 3 діб"],
                                     label=COLUMN_DESERTION_TERM
-                                ).bind_value(person, 'desertion_term').classes('w-full sm:flex-grow')
+                                ).bind_value(person, 'desertion_term').classes('col-span-12 sm:col-span-8')
 
-                            with ui.row().classes('w-full mt-2 sm:mt-4 flex-wrap items-center'):
-                                ui.input(COLUMN_EXECUTOR).bind_value(person, 'executor').classes('w-full')
+                                # --- РЯДОК 3: Виконавець (12) ---
+                                ui.input(COLUMN_EXECUTOR).bind_value(person, 'executor').classes('col-span-12')
 
-                            with ui.row().classes('w-full gap-4 mt-2 sm:mt-4 flex-wrap items-center'):
+                                # --- РЯДОК 4: Дати повернення (6 + 6 = 12) ---
                                 date_input(COLUMN_RETURN_DATE, person, 'return_date',
-                                           blur_handler=lambda e: [fix_date(e), refresh_validation()]).classes('w-full sm:w-1/3')
+                                           blur_handler=lambda e: [fix_date(e), refresh_validation()]).classes('col-span-12 sm:col-span-6')
                                 date_input(COLUMN_RETURN_TO_RESERVE_DATE, person, 'return_reserve_date',
-                                           blur_handler=lambda e: [fix_date(e), refresh_validation()]).classes('w-full sm:w-1/3')
+                                           blur_handler=lambda e: [fix_date(e), refresh_validation()]).classes('col-span-12 sm:col-span-6')
 
-                            with ui.row().classes('w-full mt-2 sm:mt-4 flex-wrap items-center'):
-                                with ui.textarea(COLUMN_DESERT_CONDITIONS).bind_value(person, 'desertion_conditions').classes('w-full') as cond_area:
+                                # --- РЯДОК 5: Обставини СЗЧ (12) ---
+                                with ui.textarea(COLUMN_DESERT_CONDITIONS).bind_value(person, 'desertion_conditions').classes('col-span-12') as cond_area:
                                     with cond_area.add_slot('append'):
                                         ui.button(icon='psychology', on_click=run_desertion_parser).props('flat round color=orange')
-
                 # ==========================================
                 # ПАНЕЛЬ 4: Біографія
                 # ==========================================
@@ -423,32 +437,34 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
                 with ui.tab_panel(erdr_tab).classes('p-0 m-0 w-full h-full'):
                     with ui.element('div').classes('w-full h-full overflow-y-auto overflow-x-hidden p-2 sm:p-6'):
                         with ui.row().classes('w-full max-w-6xl mx-auto gap-4 sm:gap-6 flex-wrap items-start mb-8'):
-                            # Ліва колонка
+                            # --- ЛІВА КОЛОНКА (Накази та статуси) ---
                             with ui.card().classes('w-full lg:w-[58%] p-4 sm:p-6 shadow-sm border border-gray-200 gap-0'):
                                 ui.label('Документальне оформлення').classes('text-lg sm:text-xl font-bold text-gray-800 mb-4 border-b pb-2 w-full')
 
-                                with ui.row().classes('w-full gap-4 flex-wrap items-center'):
+                                # Використовуємо сітку 12 колонок для ідеального вирівнювання
+                                with ui.grid(columns=12).classes('w-full gap-4 items-start'):
+                                    # Статус (8) + Стаття (4)
                                     review_status = search_select(ui_options.get(COLUMN_REVIEW_STATUS, []), COLUMN_REVIEW_STATUS, person, 'review_status').classes(
-                                        'w-full sm:flex-grow')
-                                    ui.input(COLUMN_CC_ARTICLE).bind_value(person, 'cc_article').classes('w-full sm:w-1/3')
+                                        'col-span-12 sm:col-span-8')
+                                    ui.input(COLUMN_CC_ARTICLE).bind_value(person, 'cc_article').classes('col-span-12 sm:col-span-4')
 
-                                with ui.row().classes('w-full gap-4 mt-2 sm:mt-4 flex-wrap items-center'):
-                                    ui.input(COLUMN_ORDER_ASSIGNMENT_NUMBER).bind_value(person, 'o_ass_num').classes('w-full sm:flex-grow')
-                                    date_input(COLUMN_ORDER_ASSIGNMENT_DATE, person, 'o_ass_date', blur_handler=fix_date).classes('w-full sm:w-1/3')
+                                    # Наказ СЗЧ: Номер (8) + Дата (4)
+                                    ui.input(COLUMN_ORDER_ASSIGNMENT_NUMBER).bind_value(person, 'o_ass_num').classes('col-span-12 sm:col-span-8')
+                                    date_input(COLUMN_ORDER_ASSIGNMENT_DATE, person, 'o_ass_date', blur_handler=fix_date).classes('col-span-12 sm:col-span-4')
 
-                                with ui.row().classes('w-full gap-4 mt-2 sm:mt-4 flex-wrap items-center'):
-                                    ui.input(COLUMN_ORDER_RESULT_NUMBER).bind_value(person, 'o_res_num').classes('w-full sm:flex-grow')
-                                    date_input(COLUMN_ORDER_RESULT_DATE, person, 'o_res_date', blur_handler=fix_date).classes('w-full sm:w-1/3')
+                                    # Наказ Повернення: Номер (8) + Дата (4)
+                                    ui.input(COLUMN_ORDER_RESULT_NUMBER).bind_value(person, 'o_res_num').classes('col-span-12 sm:col-span-8')
+                                    date_input(COLUMN_ORDER_RESULT_DATE, person, 'o_res_date', blur_handler=fix_date).classes('col-span-12 sm:col-span-4')
 
-                                with ui.row().classes('w-full gap-4 mt-2 sm:mt-4 flex-wrap items-center'):
-                                    kpp_num = ui.input(COLUMN_KPP_NUMBER).bind_value(person, 'kpp_num').classes('w-full sm:flex-grow')
-                                    kpp_date = date_input(COLUMN_KPP_DATE, person, 'kpp_date', blur_handler=fix_date).classes('w-full sm:w-1/3')
+                                    # КПП: Номер (8) + Дата (4)
+                                    kpp_num = ui.input(COLUMN_KPP_NUMBER).bind_value(person, 'kpp_num').classes('col-span-12 sm:col-span-8')
+                                    kpp_date = date_input(COLUMN_KPP_DATE, person, 'kpp_date', blur_handler=fix_date).classes('col-span-12 sm:col-span-4')
 
-                                with ui.row().classes('w-full gap-4 mt-2 sm:mt-4 flex-wrap items-center'):
-                                    ui.input(COLUMN_DBR_NUMBER).bind_value(person, 'dbr_num').classes('w-full sm:flex-grow')
-                                    date_input(COLUMN_DBR_DATE, person, 'dbr_date', blur_handler=fix_date).classes('w-full sm:w-1/3')
+                                    # ДБР: Номер (8) + Дата (4)
+                                    ui.input(COLUMN_DBR_NUMBER).bind_value(person, 'dbr_num').classes('col-span-12 sm:col-span-8')
+                                    date_input(COLUMN_DBR_DATE, person, 'dbr_date', blur_handler=fix_date).classes('col-span-12 sm:col-span-4')
 
-                            # Права колонка
+                            # --- ПРАВА КОЛОНКА (Дані ЄРДР) - Залишається як є ---
                             with ui.card().classes('w-full lg:w-[38%] p-4 sm:p-6 shadow-sm border border-gray-200 gap-0 flex-grow'):
                                 with ui.row().classes('items-center gap-2 mb-4 w-full border-b pb-2 flex-wrap'):
                                     ui.icon('policy', size='sm', color='blue-600')
@@ -458,6 +474,5 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
                                 ui.textarea(COLUMN_ERDR_NOTATION).bind_value(person, 'erdr_notation').classes('w-full').props('filled autogrow')
 
                                 ui.textarea(COLUMN_NOTATION).bind_value(person, 'notation').classes('w-full min-h-[200px] sm:min-h-[300px] mt-4')
-
     dialog.open()
     return dialog
