@@ -1041,6 +1041,7 @@ class ExcelReporter:
             'in_search': in_search,
             'returned': returned,
             'res_returned': res_returned,
+            'returned_all': returned + res_returned,
             'in_disposal': 0
         }]
 

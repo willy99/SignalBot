@@ -48,7 +48,8 @@ def render_home_page(auth_manager:AuthManager, report_ctrl: ReportController):
 
                         stat_item('Здійснили СЗЧ', stats['total_awol'])
                         stat_item('В розшуку', stats['in_search'], 'red-600')
-                        stat_item('Повернулися', stats['returned'], 'green-600')
+                        stat_item('Повернулися', stats['returned'] + stats['res_returned'], 'green-600')
+                        stat_item('В В/Ч', stats['returned'], 'green-600')
                         stat_item('В БРЕЗ', stats['res_returned'], 'green-600')
                         stat_item('В розпорядженні', stats['in_disposal'])
 

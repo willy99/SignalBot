@@ -312,7 +312,8 @@ def render_daily_report_page(report_ctrl: ReportController, task_ctrl: TaskContr
                     cmd_cols = [
                         {'name': 'total_awol', 'label': 'Здійснили СЗЧ', 'field': 'total_awol', 'align': 'center', 'classes': 'text-xl font-bold'},
                         {'name': 'in_search', 'label': 'Знаходяться в розшуку', 'field': 'in_search', 'align': 'center', 'classes': 'text-xl font-bold text-red-600'},
-                        {'name': 'returned', 'label': 'Повернулися з СЗЧ', 'field': 'returned', 'align': 'center', 'classes': 'text-xl font-bold text-green-600'},
+                        {'name': 'returned_all', 'label': 'Повернулися з СЗЧ', 'field': 'returned_all', 'align': 'center', 'classes': 'text-xl font-bold text-green-600'},
+                        {'name': 'returned', 'label': 'Повернулися в В/Ч', 'field': 'returned', 'align': 'center', 'classes': 'text-xl font-bold text-green-600'},
                         {'name': 'res_returned', 'label': 'Повернулися в БРЕЗ', 'field': 'res_returned', 'align': 'center', 'classes': 'text-xl font-bold text-green-600'},
                         {'name': 'in_disposal', 'label': 'Перебувають в розпорядженні', 'field': 'in_disposal', 'align': 'center', 'classes': 'text-xl font-bold'},
                     ]
