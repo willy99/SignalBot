@@ -59,18 +59,15 @@ class AppMenu:
         # ==========================================
         # 📱 МОБІЛЬНЕ МЕНЮ (БОКОВА ПАНЕЛЬ - DRAWER)
         # ==========================================
-        # Drawer створюється до Header, але він "прикріплений" до правої частини екрану
         with ui.right_drawer(fixed=True).props('bordered').classes('bg-slate-50 p-0') as mobile_drawer:
-            mobile_drawer.hide()  # За замовчуванням сховано
+            mobile_drawer.hide()
 
-            # Шапка профілю в мобільному меню
             with ui.row().classes('w-full bg-slate-800 p-4 items-center gap-3 m-0'):
                 ui.icon('account_circle', size='md', color='white')
                 with ui.column().classes('gap-0'):
                     ui.label(user_name).classes('text-white font-bold text-sm')
                     ui.label(user_role).classes('text-slate-400 text-xs')
 
-            # Хелпер для створення кнопок всередині "гармошки"
             def make_mobile_item(title: str, icon_name: str, route: str):
                 ui.button(title, icon=icon_name, on_click=lambda: ui.navigate.to(route)) \
                     .props('flat align="left"').classes('w-full no-caps text-gray-700 ml-2 font-medium')
@@ -146,7 +143,7 @@ class AppMenu:
         # ==========================================
         with ui.header().classes('bg-slate-800 items-center justify-between px-2 sm:px-4'):
 
-            # --- ЛІВА ЧАСТИНА (Логотип + Синхронізація) ---
+            # --- ЛІВА ЧАСТИНА ---
             with ui.row().classes('items-center gap-1 sm:gap-2 flex-nowrap'):
                 if config.IS_DEV:
                     title = 'DEVMODE!'
@@ -155,7 +152,6 @@ class AppMenu:
                     title = '🏃‍♂️' + PROJECT_TITLE + ' 👨‍🚀'
                     props = 'flat'
 
-                # На дуже малих екранах текст може бути трохи меншим
                 ui.button(title, on_click=lambda: ui.navigate.to('/')) \
                     .props(props).classes('font-bold text-md sm:text-xl text-white normal-case shrink-0')
 
@@ -177,10 +173,9 @@ class AppMenu:
                         finally:
                             sync_btn.classes(remove='animate-spin')
 
-            # --- ПРАВА ЧАСТИНА (Іконки сповіщень + Десктоп Меню + Гамбургер) ---
+            # --- ПРАВА ЧАСТИНА ---
             with ui.row().classes('items-center gap-1 sm:gap-2 flex-nowrap'):
 
-                # 1. ІКОНКА INBOX (Завжди видима)
                 with ui.button(icon='mail', on_click=lambda: ui.navigate.to('/inbox')).props('flat round color="white"') as inbox_btn:
                     badge_personal = ui.badge(color='red').props('floating rounded').classes('text-[10px] font-bold')
                     badge_personal.set_visibility(False)
@@ -204,7 +199,6 @@ class AppMenu:
                     ui.timer(config.CHECK_INBOX_EVERY_SEC, update_inbox)
                     ui.timer(0.1, update_inbox, once=True)
 
-                # 2. ІКОНКА ЗАДАЧ (Завжди видима)
                 with ui.button(icon='assignment', on_click=lambda: ui.navigate.to('/tasks/today')).props('flat color=white'):
                     badge_new = ui.badge(color='red').props('floating rounded').classes('text-[10px] font-bold')
                     badge_new.set_visibility(False)
@@ -245,7 +239,7 @@ class AppMenu:
                     ui.timer(0.1, update_my_tasks, once=True)
 
                 # ==========================================
-                # 🖥 ДЕСКТОПНЕ МЕНЮ (ХОВАЄТЬСЯ НА МОБІЛЬНИХ lg:hidden -> hidden lg:flex)
+                # 🖥 ДЕСКТОПНЕ МЕНЮ (Використовуємо надійний клас gt-sm)
                 # ==========================================
                 def make_menu_item(title: str, icon_name: str, route: str):
                     with ui.menu_item(on_click=lambda: ui.navigate.to(route)):
@@ -258,8 +252,8 @@ class AppMenu:
                     with ui.menu_item().props('disabled').classes('q-py-none'):
                         ui.label(title).classes('text-xs font-bold text-gray-500 uppercase tracking-wider ml-1')
 
-                # Огортаємо всі пункти десктопного меню у hidden lg:flex (видимо тільки на екранах > 1024px)
-                with ui.row().classes('hidden lg:flex items-center gap-1'):
+                # Замість 'hidden lg:flex' використовуємо 'gt-sm' (видимо тільки на планшетах і ПК)
+                with ui.row().classes('gt-sm items-center gap-1'):
 
                     if can_search_person:
                         with ui.button('Пошук', icon='search').props('flat text-white icon-right="expand_more"'):
@@ -300,7 +294,7 @@ class AppMenu:
                                 if can_report_general:
                                     make_menu_label('Аналітика та прогнози')
                                     make_menu_item('Загальний стан', 'fact_check', '/report_general_state')
-                                    make_menu_item('Теплова карта СЗЧ', 'gradient', '/report_heatmap')
+                                    make_mobile_item('Теплова карта СЗЧ', 'gradient', '/report_heatmap')
                                     make_menu_item('Помісячна дінамика', 'ssid_chart', '/report_monthly')
                                 if can_report_general or can_report_general_edit:
                                     make_menu_label('Приводимо в порядок (БД)')
@@ -342,9 +336,10 @@ class AppMenu:
                                     ui.label('Вийти з системи')
 
                 # ==========================================
-                # 🍔 КНОПКА ГАМБУРГЕР (Видима ТІЛЬКИ на мобільних lg:hidden)
+                # 🍔 КНОПКА ГАМБУРГЕР (Використовуємо надійний клас lt-md)
                 # ==========================================
-                ui.button(icon='menu', on_click=mobile_drawer.toggle).props('flat round color="white"').classes('lg:hidden ml-1')
+                # Замість 'lg:hidden' використовуємо 'lt-md' (видимо тільки на мобільних)
+                ui.button(icon='menu', on_click=mobile_drawer.toggle).props('flat round color="white"').classes('lt-md ml-1')
 
         inject_watermark()
 
