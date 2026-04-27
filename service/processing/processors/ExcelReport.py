@@ -1409,6 +1409,7 @@ class ExcelReporter:
             ret_date_idx = self.excelProcessor.header.get(COLUMN_RETURN_DATE, 1) - 1
             ret_res_idx = self.excelProcessor.header.get(COLUMN_RETURN_TO_RESERVE_DATE, 1) - 1
             bio_idx = self.excelProcessor.header.get(COLUMN_BIO, 1) - 1
+            cond_idx = self.excelProcessor.header.get(COLUMN_DESERT_CONDITIONS, 1) - 1
             title_idx = self.excelProcessor.header.get(COLUMN_TITLE, 1) - 1
             service_type_idx = self.excelProcessor.header.get(COLUMN_SERVICE_TYPE, 1) - 1
             id_idx = self.excelProcessor.header.get(COLUMN_ID_NUMBER) - 1
@@ -1453,6 +1454,7 @@ class ExcelReporter:
                     inc = get_strint_fromfloat(row[inc_idx], "").strip()
                     pib = str(row[pib_idx]).strip() if row[pib_idx] else 'Не вказано'
                     bio = str(row[bio_idx]).strip() if row[bio_idx] else ''
+                    cond = str(row[cond_idx]).strip() if row[cond_idx] else ''
                     title = str(row[title_idx]).strip() if row[title_idx] else ''
                     service_type = str(row[service_type_idx]).strip() if row[service_type_idx] else ''
                     raw_id = get_strint_fromfloat(row[id_idx], "").strip()
@@ -1497,9 +1499,14 @@ class ExcelReporter:
                             if actual_birth and expected_birth.date() != actual_birth.date():
                                 errors.append({
                                     'row_idx': excel_row_num,
+                                    'id': row[inc_idx],
                                     'name': pib,
                                     'column': COLUMN_ID_NUMBER,
-                                    'error_desc': f'Невідповідність РНОКПП і Дати народження. {actual_birth.strftime(EXCEL_DATE_FORMAT)} != {expected_birth.strftime(EXCEL_DATE_FORMAT)}, ІПН: {raw_id}'
+                                    'error_desc': f'Невідповідність РНОКПП і Дати народження. {actual_birth.strftime(EXCEL_DATE_FORMAT)} != {expected_birth.strftime(EXCEL_DATE_FORMAT)}, ІПН: {raw_id}',
+                                    'suggested_col': COLUMN_BIRTHDAY,
+                                    'expected_val': f'{expected_birth.strftime(EXCEL_DATE_FORMAT)}',
+                                    'bio': bio,
+                                    'cond' : cond
                                 })
                         except (ValueError, TypeError):
                             pass
@@ -1509,9 +1516,14 @@ class ExcelReporter:
                     if audit_filter.check_critical_empty and len(row) > inc_idx and not row[inc_idx]:
                         errors.append({
                             'row_idx': excel_row_num,
+                            'id': row[inc_idx],
                             'name': pib,
                             'column': COLUMN_INCREMENTAL,
-                            'error_desc': 'Відсутній порядковий номер (№)'
+                            'error_desc': 'Відсутній порядковий номер (№)',
+                            'suggested_col': COLUMN_INCREMENTAL,
+                            'expected_val': '',
+                            'bio': bio,
+                            'cond': cond
                         })
 
                     # Парсимо дати
@@ -1529,48 +1541,72 @@ class ExcelReporter:
                     if audit_filter.check_future_dates and  des_dt and des_dt > today:
                         errors.append({
                             'row_idx': excel_row_num,
+                            'id': row[inc_idx],
                             'name': pib,
                             'column': COLUMN_DESERTION_DATE,
-                            'error_desc': f'Дата з майбутнього: {des_dt.strftime(EXCEL_DATE_FORMAT)}'
+                            'error_desc': f'Дата з майбутнього: {des_dt.strftime(EXCEL_DATE_FORMAT)}',
+                            'suggested_col': COLUMN_DESERTION_DATE,
+                            'expected_val': f'{des_dt.strftime(EXCEL_DATE_FORMAT)}',
+                            'bio': bio,
+                            'cond': cond
+
                         })
 
                     if audit_filter.check_future_dates and actual_ret_dt and actual_ret_dt > today:
                         errors.append({
                             'row_idx': excel_row_num,
+                            'id': row[inc_idx],
                             'name': pib,
                             'column': actual_ret_col,
-                            'error_desc': f'Дата з майбутнього: {actual_ret_dt.strftime(EXCEL_DATE_FORMAT)}'
+                            'error_desc': f'Дата з майбутнього: {actual_ret_dt.strftime(EXCEL_DATE_FORMAT)}',
+                            'bio': bio,
+                            'cond': cond
+
                         })
 
                     # 3. Перевірка: СЗЧ пізніше за Повернення
                     if audit_filter.check_date_logic and des_dt and actual_ret_dt and des_dt > actual_ret_dt:
                         errors.append({
                             'row_idx': excel_row_num,
+                            'id': row[inc_idx],
                             'name': pib,
                             'column': f"{COLUMN_DESERTION_DATE} / Повернення",
-                            'error_desc': f'Нелогічна послідовність: СЗЧ ({des_dt.strftime(EXCEL_DATE_FORMAT)}) після повернення ({actual_ret_dt.strftime(EXCEL_DATE_FORMAT)})'
+                            'error_desc': f'Нелогічна послідовність: СЗЧ ({des_dt.strftime(EXCEL_DATE_FORMAT)}) після повернення ({actual_ret_dt.strftime(EXCEL_DATE_FORMAT)})',
+                            'bio': bio,
+                            'cond': cond
+
                         })
 
                     # 4. Перевірка відповідності колонок до БІО
                     expected_title = extract_title(bio)
-                    expected_service_type = extract_service_type(bio)
+                    expected_service_type = extract_service_type(bio, cond)
                     if audit_filter.check_title and expected_title != title and expected_title and title and bio:
                         errors.append({
                             'row_idx': excel_row_num,
+                            'id': row[inc_idx],
                             'name': pib,
                             'column': f"{COLUMN_TITLE}",
-                            'error_desc': f'Невірно видрано звання: ({title}, з БІО: {expected_title})'
+                            'error_desc': f'Невірно видрано звання: ({title}, з БІО: {expected_title})',
+                            'suggested_col': COLUMN_TITLE,
+                            'expected_val': f'{expected_title}',
+                            'bio': bio,
+                            'cond': cond
+
                         })
 
-                    if audit_filter.check_service_type and expected_service_type != service_type and expected_service_type and service_type:
+                    if audit_filter.check_service_type and expected_service_type != service_type and expected_service_type and service_type and bio:
                         errors.append({
                             'row_idx': excel_row_num,
+                            'id': row[inc_idx],
                             'name': pib,
                             'column': f"{COLUMN_SERVICE_TYPE}",
-                            'error_desc': f'Невірно видрано вид служби: ({service_type}, з БІО: {expected_service_type})'
+                            'error_desc': f'Невірно видрано вид служби: ({service_type}, з БІО: {expected_service_type})',
+                            'suggested_col': COLUMN_SERVICE_TYPE,
+                            'expected_val': f'{expected_service_type}',
+                            'bio': bio,
+                            'cond': cond
+
                         })
-
-
 
             except Exception as e:
                 self.logger.error(f"❌ Помилка під час пошуку аномалій в Excel: {e}")

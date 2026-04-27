@@ -135,7 +135,7 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
         person.rnokpp = extract_id_number(person.bio)
         person.title = extract_title(person.bio)
         person.title2 = extract_title_2(person.title)
-        person.service_type = extract_service_type(person.bio)
+        person.service_type = extract_service_type(person.bio, person.desertion_conditions)
         person.subunit = extract_military_subunit(person.bio, mapping=PATTERN_SUBUNIT_MAPPING)
         person.subunit2 = extract_military_subunit(person.bio, mapping=PATTERN_SUBUNIT2_MAPPING)
         person.birthday = extract_birthday(person.bio)

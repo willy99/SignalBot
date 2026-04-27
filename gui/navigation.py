@@ -131,11 +131,13 @@ def init_nicegui(workflow_obj):
         app_menu.render(auth_manager)
         dups_report_view.render_duplicates_report_page(report_ctrl, auth_manager)
 
+    '''
     @ui.page('/report_error_birthday')
     @require_access(auth_manager, MODULE_REPORT_GENERAL, PERM_READ)
     def report_error_birthday():
         app_menu.render(auth_manager)
         error_birthday_report_view.render_inn_mismatch_page(report_ctrl, person_ctrl, auth_manager)
+    '''
 
     @ui.page('/error_audit')
     @require_access(auth_manager, MODULE_REPORT_GENERAL, PERM_READ)

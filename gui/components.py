@@ -311,15 +311,16 @@ class AppMenu:
                             # --- БЛОК 3: ПРИВОДИМО В ПОРЯДОК (Валідація) ---
                             if can_report_general or can_report_general_edit:
                                 make_menu_label('Приводимо в порядок (БД)')
+                                if can_report_general_edit:
+                                    if can_report_general:
+                                        make_menu_item('Пошук помилок', 'error', '/error_audit')
+
                                 if can_report_general:
                                     make_menu_item('Дублікати прізвищ', 'people_outline', '/report_name_dups')
                                 if can_report_general:
                                     make_menu_item('Чекаємо на ЄРДР', 'pending_actions', '/report_waiting_erdr')
-                                if can_report_general:
-                                    make_menu_item('Пошук помилок', 'error', '/error_audit')
 
                                 if can_report_general_edit:
-                                    make_menu_item('РНОКПП != Дата Нар.', 'free_cancellation', '/report_error_birthday')
                                     make_menu_item('ЄРДР КРАМ', 'library_books', '/report_erdr_kram')
                                     make_menu_item('Порівняння документів', 'difference', '/report_compare')
 

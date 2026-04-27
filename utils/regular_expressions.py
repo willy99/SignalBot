@@ -114,43 +114,53 @@ def extract_title(text):
     if not text:
         return NA
 
-    # Відрізаємо "Близьких родичів", щоб не захопити звання батька/брата
+    # ВІДРІЗАЄМО ХВІСТ: щоб не захопити звання в адресах чи родичах
     search_area = re.split(r'(?i)Адреса|Близькі\s+родичі', text, maxsplit=1)[0]
 
-    found_titles = set()
+    matches = []
 
-    # 1. Збираємо всі можливі звання з тексту
+    # 1. Знаходимо всі збіги та запам'ятовуємо їхні координати (індекси)
     for pattern, canonical_name in PATTERN_TITLE_MAPPING.items():
-        if re.search(pattern, search_area, re.IGNORECASE):
-            found_titles.add(canonical_name)
+        for m in re.finditer(pattern, search_area, re.IGNORECASE):
+            matches.append({
+                'start': m.start(),
+                'end': m.end(),
+                'text': m.group().strip(),
+                'canonical': canonical_name
+            })
 
-    if not found_titles:
+    if not matches:
         return NA
 
-    # 2. Видаляємо підрядки (напр., 'лейтенант' зникне, якщо є 'старший лейтенант')
-    # Це потрібно, бо регулярка 'лейтенант' спрацює на тексті "старший лейтенант"
-    filtered_titles = set()
-    for t1 in found_titles:
-        # Перевіряємо, чи не є t1 частиною якогось іншого більшого звання t2
-        is_substring = any(t1 != t2 and t1 in t2 for t2 in found_titles)
-        if not is_substring:
-            filtered_titles.add(t1)
+    # 2. Сортуємо збіги за порядком появи в тексті.
+    # Якщо два збіги починаються однаково (напр. "сержант" і "старший сержант"),
+    # першим піде той, що довший (щоб уникнути "відкушування" слів).
+    matches.sort(key=lambda x: (x['start'], -(x['end'] - x['start'])))
 
-    # 3. Вирішуємо конфлікт "майор vs військовослужбовець"
-    # Якщо знайдено більше одного звання, відкидаємо базові "заглушки"
-    if len(filtered_titles) > 1:
-        filtered_titles.discard('солдат')
-        filtered_titles.discard('матрос')
-        filtered_titles.discard('сержант')
-        filtered_titles.discard('офіцер')
+    # 3. Фільтруємо накладання (overlap)
+    # Щоб не було такого, що "сержант" знову знайшовся всередині "старшого сержанта"
+    filtered_matches = []
+    last_end = -1
+    for m in matches:
+        if m['start'] >= last_end:  # Якщо поточне слово йде ПІСЛЯ попереднього
+            filtered_matches.append(m)
+            last_end = m['end']
 
-    # 4. Повертаємо найточніше звання (якщо їх раптом кілька, беремо перше за пріоритетом мапінгу)
-    if filtered_titles:
-        for _, canonical in PATTERN_TITLE_MAPPING.items():
-            if canonical in filtered_titles:
-                return canonical
+    # Допоміжна функція: чи є знайдене слово загальним поняттям?
+    def is_generic(text_str):
+        t = text_str.lower()
+        return 'військ' in t or 'рядов' in t or 'рекрут' in t
 
-    return NA
+    # 4. ШУКАЄМО РЕЗУЛЬТАТ
+    # Йдемо по відфільтрованих званнях по порядку (зліва направо)
+    # Якщо бачимо перше КОНКРЕТНЕ звання - одразу повертаємо його.
+    for m in filtered_matches:
+        if not is_generic(m['text']):
+            return m['canonical']
+
+    # 5. Якщо всі знайдені слова виявилися загальними ("військовослужбовець", "рядовий")
+    # повертаємо найперше з них (воно сконвертується у 'солдат' через мапінг).
+    return filtered_matches[0]['canonical']
 
 def extract_title_2(canonical_title):
     if canonical_title is None: return NA
@@ -222,10 +232,14 @@ def extract_phone(text):
             return digits[-10:]
     return NA
 
-def extract_service_type(text):
+def extract_service_type(bio, cond):
     for pattern, result in PATTERN_SERVICE_TYPE_MAPPING.items():
-        if re.search(pattern, text, re.IGNORECASE):
+        if re.search(pattern, bio, re.IGNORECASE):
             return result
+    for pattern, result in PATTERN_SERVICE_TYPE_MAPPING.items():
+        if re.search(pattern, cond, re.IGNORECASE):
+            return result
+
     return DEFAULT_SERVICE_TYPE # default
 
 

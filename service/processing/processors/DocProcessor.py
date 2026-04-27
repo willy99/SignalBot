@@ -68,46 +68,46 @@ class DocProcessor:
             col.COLUMN_MIL_UNIT: DEFAULT_MIL_UNIT,
         }
 
-        text = text_pieces[self.__PIECE_HEADER]
-        if text is not None:
-            fields[col.COLUMN_MIL_UNIT] = extract_mil_unit(text)
+        header_text = text_pieces[self.__PIECE_HEADER]
+        if header_text is not None:
+            fields[col.COLUMN_MIL_UNIT] = extract_mil_unit(header_text)
 
-        text = text_pieces[self.__PIECE_1]
+        cond_text = text_pieces[self.__PIECE_1]
 
-        if text is not None:
-            fields[col.COLUMN_DESERT_CONDITIONS] = extract_desert_conditions(text)
+        if cond_text is not None:
+            fields[col.COLUMN_DESERT_CONDITIONS] = extract_desert_conditions(cond_text)
             fields[col.COLUMN_DESERTION_DATE] = extract_desertion_date(fields[col.COLUMN_DESERT_CONDITIONS])
-            fields[col.COLUMN_DESERTION_PLACE] = extract_desertion_place(clean_text(text), get_file_name(self.original_filename))
+            fields[col.COLUMN_DESERTION_PLACE] = extract_desertion_place(clean_text(cond_text), get_file_name(self.original_filename))
             fields[col.COLUMN_DESERTION_REGION] = extract_desertion_region(fields[col.COLUMN_DESERT_CONDITIONS])
             fields[col.COLUMN_RETURN_DATE] = extract_return_date(fields[col.COLUMN_DESERT_CONDITIONS])
-            fields[col.COLUMN_DESERTION_TYPE] = extract_desertion_type(text, fields[col.COLUMN_DESERTION_PLACE])
+            fields[col.COLUMN_DESERTION_TYPE] = extract_desertion_type(cond_text, fields[col.COLUMN_DESERTION_PLACE])
             fields[col.COLUMN_CC_ARTICLE] = extract_cc_article(fields[col.COLUMN_DESERTION_TYPE])
             if self._check_return_sign(text_pieces[self.__PIECE_1]):
-                fields[col.COLUMN_RETURN_DATE] = extract_return_date(text) or fields[col.COLUMN_DESERTION_DATE]
+                fields[col.COLUMN_RETURN_DATE] = extract_return_date(cond_text) or fields[col.COLUMN_DESERTION_DATE]
                 fields[col.COLUMN_DESERTION_DATE] = NA
                 fields[col.COLUMN_DESERTION_REGION] = NA
                 fields[col.COLUMN_DESERTION_PLACE] = NA
                 # fields[col.COLUMN_DESERTION_TYPE] = fields[col.COLUMN_DESERTION_PLACE]
             self.logger.debug('--- ' + COLUMN_RETURN_DATE + ':' + str(fields[col.COLUMN_RETURN_DATE]))
 
-        text = text_pieces[self.__PIECE_3]
-        ml_extracted = self.ml_parser.parse_text(text)
-        if text is not None:
-            fields[col.COLUMN_NAME] = self.get_best_match(ml_extracted.get(col.COLUMN_NAME), extract_name(clean_text(text)))
-            fields[col.COLUMN_ID_NUMBER] = self.get_best_match(ml_extracted.get(col.COLUMN_ID_NUMBER), extract_id_number(text))
-            fields[col.COLUMN_TZK] = extract_rtzk(clean_text(text))
-            fields[col.COLUMN_PHONE] = self.get_best_match(ml_extracted.get(col.COLUMN_PHONE), extract_phone(text))
-            fields[col.COLUMN_BIRTHDAY] = self.get_best_match(ml_extracted.get(col.COLUMN_BIRTHDAY), extract_birthday(text))
-            fields[col.COLUMN_TITLE] = extract_title(text)
+        bio_text = text_pieces[self.__PIECE_3]
+        ml_extracted = self.ml_parser.parse_text(bio_text)
+        if bio_text is not None:
+            fields[col.COLUMN_NAME] = self.get_best_match(ml_extracted.get(col.COLUMN_NAME), extract_name(clean_text(bio_text)))
+            fields[col.COLUMN_ID_NUMBER] = self.get_best_match(ml_extracted.get(col.COLUMN_ID_NUMBER), extract_id_number(bio_text))
+            fields[col.COLUMN_TZK] = extract_rtzk(clean_text(bio_text))
+            fields[col.COLUMN_PHONE] = self.get_best_match(ml_extracted.get(col.COLUMN_PHONE), extract_phone(bio_text))
+            fields[col.COLUMN_BIRTHDAY] = self.get_best_match(ml_extracted.get(col.COLUMN_BIRTHDAY), extract_birthday(bio_text))
+            fields[col.COLUMN_TITLE] = extract_title(bio_text)
             fields[col.COLUMN_TITLE_2] = extract_title_2(fields[col.COLUMN_TITLE])
-            fields[col.COLUMN_SERVICE_TYPE] = self.get_best_match(ml_extracted.get(col.COLUMN_SERVICE_TYPE), extract_service_type(text))
-            fields[col.COLUMN_ADDRESS] = self.get_best_match(ml_extracted.get(col.COLUMN_ADDRESS), extract_address(clean_text(text)))
+            fields[col.COLUMN_SERVICE_TYPE] = self.get_best_match(ml_extracted.get(col.COLUMN_SERVICE_TYPE), extract_service_type(bio_text, cond_text))
+            fields[col.COLUMN_ADDRESS] = self.get_best_match(ml_extracted.get(col.COLUMN_ADDRESS), extract_address(clean_text(bio_text)))
             fields[col.COLUMN_TZK_REGION] = extract_region(fields[col.COLUMN_TZK])
             if fields[col.COLUMN_TZK_REGION] == NA:
                 fields[col.COLUMN_TZK_REGION] = extract_region(fields[col.COLUMN_ADDRESS])
-            fields[col.COLUMN_BIO] = self.get_best_match(ml_extracted.get(col.COLUMN_BIO), extract_bio(clean_text(text), fields[col.COLUMN_NAME]))
-            fields[col.COLUMN_ENLISTMENT_DATE] = self.get_best_match(ml_extracted.get(col.COLUMN_ENLISTMENT_DATE), extract_conscription_date(text))
-            fields[col.COLUMN_SUBUNIT] = self.get_best_match(ml_extracted.get(col.COLUMN_SUBUNIT), extract_military_subunit(text, get_file_name(self.original_filename)))
+            fields[col.COLUMN_BIO] = self.get_best_match(ml_extracted.get(col.COLUMN_BIO), extract_bio(clean_text(bio_text), fields[col.COLUMN_NAME]))
+            fields[col.COLUMN_ENLISTMENT_DATE] = self.get_best_match(ml_extracted.get(col.COLUMN_ENLISTMENT_DATE), extract_conscription_date(bio_text))
+            fields[col.COLUMN_SUBUNIT] = self.get_best_match(ml_extracted.get(col.COLUMN_SUBUNIT), extract_military_subunit(bio_text, get_file_name(self.original_filename)))
             subunit2 = extract_military_subunit(text_pieces[self.__PIECE_3], get_file_name(self.original_filename), mapping=PATTERN_SUBUNIT2_MAPPING)
             if subunit2 is NA:
                 subunit2 = extract_military_subunit(text_pieces[self.__PIECE_1],get_file_name(self.original_filename), mapping=PATTERN_SUBUNIT2_MAPPING)
