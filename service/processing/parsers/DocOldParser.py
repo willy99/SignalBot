@@ -1,7 +1,7 @@
 import sys
 import subprocess
 import os
-import re
+import regex as re
 import shutil
 import tempfile
 

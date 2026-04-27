@@ -91,7 +91,6 @@ def main() -> None:
         workflow.initExcelProcessor(config.DESERTER_XLSX_FILE_PATH)
         workflow.excelProcessor.switch_to_sheet(config.DESERTER_TAB_NAME)
 
-        print('>>> clieng bot ' + str(config.SIGNAL_BOT))
         if config.SIGNAL_BOT:
             threading.Thread(target=run_async_bot, args=(workflow,), daemon=True).start()
         else:

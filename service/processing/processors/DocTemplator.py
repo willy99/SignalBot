@@ -115,6 +115,7 @@ class DocTemplator:
                 'NUMBER': raw.get('seq_num'),
                 'TITLE': title_gen.lower(),
                 'NAME': self._format_military_name(name_gen),
+                'RET': ', який повернувся на військову службу у в/ч А0224 ' if raw.get('return_date') is not None else '',
                 'TOTAL_PAGES': raw.get('total', 0)
             }
             formatted_docs.append(formatted_doc)

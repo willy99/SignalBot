@@ -2,7 +2,7 @@ from nicegui import ui
 import config
 from gui.services.auth_manager import AuthManager
 from service.storage.ErdrCacher import ErdrCacheManager
-import re
+import regex as re
 
 def render_erdr_search_page(erdr_cache_manager: ErdrCacheManager, auth_manager: AuthManager):
     # Завантажуємо кеш при відкритті сторінки

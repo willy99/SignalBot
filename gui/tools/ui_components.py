@@ -1,4 +1,4 @@
-import re
+import regex as re
 from nicegui import ui
 import config
 from dics.deserter_xls_dic import VALID_PATTERN_DATE

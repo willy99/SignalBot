@@ -13,8 +13,7 @@ from service.processing.processors.ExcelReport import ExcelReporter
 from service.storage.BackupData import BackupData
 from service.users.UserService import UserService
 import threading
-import re
-import html
+import regex as re
 
 class MyWorkFlow:
 

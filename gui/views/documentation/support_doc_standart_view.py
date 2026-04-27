@@ -12,7 +12,7 @@ import io
 from gui.controllers.person_controller import PersonController
 from gui.controllers.support_controller import SupportController
 from service.constants import DOC_STATUS_COMPLETED, DOC_STATUS_DRAFT, DOC_PACKAGE_STANDART
-import re
+import regex as re
 
 def render_support_standard_page(controller: SupportController, person_controller: PersonController,
                                  file_cache_manager: FileCacheManager, auth_manager: AuthManager, draft_id: int = None):
@@ -219,7 +219,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                     'clearable autofocus')
                 search_btn = ui.button('Шукати', icon='search').props('elevated color="primary"')
 
-            def update_badges(status_val, mil_unit_val, has_multiple_events=False):
+            def update_badges(status_val, mil_unit_val, ret_val, ret_res_val, has_multiple_events=False):
                 if not status_val:
                     review_status_badge.set_visibility(False)
                 else:
@@ -235,6 +235,14 @@ def render_support_standard_page(controller: SupportController, person_controlle
                 else:
                     mil_unit_badge.set_visibility(False)
 
+                if ret_val:
+                    ret_badge.set_visibility(True)
+                else:
+                    ret_badge.set_visibility(False)
+                if ret_res_val:
+                    ret_res_badge.set_visibility(True)
+                else:
+                    ret_res_badge.set_visibility(False)
                 if has_multiple_events:
                     multiple_events_badge.set_visibility(True)
                 else:
@@ -256,9 +264,9 @@ def render_support_standard_page(controller: SupportController, person_controlle
                     has_multiple = match_count > 1
 
                     name_gen_input.value = to_genitive_case(real_name)
-                    update_badges(person_data.get('review_status', ''), person_data.get('mil_unit', ''), has_multiple)
+                    update_badges(person_data.get('review_status', ''), person_data.get('mil_unit', ''), person_data.get('return_date', None), person_data.get('return_reserve_date', None),  has_multiple)
                 else:
-                    update_badges('', '', False)
+                    update_badges('', '', False, False,False)
 
             with ui.row().classes('w-full items-center gap-4 mb-4'):
                 person_select = ui.select(
@@ -277,6 +285,12 @@ def render_support_standard_page(controller: SupportController, person_controlle
 
                     mil_unit_badge = ui.badge('БРЕЗ', color='orange').classes('text-xs font-bold px-2 py-1 shadow-sm')
                     mil_unit_badge.set_visibility(False)
+
+                    ret_badge = ui.badge('↩️Повернення', color='cyan').classes('text-xs font-bold px-2 py-1 shadow-sm')
+                    ret_badge.set_visibility(False)
+
+                    ret_res_badge = ui.badge('↕️Повернення (БРЕЗ)', color='cyan').classes('text-xs font-bold px-2 py-1 shadow-sm')
+                    ret_res_badge.set_visibility(False)
 
                     multiple_events_badge = ui.badge('⚠️ Кілька епізодів СЗЧ!', color='purple').classes('text-xs font-bold px-2 py-1 shadow-sm')
                     multiple_events_badge.set_visibility(False)
@@ -309,6 +323,8 @@ def render_support_standard_page(controller: SupportController, person_controlle
                             'rnokpp': person.rnokpp,
                             'desertion_date': des_date_val,
                             'review_status': getattr(person, 'review_status', ''),
+                            'return_date': getattr(person, 'return_date', None),
+                            'return_reserve_date': getattr(person, 'return_reserve_date', None),
                             'title': title_val,
                             'mil_unit': mil_unit_val,
                             'id_number': id_num
@@ -362,7 +378,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                 person_select.visible = False
                 name_gen_input.value = ''
                 name_gen_input.visible = False
-                update_badges('', '', False)
+                update_badges('', '', False, False, False)
                 total_input.value = 0
                 update_btn_state()
 
@@ -408,6 +424,8 @@ def render_support_standard_page(controller: SupportController, person_controlle
                     'rnokpp': selected_person.get('rnokpp', ''),
                     'desertion_date': selected_person.get('desertion_date', ''),
                     'review_status': selected_person.get('review_status', ''),
+                    'return_date': selected_person.get('return_date', None),
+                    'return_reserve_date': selected_person.get('return_reserve_date', None),
                     'mil_unit': mil_unit_val,  # 💡 Зберігаємо у payload
                     'total': total_val
                 }
@@ -464,7 +482,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                 name_gen_input.value = doc.get('name_gen', to_genitive_case(doc['name']))
                 name_gen_input.visible = True
 
-                update_badges(doc.get('review_status', ''), mil_unit_val)
+                update_badges(doc.get('review_status', ''), mil_unit_val, doc.get('return_date'), doc.get('return_reserve_date'))
                 total_input.value = doc['total']
 
                 update_btn_state()
@@ -491,6 +509,10 @@ def render_support_standard_page(controller: SupportController, person_controlle
                                             ui.badge('ЄРДР', color='red').classes('text-[10px] px-1 py-0 w-min')
                                         if doc.get('mil_unit') == 'А7018':
                                             ui.badge('БРЕЗ', color='orange').classes('text-[10px] px-1 py-0 w-min')
+                                        if doc.get('return_date' is not None):
+                                            ui.badge('↩️Повернення', color='cyan').classes('text-[10px] px-1 py-0 w-min')
+                                        if doc.get('return_reserve_date' is not None):
+                                            ui.badge('↕️Повернення (БРЕЗ)', color='cyan').classes('text-[10px] px-1 py-0 w-min')
 
                                 with ui.row().classes('gap-1'):
                                     edit_button = ui.button(icon='edit', color='blue',

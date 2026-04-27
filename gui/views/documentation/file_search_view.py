@@ -2,7 +2,7 @@ from nicegui import ui, run
 import config
 from gui.services.auth_manager import AuthManager
 from service.storage.FileCacher import FileCacheManager
-import re
+import regex as re
 
 def render_file_search_page(file_cache_manager: FileCacheManager, auth_manager: AuthManager):
     file_cache_manager.load_cache()

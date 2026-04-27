@@ -7,6 +7,7 @@ from datetime import date, datetime
 
 from dics.security_config import PERM_READ, MODULE_ADMIN
 from dics.deserter_xls_dic import *
+from domain.audit_filter import AuditSearchFilter
 from domain.person_filter import PersonSearchFilter
 from gui.auth_routes import refresh_session_method
 from gui.services.auth_manager import AuthManager
@@ -81,6 +82,14 @@ class ReportController:
     def get_error_birthday_report(self, ctx: RequestContext, search_filter: PersonSearchFilter):
         self.logger.debug('UI:' + ctx.user_name + ': Генеруємо репорт дублікатів прізвищ в системі: ')
         results = self.reporter.get_inn_birthday_mismatch_report(search_filter)
+        return results
+
+    @refresh_session_method
+    def find_excel_anomalies(self, ctx: RequestContext, audit_filter: AuditSearchFilter):
+        self.logger.debug('UI:' + ctx.user_name + ': Генеруємо пошук загальних помилок в екселі: ')
+        results = {}
+        results[MIL_UNITS[0]] = self.reporter.find_excel_anomalies(audit_filter, sheet_name=config.DESERTER_TAB_NAME)
+        results[MIL_UNITS[1]] = self.reporter.find_excel_anomalies(audit_filter, sheet_name=config.DESERTER_RESERVE_TAB_NAME)
         return results
 
     @refresh_session_method

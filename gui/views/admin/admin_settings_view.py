@@ -1,5 +1,5 @@
 from nicegui import ui, run
-import re
+import regex as re
 from gui.controllers.config_controller import ConfigController
 from gui.services.auth_manager import AuthManager
 

@@ -4,8 +4,7 @@ from domain.person import Person
 import asyncio
 from gui.controllers.person_controller import PersonController
 from gui.services.auth_manager import AuthManager
-from gui.services.request_context import RequestContext
-import re
+import regex as re
 from gui.tools.ui_components import date_input, fix_date, confirm_delete_dialog
 from dics.security_config import MODULE_PERSON, PERM_DELETE, PERM_EDIT
 from datetime import datetime, timedelta

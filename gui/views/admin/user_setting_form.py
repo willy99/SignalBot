@@ -4,7 +4,7 @@ from dics.deserter_xls_dic import VALID_PATTERN_PHONE, VALID_PATTERN_EMAIL
 from domain.user import User
 from gui.services.auth_manager import AuthManager
 from gui.controllers.user_controller import UserController
-import re
+import regex as re
 
 
 def render_profile_settings(user_ctrl: UserController, auth_manager: AuthManager):

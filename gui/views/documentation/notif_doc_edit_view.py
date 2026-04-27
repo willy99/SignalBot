@@ -10,7 +10,7 @@ from dics.deserter_xls_dic import *
 from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED, DB_DATE_FORMAT
 from utils.utils import format_to_excel_date
 from gui.tools.validation import is_valid_doc_number
-import re
+import regex as re
 from gui.tools.ui_components import date_input, fix_date, mark_clean, mark_dirty, confirm_delete_dialog
 
 

@@ -1,4 +1,4 @@
-import re
+import regex as re
 from datetime import datetime
 from gui.services.request_context import RequestContext
 from service.storage.LoggerManager import LoggerManager

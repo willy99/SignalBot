@@ -1,5 +1,5 @@
 import spacy
-import re
+import regex as re
 from service.storage.LoggerManager import LoggerManager
 
 class MLParser:

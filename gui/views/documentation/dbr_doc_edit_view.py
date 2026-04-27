@@ -13,7 +13,7 @@ from service.constants import DOC_STATUS_DRAFT, DOC_STATUS_COMPLETED
 from gui.tools.validation import is_number, is_valid_doc_number
 from utils.utils import format_to_excel_date
 from gui.tools.ui_components import date_input, fix_date, confirm_delete_dialog
-import re
+import regex as re
 
 
 def render_dbr_page(dbr_ctrl: DbrController, person_ctrl: PersonController, file_cache_manager: FileCacheManager,

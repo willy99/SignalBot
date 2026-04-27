@@ -1,5 +1,5 @@
 from datetime import datetime
-import re
+import regex as re
 from dics.deserter_xls_dic import VALID_PATTERN_DOC_NUM
 
 def is_number(s):

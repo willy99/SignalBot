@@ -6,7 +6,7 @@ from gui.controllers.task_controller import TaskController
 from gui.services.auth_manager import AuthManager
 import config
 import os
-import re
+import regex as re
 from gui.tools.ui_components import confirm_delete_dialog
 from service.processing.parsers.ParserFactory import ParserFactory
 from domain.person import Person

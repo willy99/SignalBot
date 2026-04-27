@@ -23,6 +23,7 @@ from gui.views.report import subunits_report_view
 from gui.views.report import yearly_report_view
 from gui.views.report import dups_report_view
 from gui.views.report import error_birthday_report_view
+from gui.views.report import error_audit_view
 from gui.views.report import waiting_for_erdr_report_view
 from gui.views.report.erdr_kram_report_view import render_erdr_kram_page
 from gui.views.report.compare_report_view import render_compare_report_page
@@ -135,6 +136,12 @@ def init_nicegui(workflow_obj):
     def report_error_birthday():
         app_menu.render(auth_manager)
         error_birthday_report_view.render_inn_mismatch_page(report_ctrl, person_ctrl, auth_manager)
+
+    @ui.page('/error_audit')
+    @require_access(auth_manager, MODULE_REPORT_GENERAL, PERM_READ)
+    def report_error_audit():
+        app_menu.render(auth_manager)
+        error_audit_view.render_audit_page(report_ctrl, person_ctrl, auth_manager)
 
 
     @ui.page('/report_waiting_erdr')

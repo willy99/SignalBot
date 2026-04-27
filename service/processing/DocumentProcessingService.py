@@ -1,10 +1,8 @@
 # service/processing/DocumentProcessingService.py
-import logging
 import os
 import config
 from dics.deserter_xls_dic import COLUMN_NAME
 from service.processing.processors.DocProcessor import DocProcessor
-from service.storage.LoggerManager import LoggerManager
 from utils.utils import get_effective_date
 import unicodedata
 import traceback

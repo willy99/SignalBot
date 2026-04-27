@@ -2,7 +2,7 @@ import sqlite3
 from contextlib import closing
 import config
 import os
-import re
+import regex as re
 import threading
 
 from service.constants import DB_ALLOWED_TABLES

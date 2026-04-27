@@ -13,7 +13,7 @@ import io
 from gui.controllers.person_controller import PersonController
 from gui.controllers.support_controller import SupportController
 from service.constants import DOC_STATUS_COMPLETED, DOC_STATUS_DRAFT, DOC_PACKAGE_DETAILED
-import re
+import regex as re
 
 DEF_NOTIF, DEF_ASSIGN, DEF_RESULT = 1, 3, 3
 DEF_ACT, DEF_EXPL, DEF_CHAR = 4, 4, 2

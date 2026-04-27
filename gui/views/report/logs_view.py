@@ -1,5 +1,5 @@
 import os
-import re
+import regex as re
 from nicegui import ui
 import config
 import html

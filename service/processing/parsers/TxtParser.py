@@ -1,6 +1,6 @@
 from .BaseFileParser import BaseFileParser
 import os
-import re
+import regex as re
 
 class TxtParser(BaseFileParser):
     def get_full_text(self) -> str:

@@ -1,7 +1,7 @@
 import config
 from typing import List
 from domain.sys_config import SysConfig
-import re
+import regex as re
 
 class ConfigService:
     """

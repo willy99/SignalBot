@@ -3,6 +3,9 @@ from typing import Any, Optional
 import traceback
 import config
 from collections import defaultdict
+
+from config import EXCEL_DATE_FORMAT
+from domain.audit_filter import AuditSearchFilter
 from service.processing.DocumentProcessingService import DocumentProcessingService
 from service.processing.processors.ExcelProcessor import ExcelProcessor
 from service.storage.LoggerManager import LoggerManager
@@ -1372,6 +1375,8 @@ class ExcelReporter:
                 if has_return:
                     # Беремо дату повернення для таймлайну
                     r_dt = datetime.strptime(format_to_excel_date(row[ret_date_idx] or row[ret_res_idx]), config.EXCEL_DATE_FORMAT)
+                    if r_dt and r_dt > datetime.now():
+                        print('>>> later than today ' + str(r_dt))
                     if r_dt:
                         key = r_dt.strftime('%Y-%m')
                         stats[key]['returned'] += 1
@@ -1386,3 +1391,188 @@ class ExcelReporter:
             'awol_counts': [stats[k]['awol'] for k in sorted_keys],
             'ret_counts': [stats[k]['returned'] for k in sorted_keys]
         }
+
+
+    # audit report
+    def find_excel_anomalies(self, audit_filter: AuditSearchFilter, sheet_name=config.DESERTER_TAB_NAME):
+        """
+        Сканує Excel на наявність логічних помилок у даних.
+        Повертає список словників для таблиці UI.
+        """
+        with self.excelProcessor.lock:
+            self.excelProcessor.switch_to_sheet(sheet_name, silent=True)
+
+            # Отримуємо індекси (0-based для масиву)
+            inc_idx = self.excelProcessor.header.get(COLUMN_INCREMENTAL, 1) - 1
+            pib_idx = self.excelProcessor.header.get(COLUMN_NAME, 1) - 1
+            des_date_idx = self.excelProcessor.header.get(COLUMN_DESERTION_DATE, 1) - 1
+            ret_date_idx = self.excelProcessor.header.get(COLUMN_RETURN_DATE, 1) - 1
+            ret_res_idx = self.excelProcessor.header.get(COLUMN_RETURN_TO_RESERVE_DATE, 1) - 1
+            bio_idx = self.excelProcessor.header.get(COLUMN_BIO, 1) - 1
+            title_idx = self.excelProcessor.header.get(COLUMN_TITLE, 1) - 1
+            service_type_idx = self.excelProcessor.header.get(COLUMN_SERVICE_TYPE, 1) - 1
+            id_idx = self.excelProcessor.header.get(COLUMN_ID_NUMBER) - 1
+            birth_idx = self.excelProcessor.header.get(COLUMN_BIRTHDAY) - 1
+            ins_date_idx = self.excelProcessor.header.get(COLUMN_INSERT_DATE, 1) - 1
+
+            q_ins_year = audit_filter.ins_year
+
+            errors = []
+            today = datetime.now().date()
+
+            try:
+                last_row = self.excelProcessor.get_last_row()
+                if last_row < 2:
+                    return []
+
+                data = self.excelProcessor.sheet.range(f"A2:BB{last_row}").value
+
+                # Допоміжна функція для безпечного парсингу дат
+                def safe_parse_date(val):
+                    if not val:
+                        return None
+                    if isinstance(val, (datetime, date)):
+                        return val.date() if isinstance(val, datetime) else val
+                    try:
+                        dt_str = format_to_excel_date(val)
+                        return datetime.strptime(dt_str, EXCEL_DATE_FORMAT).date()
+                    except:
+                        return None
+
+                base_date = datetime(1899, 12, 31)
+                for i, row in enumerate(data):
+                    if not row: continue
+
+                    # Excel починається з 1, плюс заголовок, тому рядок даних = індекс + 2
+                    excel_row_num = i + 2
+
+                    # Ігноруємо повністю порожні рядки (якщо немає ні ПІБ, ні №)
+                    if not row[pib_idx] and not row[inc_idx]:
+                        continue
+
+                    inc = get_strint_fromfloat(row[inc_idx], "").strip()
+                    pib = str(row[pib_idx]).strip() if row[pib_idx] else 'Не вказано'
+                    bio = str(row[bio_idx]).strip() if row[bio_idx] else ''
+                    title = str(row[title_idx]).strip() if row[title_idx] else ''
+                    service_type = str(row[service_type_idx]).strip() if row[service_type_idx] else ''
+                    raw_id = get_strint_fromfloat(row[id_idx], "").strip()
+                    raw_birth = row[birth_idx]
+
+                    # filtering date
+                    ins_date_val = row[ins_date_idx]
+                    ins_date_year = None
+                    ins_date_str = ""
+
+                    if isinstance(ins_date_val, (datetime, date)):
+                        ins_date_year = str(ins_date_val.year)
+                        ins_date_str = ins_date_val.strftime(config.EXCEL_DATE_FORMAT)
+                    elif ins_date_val:
+                        ins_date_str = str(ins_date_val).strip()
+                        if len(ins_date_str) >= 4:
+                            ins_date_year = ins_date_str[-4:]
+
+                    match_des_year = True
+                    if q_ins_year:
+                        if isinstance(q_ins_year, list):
+                            match_des_year = (ins_date_year in q_ins_year)
+                        else:
+                            match_des_year = (ins_date_year == str(q_ins_year))
+
+                    if not match_des_year: continue
+
+                    if audit_filter.check_rnokpp_dob:
+                        try:
+                            # 1. Вираховуємо дату з перших 5 цифр ІПН
+                            days_offset = int(raw_id[:5])
+                            expected_birth = base_date + timedelta(days=days_offset)
+
+                            # 2. Отримуємо фактичну дату з таблиці
+                            actual_birth = None
+                            if isinstance(raw_birth, datetime):
+                                actual_birth = raw_birth
+                            elif isinstance(raw_birth, (int, float)):  # Excel іноді віддає числом
+                                actual_birth = base_date + timedelta(days=int(raw_birth))
+
+                            # 3. Порівнюємо (тільки дату, без часу)
+                            if actual_birth and expected_birth.date() != actual_birth.date():
+                                errors.append({
+                                    'row_idx': excel_row_num,
+                                    'name': pib,
+                                    'column': COLUMN_ID_NUMBER,
+                                    'error_desc': f'Невідповідність РНОКПП і Дати народження. {actual_birth.strftime(EXCEL_DATE_FORMAT)} != {expected_birth.strftime(EXCEL_DATE_FORMAT)}, ІПН: {raw_id}'
+                                })
+                        except (ValueError, TypeError):
+                            pass
+
+
+                    # 1. Перевірка на порожній № (Incremental ID)
+                    if audit_filter.check_critical_empty and len(row) > inc_idx and not row[inc_idx]:
+                        errors.append({
+                            'row_idx': excel_row_num,
+                            'name': pib,
+                            'column': COLUMN_INCREMENTAL,
+                            'error_desc': 'Відсутній порядковий номер (№)'
+                        })
+
+                    # Парсимо дати
+                    des_dt = safe_parse_date(row[des_date_idx]) if len(row) > des_date_idx else None
+                    ret_dt = safe_parse_date(row[ret_date_idx]) if len(row) > ret_date_idx else None
+                    ret_res_dt = safe_parse_date(row[ret_res_idx]) if len(row) > ret_res_idx else None
+                    # Визначаємо, яка саме дата повернення заповнена
+                    actual_ret_dt = ret_dt or ret_res_dt
+                    if actual_ret_dt and actual_ret_dt.year == 2020: # КОСТИЛЬ
+                        actual_ret_dt = None
+
+                    actual_ret_col = COLUMN_RETURN_DATE if ret_dt else COLUMN_RETURN_TO_RESERVE_DATE
+
+                    # 2. Перевірка на дати з майбутнього
+                    if audit_filter.check_future_dates and  des_dt and des_dt > today:
+                        errors.append({
+                            'row_idx': excel_row_num,
+                            'name': pib,
+                            'column': COLUMN_DESERTION_DATE,
+                            'error_desc': f'Дата з майбутнього: {des_dt.strftime(EXCEL_DATE_FORMAT)}'
+                        })
+
+                    if audit_filter.check_future_dates and actual_ret_dt and actual_ret_dt > today:
+                        errors.append({
+                            'row_idx': excel_row_num,
+                            'name': pib,
+                            'column': actual_ret_col,
+                            'error_desc': f'Дата з майбутнього: {actual_ret_dt.strftime(EXCEL_DATE_FORMAT)}'
+                        })
+
+                    # 3. Перевірка: СЗЧ пізніше за Повернення
+                    if audit_filter.check_date_logic and des_dt and actual_ret_dt and des_dt > actual_ret_dt:
+                        errors.append({
+                            'row_idx': excel_row_num,
+                            'name': pib,
+                            'column': f"{COLUMN_DESERTION_DATE} / Повернення",
+                            'error_desc': f'Нелогічна послідовність: СЗЧ ({des_dt.strftime(EXCEL_DATE_FORMAT)}) після повернення ({actual_ret_dt.strftime(EXCEL_DATE_FORMAT)})'
+                        })
+
+                    # 4. Перевірка відповідності колонок до БІО
+                    expected_title = extract_title(bio)
+                    expected_service_type = extract_service_type(bio)
+                    if audit_filter.check_title and expected_title != title and expected_title and title and bio:
+                        errors.append({
+                            'row_idx': excel_row_num,
+                            'name': pib,
+                            'column': f"{COLUMN_TITLE}",
+                            'error_desc': f'Невірно видрано звання: ({title}, з БІО: {expected_title})'
+                        })
+
+                    if audit_filter.check_service_type and expected_service_type != service_type and expected_service_type and service_type:
+                        errors.append({
+                            'row_idx': excel_row_num,
+                            'name': pib,
+                            'column': f"{COLUMN_SERVICE_TYPE}",
+                            'error_desc': f'Невірно видрано вид служби: ({service_type}, з БІО: {expected_service_type})'
+                        })
+
+
+
+            except Exception as e:
+                self.logger.error(f"❌ Помилка під час пошуку аномалій в Excel: {e}")
+
+            return errors

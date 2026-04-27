@@ -25,7 +25,7 @@ from service.processing.processors.ExcelReport import ExcelReporter
 from service.processing.processors.BatchProcessor import BatchProcessor
 from service.processing.converter.ColumnConverter import ColumnConverter
 from service.storage.LoggerManager import LoggerManager
-import re
+import regex as re
 from datetime import datetime
 from domain.person import Person
 import html

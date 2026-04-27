@@ -1,5 +1,5 @@
 from dics.deserter_xls_dic import *
-import re
+import regex as re
 from datetime import datetime
 from utils.utils import format_to_excel_date, to_nominative_case
 
@@ -109,11 +109,47 @@ def extract_erdr(text: str) -> tuple[str, str]:
         return match.group(1), format_to_excel_date(match.group(2))
     return NA, NA
 
+
 def extract_title(text):
-    # Проходимо по мапінгу (важливо: довгі назви мають бути вище коротких)
+    if not text:
+        return NA
+
+    # Відрізаємо "Близьких родичів", щоб не захопити звання батька/брата
+    search_area = re.split(r'(?i)Адреса|Близькі\s+родичі', text, maxsplit=1)[0]
+
+    found_titles = set()
+
+    # 1. Збираємо всі можливі звання з тексту
     for pattern, canonical_name in PATTERN_TITLE_MAPPING.items():
-        if re.search(pattern, text, re.IGNORECASE):
-            return canonical_name
+        if re.search(pattern, search_area, re.IGNORECASE):
+            found_titles.add(canonical_name)
+
+    if not found_titles:
+        return NA
+
+    # 2. Видаляємо підрядки (напр., 'лейтенант' зникне, якщо є 'старший лейтенант')
+    # Це потрібно, бо регулярка 'лейтенант' спрацює на тексті "старший лейтенант"
+    filtered_titles = set()
+    for t1 in found_titles:
+        # Перевіряємо, чи не є t1 частиною якогось іншого більшого звання t2
+        is_substring = any(t1 != t2 and t1 in t2 for t2 in found_titles)
+        if not is_substring:
+            filtered_titles.add(t1)
+
+    # 3. Вирішуємо конфлікт "майор vs військовослужбовець"
+    # Якщо знайдено більше одного звання, відкидаємо базові "заглушки"
+    if len(filtered_titles) > 1:
+        filtered_titles.discard('солдат')
+        filtered_titles.discard('матрос')
+        filtered_titles.discard('сержант')
+        filtered_titles.discard('офіцер')
+
+    # 4. Повертаємо найточніше звання (якщо їх раптом кілька, беремо перше за пріоритетом мапінгу)
+    if filtered_titles:
+        for _, canonical in PATTERN_TITLE_MAPPING.items():
+            if canonical in filtered_titles:
+                return canonical
+
     return NA
 
 def extract_title_2(canonical_title):
@@ -198,7 +234,7 @@ def extract_conscription_date(text):
     if start_match is None:
         return NA
 
-    # Шукаємо дати після слова "призваний/направлений"
+    # Шукаємо дати після першого входження "призваний/направлений"
     lookback_area = text[start_match.start():]
     raw_dates = re.findall(PATTERN_DATE, lookback_area)
 
@@ -208,11 +244,26 @@ def extract_conscription_date(text):
     parsed_dates = []
     for rd in raw_dates:
         date_str = rd[0] if isinstance(rd, tuple) else rd
-        year_match = re.search(r'\d{4}', date_str)
-        if year_match:
-            parsed_dates.append((date_str, int(year_match.group(0))))
 
-    # Якщо раптом жодна дата не містить 4-значного року, повертаємо першу
+        # Витягуємо всі цифрові блоки з дати (напр. '25.06.1997' -> ['25', '06', '1997'])
+        digit_groups = re.findall(r'\d+', date_str)
+
+        if digit_groups:
+            # Якщо перший блок має 4 цифри - це формат YYYY-MM-DD
+            if len(digit_groups[0]) == 4:
+                year_str = digit_groups[0]
+            else:
+                # Інакше рік стоїть у самому кінці (DD.MM.YY або DD.MM.YYYY)
+                year_str = digit_groups[-1]
+
+            year = int(year_str)
+
+            # Обробка 2-значних років (напр. '25' -> '2025')
+            if len(year_str) == 2:
+                year += 2000 if year < 50 else 1900
+
+            parsed_dates.append((date_str, year))
+
     if not parsed_dates:
         first_date = raw_dates[0][0] if isinstance(raw_dates[0], tuple) else raw_dates[0]
         return format_to_excel_date(first_date)
@@ -221,25 +272,22 @@ def extract_conscription_date(text):
     min_year = min(year for _, year in parsed_dates)
     max_year = max(year for _, year in parsed_dates)
 
-    # Мінімальний вік призову (18 років)
     MIN_AGE = 18
+
+    # Перевіряємо, чи є в тексті дата народження
+    has_dob_in_list = (max_year - min_year) >= MIN_AGE
 
     valid_conscription_dates = []
 
-    # Перевіряємо, чи є в тексті дата народження (розкид між найменшою і найбільшою датою >= 18 років)
-    has_dob_in_list = (max_year - min_year) >= MIN_AGE
-
     for date_str, year in parsed_dates:
         if has_dob_in_list:
-            # Якщо дата народження є, беремо тільки ті дати, що на 18+ років більші за найменшу
+            # Беремо тільки ті дати, що на 18+ років більші за дату народження
             if year - min_year >= MIN_AGE:
                 valid_conscription_dates.append(date_str)
         else:
-            # Якщо розкид дат малий (наприклад, 2022 і 2024), значить дати народження тут немає
             valid_conscription_dates.append(date_str)
 
     if valid_conscription_dates:
-        # Перша ж "доросла" дата після слова "призваний" є нашою ціллю
         return format_to_excel_date(valid_conscription_dates[0])
 
     return NA

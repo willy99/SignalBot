@@ -188,7 +188,7 @@ def search_page(person_ctrl, auth_manager: AuthManager):
 
     # --- 3. МАЛЮЄМО UI ТА ПРИВ'ЯЗУЄМО НОВІ ФУНКЦІЇ ---
     with ui.column().classes('w-full items-center p-4'):
-        ui.label('Пошук і редагування військовослужбовців').classes('text-h4 mb-4')
+        ui.label('Пошук і редагування подій').classes('text-h4 mb-4')
 
         with ui.row().classes('w-full max-w-4xl items-center gap-4'):
             # Головний рядок пошуку

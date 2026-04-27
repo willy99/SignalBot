@@ -315,6 +315,8 @@ class AppMenu:
                                     make_menu_item('Дублікати прізвищ', 'people_outline', '/report_name_dups')
                                 if can_report_general:
                                     make_menu_item('Чекаємо на ЄРДР', 'pending_actions', '/report_waiting_erdr')
+                                if can_report_general:
+                                    make_menu_item('Пошук помилок', 'error', '/error_audit')
 
                                 if can_report_general_edit:
                                     make_menu_item('РНОКПП != Дата Нар.', 'free_cancellation', '/report_error_birthday')

@@ -1,4 +1,4 @@
-import re
+import regex as re
 from nicegui import ui, run
 from dics.deserter_xls_dic import PATTERN_NAME_WITH_CASE
 from gui.services.auth_manager import AuthManager
