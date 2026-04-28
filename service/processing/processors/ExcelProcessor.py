@@ -6,7 +6,7 @@ import config
 from dics.deserter_xls_dic import *
 from dics.deserter_xls_dic import NA
 from typing import List, Dict, Any
-from utils.utils import format_ukr_date, get_typed_value, format_to_excel_date, get_strint_fromfloat, pythoncom_initialize, is_win
+from utils.utils import format_ukr_date, get_typed_value, format_to_excel_date, get_strint_fromfloat, pythoncom_initialize, is_win, clean_text
 import traceback
 from service.storage.LoggerManager import LoggerManager
 from datetime import date, datetime
@@ -568,7 +568,7 @@ class ExcelProcessor:
             if data is None:
                 return results
 
-            q_text = (filter_obj.query or "").lower().strip()
+            q_text = clean_text(filter_obj.query or "").lower().strip()
             q_des_year = filter_obj.des_year
 
             q_des_date_from = date.fromisoformat(filter_obj.des_date_from) if filter_obj.des_date_from else None
@@ -777,7 +777,7 @@ class ExcelProcessor:
                     # Перевіряємо кожен ключ, який ми шукаємо в цьому листі
                     found_indices = []
                     for idx, key in enumerate(remaining_keys):
-                        target_name = (key.name or "").lower().strip()
+                        target_name = clean_text(key.name or "").lower().strip()
                         target_rnokpp = (key.rnokpp or "").strip()
                         target_des_date = (key.des_date or "").strip()
 
@@ -917,7 +917,7 @@ class ExcelProcessor:
             rnokpp_idx = self.header.get(COLUMN_ID_NUMBER, 1) - 1
             des_date_idx = self.header.get(COLUMN_DESERTION_DATE, 1) - 1
 
-            target_name = (key.name or "").lower().strip()
+            target_name = clean_text(key.name or "").lower().strip()
             target_rnokpp = (key.rnokpp or "").strip()
             target_des_date = (key.des_date or "").strip()
 
@@ -1070,7 +1070,7 @@ class ExcelProcessor:
         # 4. Перевіряємо список
         results = []
         for orig_name in names_list:
-            search_name = str(orig_name).strip().lower()
+            search_name = clean_text(str(orig_name).strip().lower())
             found = search_name in db_map
 
             results.append({

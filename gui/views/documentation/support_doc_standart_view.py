@@ -344,7 +344,7 @@ def render_support_standard_page(controller: SupportController, person_controlle
                     else:
                         ui.notify('За цим запитом нікого не знайдено', type='warning')
                         person_select.visible = False
-                        update_badges('', '')
+                        update_badges('', '', False, False, False)
 
                 except Exception as ex:
                     ui.notify(f'Помилка пошуку: {ex}', type='negative')
