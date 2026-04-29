@@ -8,28 +8,33 @@ import time
 import config
 from nicegui import app, run
 
+from service.users.UserService import UserService
+
+
 class AuthManager:
     def __init__(self, workflow:MyWorkFlow):
         self.db = workflow.db
-        self.auth_service = AuthService(self.db)
+        self.user_service = UserService(self.db, workflow.signalClient, workflow.emailClient)
+        self.auth_service = AuthService(self.db, self.user_service)
         self.auth_service.init_default_admin()
+
         self.logger = workflow.log_manager.get_logger()
 
     def create_user(self, username: str, password: str, role: str, full_name: str):
         """Delegate entirely to AuthService — no duplicate hashing or SQL here."""
-        return self.auth_service.create_user(username, password, role, full_name)
+        return self.user_service.create_user(username, password, role, full_name)
 
     def get_user(self, username: str) -> User:
-        return self.auth_service.get_user_by_username(username)
+        return self.user_service.get_user_by_username(username)
 
     def get_all_users(self) -> list:
-        return self.auth_service.get_all_users()
+        return self.user_service.get_all_users(hide_active=False)
 
-    def update_user(self, user_id: int, role: str, full_name: str, is_active: bool):
-        self.auth_service.update_user(user_id=user_id, role=role, full_name=full_name, is_active=is_active)
+    def update_user(self, user_id: int, **kwargs):
+        self.user_service.update_user(user_id=user_id, **kwargs)
 
     def update_password(self, user_id: int, new_password: str):
-        self.auth_service.update_password(user_id=user_id, new_password=new_password)
+        self.user_service.update_password(user_id=user_id, new_password=new_password)
 
     def clear_force_password_change(self, user_id: int):
         """Знімає прапор примусової зміни пароля після успішної зміни."""
@@ -39,7 +44,7 @@ class AuthManager:
         self.auth_service.set_permissions(role=role, module_name=module_name, can_read=can_read, can_write=can_write, can_delete=can_delete)
 
     def get_user_permissions(self, role: str) -> dict:
-        return self.auth_service.get_user_permissions(role)
+        return self.user_service.get_user_permissions(role)
 
 
     async def authenticate(self, username: str, password: str) -> Optional[dict]:
@@ -98,10 +103,6 @@ class AuthManager:
         user_info = app.storage.user.get('user_info', {})
         client_token = user_info.get('session_token')
 
-        # time_str = datetime.fromtimestamp(last_activity).strftime('%H:%M:%S')
-        # print(f'>>> check sessions (formatted): {time_str}')
-        # print(f'>>> diff: {str(time.time() - last_activity)})')
-
         if time.time() - last_activity > config.SECURITY_SESSION_TIMEOUT:
             self.logout()
             return False
@@ -111,7 +112,7 @@ class AuthManager:
         if ctx:
             ctx.last_activity = new_now
 
-        user = self.auth_service.get_user_by_username(user_info.get('username'))
+        user = self.user_service.get_user_by_username(user_info.get('username'))
 
         if not user or user.session_token != client_token:
             uname = user.username if user else user_info.get('username', '?')
@@ -174,7 +175,6 @@ class AuthManager:
         module_perms = perms.get(module_name, {})
 
         return bool(module_perms.get(action, False))
-
 
 
     def get_current_context(self) -> RequestContext:

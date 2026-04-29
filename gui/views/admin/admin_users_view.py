@@ -1,7 +1,7 @@
 from nicegui import ui
-
 from gui.services.auth_manager import AuthManager
 from dics.security_config import *
+
 
 def render_users_page(auth_manager: AuthManager):
     ui.label('Керування користувачами').classes('w-full text-center text-3xl font-bold mb-8')
@@ -79,8 +79,20 @@ def render_users_page(auth_manager: AuthManager):
                 refresh_table()
                 return
 
-            auth_manager.update_user(user['id'], user['role'], user['full_name'], user['is_active'])
+            auth_manager.update_user(user['id'], role=user['role'], full_name=user['full_name'], is_active=user['is_active'])
             ui.notify(f"Статус {user['username']} змінено!", type='info')
+            refresh_table()
+
+        def toggle_user_2fa(user):
+            # Якщо адмін намагається ВВІМКНУТИ 2FA, але в юзера немає контактів
+            if user.get('use_2fa') and not user.get('email') and not user.get('phone'):
+                ui.notify(f"Неможливо ввімкнути 2FA для {user['username']} — немає Email або Signal!", type='negative', position='top')
+                refresh_table()  # Відкочуємо перемикач візуально назад
+                return
+
+            auth_manager.update_user(user['id'], use_2fa=user['use_2fa'])
+            ui.notify(f"2FA для {user['username']} {'ввімкнено' if user['use_2fa'] else 'вимкнено'}", type='positive')
+
             refresh_table()
 
         def update_user_role(user, new_role):
@@ -89,7 +101,7 @@ def render_users_page(auth_manager: AuthManager):
                 refresh_table()
                 return
 
-            auth_manager.update_user(user['id'], new_role, user['full_name'], user['is_active'])
+            auth_manager.update_user(user['id'], role=new_role, full_name=user['full_name'], is_active=user['is_active'])
             ui.notify(f"Роль {user['username']} змінено на {new_role}", type='positive')
             refresh_table()
 
@@ -110,7 +122,7 @@ def render_users_page(auth_manager: AuthManager):
 
                 table = ui.table(columns=columns, rows=users, row_key='id').classes('w-full general-table')
 
-                # Кастомний слот для колонки "Роль" (випадаючий список прямо в таблиці)
+                # Кастомний слот для колонки "Роль"
                 table.add_slot('body-cell-role', f'''
                     <q-td :props="props">
                         <q-select 
@@ -122,17 +134,33 @@ def render_users_page(auth_manager: AuthManager):
                     </q-td>
                 ''')
 
+                # Оновлений слот для 2FA (Перемикач + Іконка статусу контактів)
                 table.add_slot('body-cell-2fa', '''
                     <q-td :props="props">
-                        <q-icon :name="props.row.use_2fa ? 'security' : 'gpp_bad'" 
-                                :color="props.row.use_2fa ? 'green' : 'grey-4'" 
-                                size="sm">
-                            <q-tooltip>{{ props.row.use_2fa ? '2FA налаштовано' : '2FA не активовано' }}</q-tooltip>
-                        </q-icon>
+                        <div class="flex items-center justify-center gap-1">
+                            <q-toggle 
+                                :model-value="props.row.use_2fa" 
+                                color="green" 
+                                @update:model-value="val => { props.row.use_2fa = val; $parent.$emit('toggle_2fa', props.row) }" 
+                            />
+                            <q-icon :name="props.row.email || props.row.phone ? 'contact_mail' : 'warning'" 
+                                    :color="props.row.email || props.row.phone ? 'grey-5' : 'red'" 
+                                    size="sm">
+                                <q-tooltip class="bg-grey-9 text-body2">
+                                    <div v-if="props.row.email || props.row.phone">
+                                        <div>📧 Email: {{ props.row.email || '—' }}</div>
+                                        <div>📱 Signal: {{ props.row.phone || '—' }}</div>
+                                    </div>
+                                    <div v-else class="text-red-300 font-bold">
+                                        ❌ Немає контактів для 2FA!
+                                    </div>
+                                </q-tooltip>
+                            </q-icon>
+                        </div>
                     </q-td>
                 ''')
 
-                # Кастомний слот для статусу (перемикач Активний/Вимкнений)
+                # Кастомний слот для статусу
                 table.add_slot('body-cell-status', '''
                     <q-td :props="props">
                         <q-toggle 
@@ -142,6 +170,7 @@ def render_users_page(auth_manager: AuthManager):
                         />
                     </q-td>
                 ''')
+
 
                 # Кастомний слот для дій (Кнопка зміни пароля)
                 table.add_slot('body-cell-actions', '''
@@ -155,6 +184,7 @@ def render_users_page(auth_manager: AuthManager):
                 # Обробники подій з таблиці
                 table.on('role_changed', lambda e: update_user_role(e.args, e.args['role']))
                 table.on('toggle_status', lambda e: toggle_user_status(e.args))
+                table.on('toggle_2fa', lambda e: toggle_user_2fa(e.args))
                 table.on('change_pwd', lambda e: open_password_dialog(e.args))
 
         # Малюємо таблицю при першому завантаженні

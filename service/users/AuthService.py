@@ -1,7 +1,7 @@
-from typing import Optional, Tuple, Dict, List
+from typing import Optional
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from dics.security_config import PERM_READ, PERM_EDIT, PERM_DELETE, MODULE_ADMIN, MODULE_SEARCH, MODULE_PERSON
+from dics.security_config import MODULE_ADMIN, MODULE_SEARCH, MODULE_PERSON
 from domain.user import User
 import uuid
 import secrets
@@ -14,8 +14,9 @@ import time
 
 class AuthService:
 
-    def __init__(self, db):
+    def __init__(self, db, user_service):
         self.db = db
+        self.user_service = user_service
         self.ip_attempts = {}
 
     async def authenticate(self, username: str, password: str) -> Optional[User]:
@@ -40,12 +41,12 @@ class AuthService:
 
 
         if row and check_password_hash(row['password_hash'], password):
-            user = self._map_to_user(row)
+            user = self.user_service.map_to_user(row)
             if user:
                 # УСПІХ: Скидаємо лічильник помилок
                 self.reset_failed_attempts(user_id)
 
-                user.permissions = self.get_user_permissions(user.role)
+                user.permissions = self.user_service.get_user_permissions(user.role)
                 new_token = str(uuid.uuid4())
                 update_query = f"UPDATE {DB_TABLE_USER} SET session_token = ? WHERE id = ?"
                 self.db.__execute_query__(update_query, (new_token, row['id']))
@@ -56,98 +57,6 @@ class AuthService:
             await asyncio.sleep(1)
         return None
 
-    def get_user_permissions(self, role: str) -> Dict[str, Dict[str, bool]]:
-        """Завантажує права доступу."""
-        query = "SELECT module_name, can_read, can_write, can_delete FROM role_permissions WHERE role = ?"
-        rows = self.db.__execute_fetchall__(query, (role,))
-
-        perms = {}
-        for r in rows:
-            perms[r['module_name']] = {
-                PERM_READ: bool(r['can_read']),
-                PERM_EDIT: bool(r['can_write']),
-                PERM_DELETE: bool(r['can_delete'])
-            }
-        return perms
-
-    def create_user(self, username: str, password: str, role: str, full_name: str,
-                    force_password_change: bool = False):
-
-        if self.get_user_by_username(username):
-            return False, "Користувач з таким логіном вже існує"
-
-        pass_hash = generate_password_hash(password, method='pbkdf2:sha256')
-
-        query = (f"INSERT INTO {DB_TABLE_USER} (username, password_hash, role, full_name, force_password_change) "
-                 "VALUES (?, ?, ?, ?, ?)")
-        user_id = self.db.__execute_query__(
-            query, (username, pass_hash, role, full_name, int(force_password_change))
-        )
-
-        if user_id:
-            return True, "Користувача успішно створено"
-        return False, "Помилка бази даних при створенні користувача"
-
-    def get_user_by_username(self, username: str) -> Optional[User]:
-        query = f"SELECT * FROM {DB_TABLE_USER} WHERE username = ?"
-        row = self.db.__execute_fetch__(query, (username,))
-        return self._map_to_user(row)
-
-    def get_user_by_id(self, user_id: int) -> Optional[User]:
-        """Отримує повні дані користувача за ID."""
-        query = f"SELECT * FROM {DB_TABLE_USER} WHERE id = ?"
-        row = self.db.__execute_fetch__(query, (user_id,))
-        return self._map_to_user(row)
-
-
-    def _map_to_user(self, row) -> Optional[User]:
-        """Єдине місце, де ми створюємо об'єкт User з даних БД."""
-        if not row:
-            return None
-
-        row_keys = row.keys()
-        user = User(
-            id=row['id'],
-            username=row['username'],
-            role=row['role'],
-            full_name=row['full_name'],
-            is_active=bool(row['is_active']),
-            session_token=row['session_token'],
-            lockout_until=row['lockout_until'],
-            failed_login_attempts=row['failed_login_attempts'],
-            use_2fa=row['use_2fa'],
-            email=row['email'],
-            phone=row['phone'],
-            verification_code=row['verification_code'],
-            # Безпечний fallback на випадок, якщо міграція ще не відбулась
-            force_password_change=bool(row['force_password_change']) if 'force_password_change' in row_keys else False,
-        )
-        return user
-
-    def get_all_users(self) -> List[Dict]:
-        """
-        Повертає список словників для таблиці NiceGUI.
-        NiceGUI зручно працює саме зі списком dict.
-        """
-        query = f"SELECT id, username, role, full_name, use_2fa, is_active FROM {DB_TABLE_USER}"
-        rows = self.db.__execute_fetchall__(query)
-        return [
-            {
-                **dict(row),
-                'is_active': bool(row['is_active'])
-            } for row in rows
-        ]
-
-    def update_user(self, user_id: int, role: str, full_name: str, is_active: bool):
-        """Оновлює профіль користувача (без пароля)."""
-        query = f"UPDATE {DB_TABLE_USER} SET role = ?, full_name = ?, is_active = ? WHERE id = ?"
-        self.db.__execute_query__(query, (role, full_name, int(is_active), user_id))
-
-    def update_password(self, user_id: int, new_password: str):
-        """Встановлює новий пароль для існуючого користувача."""
-        pass_hash = generate_password_hash(new_password, method='pbkdf2:sha256')
-        query = f"UPDATE {DB_TABLE_USER} SET password_hash = ? WHERE id = ?"
-        self.db.__execute_query__(query, (pass_hash, user_id))
 
     def clear_force_password_change(self, user_id: int):
         return self.db.__execute_query__(f"UPDATE {DB_TABLE_USER} SET force_password_change = ? WHERE id = ?", (0, user_id))
@@ -168,12 +77,12 @@ class AuthService:
         Пароль генерується криптографічно безпечним способом і виводиться ОДИН РАЗ.
         При першому вході система примусово вимагає змінити пароль.
         """
-        if not self.get_user_by_username('admin'):
+        if not self.user_service.get_user_by_username('admin'):
             # Генеруємо криптографічно безпечний тимчасовий пароль
             alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
             temp_password = ''.join(secrets.choice(alphabet) for _ in range(16))
 
-            self.create_user('admin', temp_password, 'admin', 'Адміністратор',
+            self.user_service.create_user('admin', temp_password, 'admin', 'Адміністратор',
                              force_password_change=True)
 
             # Надаємо максимальні права на існуючі модулі
@@ -208,7 +117,7 @@ class AuthService:
 
     def register_failed_attempt(self, user_id: int):
         """Збільшує лічильник помилок та блокує юзера, якщо ліміт вичерпано."""
-        user:User = self.get_user_by_id(user_id)
+        user:User = self.user_service.get_user_by_id(user_id)
         new_attempts = (user.failed_login_attempts or 0) + 1
         lockout_until = None
 

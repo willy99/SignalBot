@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
+
+from dics.security_config import PERM_READ, PERM_EDIT, PERM_DELETE
 from domain.user import User
 from service.connection.EmailClient import EmailClient
 from service.connection.MyDataBase import MyDataBase
@@ -7,7 +9,6 @@ from service.connection.SignalClient import SignalClient
 from service.constants import DB_TABLE_USER
 from service.storage.LoggerManager import LoggerManager
 from service.storage.StorageFactory import StorageFactory
-from service.users.AuthService import AuthService
 from werkzeug.security import generate_password_hash
 import config
 from utils.utils import normalize_phone
@@ -18,7 +19,6 @@ class UserService:
         self.db = db
         self.signal_client = signal_client
         self.email_client = email_client
-        self.auth_service = AuthService(self.db)
         self._signal_sessions = {}
 
     def get_user_state(self, phone_number: str) -> str:
@@ -88,9 +88,6 @@ class UserService:
             (user_id,)
         )
 
-    def get_user_by_id(self, user_id: int) -> Optional[User]:
-        return self.auth_service.get_user_by_id(user_id)
-
     def update_user_profile(self, user_id: int, full_name: str, use_2fa: bool) -> bool:
         """Оновлює профіль користувача."""
         query = f'''
@@ -147,7 +144,7 @@ class UserService:
             stored_digits = normalize_phone(str(row['phone']))
             print('>>> checking with ' + str(stored_digits))
             if stored_digits[-9:] == suffix:
-                return self.auth_service._map_to_user(row)
+                return self.map_to_user(row)
 
         return None
 
@@ -193,9 +190,13 @@ class UserService:
         self.db.__execute_query__(query, (phone_number,))
         self.set_user_state(phone_number, "START")
 
-    def get_all_users(self) -> List[Dict]:
-        query = f"SELECT id, username, is_active FROM {DB_TABLE_USER} where is_active = ?"
-        rows = self.db.__execute_fetchall__(query, (int(True),))
+    def get_all_users(self, hide_active=True) -> List[Dict]:
+        if hide_active:
+            query = f"SELECT * FROM {DB_TABLE_USER} where is_active = ?"
+            rows = self.db.__execute_fetchall__(query, (int(True),))
+        else:
+            query = f"SELECT * FROM {DB_TABLE_USER}"
+            rows = self.db.__execute_fetchall__(query)
 
         if not rows:
             return []
@@ -203,7 +204,8 @@ class UserService:
         return [
             {
                 **dict(row),
-                'is_active': bool(row['is_active'])
+                'is_active': bool(row['is_active']),
+                'use_2fa': bool(row['use_2fa'])
             } for row in rows
         ]
 
@@ -229,3 +231,108 @@ class UserService:
                 if username:
                     print('>>> створюємо папку ' + str(f'{config.OUTBOX_LOCAL_DIR_PATH}{client.get_separator()}{username}'))
                     client.make_dirs(f'{config.OUTBOX_LOCAL_DIR_PATH}{client.get_separator()}{username}')
+
+
+    def update_user(self, user_id: int, **kwargs) -> bool:
+        """
+        Універсальний метод для оновлення будь-яких полів користувача.
+        Приклад виклику:
+        update_user_fields(1, role='admin', is_active=True, use_2fa=False)
+        """
+        if not kwargs:
+            return False  # Немає полів для оновлення
+
+        # Формуємо частину SET: "role = ?, is_active = ?, use_2fa = ?"
+        set_clauses = [f"{key} = ?" for key in kwargs.keys()]
+        set_string = ", ".join(set_clauses)
+
+        # Обробляємо значення (перетворюємо Python True/False на 1/0 для надійності в SQLite)
+        processed_values = [int(v) if isinstance(v, bool) else v for v in kwargs.values()]
+
+        # Додаємо user_id в кінець для умови WHERE
+        processed_values.append(user_id)
+
+        query = f"UPDATE {DB_TABLE_USER} SET {set_string} WHERE id = ?"
+        try:
+            self.db.__execute_query__(query, tuple(processed_values))
+            return True
+        except Exception as e:
+            # Тут можна додати запис у лог, якщо використовуєте self.log_manager
+            print(f"❌ Помилка універсального оновлення користувача {user_id}: {e}")
+            return False
+
+
+    def update_password(self, user_id: int, new_password: str):
+        """Встановлює новий пароль для існуючого користувача."""
+        pass_hash = generate_password_hash(new_password, method='pbkdf2:sha256')
+        query = f"UPDATE {DB_TABLE_USER} SET password_hash = ? WHERE id = ?"
+        self.db.__execute_query__(query, (pass_hash, user_id))
+
+
+    def get_user_by_username(self, username: str) -> Optional[User]:
+        query = f"SELECT * FROM {DB_TABLE_USER} WHERE username = ?"
+        row = self.db.__execute_fetch__(query, (username,))
+        return self.map_to_user(row)
+
+    def get_user_by_id(self, user_id: int) -> Optional[User]:
+        """Отримує повні дані користувача за ID."""
+        query = f"SELECT * FROM {DB_TABLE_USER} WHERE id = ?"
+        row = self.db.__execute_fetch__(query, (user_id,))
+        return self.map_to_user(row)
+
+    def get_user_permissions(self, role: str) -> Dict[str, Dict[str, bool]]:
+        """Завантажує права доступу."""
+        query = "SELECT module_name, can_read, can_write, can_delete FROM role_permissions WHERE role = ?"
+        rows = self.db.__execute_fetchall__(query, (role,))
+
+        perms = {}
+        for r in rows:
+            perms[r['module_name']] = {
+                PERM_READ: bool(r['can_read']),
+                PERM_EDIT: bool(r['can_write']),
+                PERM_DELETE: bool(r['can_delete'])
+            }
+        return perms
+
+    def create_user(self, username: str, password: str, role: str, full_name: str,
+                    force_password_change: bool = False):
+
+        if self.get_user_by_username(username):
+            return False, "Користувач з таким логіном вже існує"
+
+        pass_hash = generate_password_hash(password, method='pbkdf2:sha256')
+
+        query = (f"INSERT INTO {DB_TABLE_USER} (username, password_hash, role, full_name, force_password_change) "
+                 "VALUES (?, ?, ?, ?, ?)")
+        user_id = self.db.__execute_query__(
+            query, (username, pass_hash, role, full_name, int(force_password_change))
+        )
+
+        if user_id:
+            return True, "Користувача успішно створено"
+        return False, "Помилка бази даних при створенні користувача"
+
+
+    def map_to_user(self, row) -> Optional[User]:
+        """Єдине місце, де ми створюємо об'єкт User з даних БД."""
+        if not row:
+            return None
+
+        row_keys = row.keys()
+        user = User(
+            id=row['id'],
+            username=row['username'],
+            role=row['role'],
+            full_name=row['full_name'],
+            is_active=bool(row['is_active']),
+            session_token=row['session_token'],
+            lockout_until=row['lockout_until'],
+            failed_login_attempts=row['failed_login_attempts'],
+            use_2fa=row['use_2fa'],
+            email=row['email'],
+            phone=row['phone'],
+            verification_code=row['verification_code'],
+            # Безпечний fallback на випадок, якщо міграція ще не відбулась
+            force_password_change=bool(row['force_password_change']) if 'force_password_change' in row_keys else False,
+        )
+        return user

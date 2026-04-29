@@ -294,7 +294,7 @@ class AppMenu:
                                 if can_report_general:
                                     make_menu_label('Аналітика та прогнози')
                                     make_menu_item('Загальний стан', 'fact_check', '/report_general_state')
-                                    make_mobile_item('Теплова карта СЗЧ', 'gradient', '/report_heatmap')
+                                    make_menu_item('Теплова карта СЗЧ', 'gradient', '/report_heatmap')
                                     make_menu_item('Помісячна дінамика', 'ssid_chart', '/report_monthly')
                                 if can_report_general or can_report_general_edit:
                                     make_menu_label('Приводимо в порядок (БД)')
