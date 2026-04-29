@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List, Dict
 from domain.user import User
 from service.connection.EmailClient import EmailClient
 from service.connection.MyDataBase import MyDataBase
 from service.connection.SignalClient import SignalClient
 from service.constants import DB_TABLE_USER
+from service.storage.LoggerManager import LoggerManager
+from service.storage.StorageFactory import StorageFactory
 from service.users.AuthService import AuthService
 from werkzeug.security import generate_password_hash
 import config
@@ -190,3 +192,40 @@ class UserService:
         query = "UPDATE users SET signal_last_activity = NULL WHERE phone = ?"
         self.db.__execute_query__(query, (phone_number,))
         self.set_user_state(phone_number, "START")
+
+    def get_all_users(self) -> List[Dict]:
+        query = f"SELECT id, username, is_active FROM {DB_TABLE_USER} where is_active = ?"
+        rows = self.db.__execute_fetchall__(query, (int(True),))
+
+        if not rows:
+            return []
+
+        return [
+            {
+                **dict(row),
+                'is_active': bool(row['is_active'])
+            } for row in rows
+        ]
+
+    def init_user_folders(self):
+        users = self.get_all_users()
+        if not users:
+            return
+        # --- 1. Створення папок INBOX ---
+        # Створюємо клієнт для кореневої папки inbox
+        with StorageFactory.create_client(config.INBOX_LOCAL_DIR_PATH, LoggerManager()) as client:
+            for user in users:
+                username = user.get('username')
+                if username:
+                    # Створюємо директорію для конкретного юзера (відносно INBOX_LOCAL_DIR_PATH)
+                    print('>>> створюємо папку ' + str(f'{config.INBOX_LOCAL_DIR_PATH}{client.get_separator()}{username}'))
+                    client.make_dirs(f'{config.INBOX_LOCAL_DIR_PATH}{client.get_separator()}{username}')
+
+        # --- 2. Створення папок OUTBOX ---
+        # Створюємо клієнт для кореневої папки outbox
+        with StorageFactory.create_client(config.OUTBOX_LOCAL_DIR_PATH, LoggerManager()) as client:
+            for user in users:
+                username = user.get('username')
+                if username:
+                    print('>>> створюємо папку ' + str(f'{config.OUTBOX_LOCAL_DIR_PATH}{client.get_separator()}{username}'))
+                    client.make_dirs(f'{config.OUTBOX_LOCAL_DIR_PATH}{client.get_separator()}{username}')

@@ -141,7 +141,6 @@ class AuthService:
     def update_user(self, user_id: int, role: str, full_name: str, is_active: bool):
         """Оновлює профіль користувача (без пароля)."""
         query = f"UPDATE {DB_TABLE_USER} SET role = ?, full_name = ?, is_active = ? WHERE id = ?"
-        print(str(int(is_active)))
         self.db.__execute_query__(query, (role, full_name, int(is_active), user_id))
 
     def update_password(self, user_id: int, new_password: str):

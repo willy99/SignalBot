@@ -48,6 +48,7 @@ class MyWorkFlow:
             excel_lock=self._excel_lock,
             excel_processor=self.excelProcessor
         )
+        user_service.init_user_folders()
 
     async def parseSignalData(self, data: dict):
         """Розбирає JSON-RPC пакет від Signal та запускає відповідну логіку."""
