@@ -72,6 +72,8 @@ class DocProcessor:
         if header_text is not None:
             fields[col.COLUMN_MIL_UNIT] = extract_mil_unit(header_text)
 
+        print('>>> MU: '+str(fields[col.COLUMN_MIL_UNIT]))
+
         cond_text = text_pieces[self.__PIECE_1]
 
         if cond_text is not None:
@@ -113,11 +115,11 @@ class DocProcessor:
                 subunit2 = extract_military_subunit(text_pieces[self.__PIECE_1],get_file_name(self.original_filename), mapping=PATTERN_SUBUNIT2_MAPPING)
             fields[col.COLUMN_SUBUNIT2] = subunit2
             fields[col.COLUMN_REVIEW_STATUS] = DEFAULT_REVIEW_STATUS
-            if fields[col.COLUMN_DESERTION_PLACE] == 'НЦ':
+            if fields[col.COLUMN_DESERTION_PLACE] == EDU_CENTER:
                 fields[col.COLUMN_REVIEW_STATUS] = DEFAULT_REVIEW_STATUS_FOR_EDU_CENTER
-                fields[col.COLUMN_ORDER_ASSIGNMENT_NUMBER] = 'НЦ'
+                fields[col.COLUMN_ORDER_ASSIGNMENT_NUMBER] = EDU_CENTER
                 fields[col.COLUMN_ORDER_ASSIGNMENT_DATE] = fields[col.COLUMN_DESERTION_DATE]
-                fields[col.COLUMN_KPP_NUMBER] = 'НЦ'
+                fields[col.COLUMN_KPP_NUMBER] = EDU_CENTER
                 fields[col.COLUMN_KPP_DATE] = fields[col.COLUMN_DESERTION_DATE]
                 fields[col.COLUMN_DESERTION_TYPE] = DEFAULT_DESERTION_TYPE_FOR_EDU_CENTER
 

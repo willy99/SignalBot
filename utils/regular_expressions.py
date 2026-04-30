@@ -4,7 +4,9 @@ from datetime import datetime
 from utils.utils import format_to_excel_date, to_nominative_case
 
 
-def extract_locality(conditions: str) -> str:
+def extract_locality(conditions: str, des_place=None) -> str:
+    if des_place == EDU_CENTER:
+        return des_place
     if not conditions or conditions == NA:
         return NA
     match = re.search(PATTERN_LOCALITY, conditions)
@@ -176,10 +178,6 @@ def extract_title_2(canonical_title):
 
 
 def extract_mil_unit(text):
-    UNIT_ALIASES = {
-        'А7019': 'А7018',
-        'А7017': 'А7018'
-    }
     matches = re.findall(PATTERN_MIL_UNIT, text)
 
     if not matches:
@@ -191,12 +189,8 @@ def extract_mil_unit(text):
         unit = m.upper()
 
         # Якщо частина є в списку аліасів (7019 -> 7018)
-        if unit in UNIT_ALIASES:
-            return UNIT_ALIASES[unit]
-
-        # Якщо це безпосередньо 7018
-        if unit == 'А7018':
-            return unit
+        if unit in MIL_UNIT_ALIASES:
+            return MIL_UNIT_ALIASES[unit]
 
     # 2. Якщо частин 701x не знайдено, повертаємо першу ліпшу (наприклад, А0224)
     return matches[0].upper()
@@ -418,7 +412,7 @@ def extract_desertion_region(text):
     if desertion_place:
         if 'ППД' == desertion_place:
             return 'Миколаївська область'
-        if 'НЦ' == desertion_place:
+        if EDU_CENTER == desertion_place:
             return 'Житомирська область'
     return NA
 
@@ -503,16 +497,16 @@ def extract_desertion_type(desertion_condition, desertion_where):
     for pattern, short_name in PATTERN_DESERTION_TYPE_MAPPING.items():
         if re.search(pattern, desertion_condition, re.IGNORECASE):
             return short_name
-    if desertion_where == 'НЦ':
+    if desertion_where == EDU_CENTER:
         des_type = DEFAULT_DESERTION_TYPE_FOR_EDU_CENTER
     return des_type
 
 def extract_cc_article(desertion_type):
     if desertion_type == 'СЗЧ зброя':
-        return "429"
+        return ARTICLE_429_WEAPON
     if desertion_type == 'відмова':
-        return "402"
-    return "407"
+        return ARTICLE_402_REBELLIOUS
+    return ARTICLE_407_ABANDONEMENT
 
 def extract_experience(days: int):
     if days > EXPERIENCED_MORE_THAN_DAYS:

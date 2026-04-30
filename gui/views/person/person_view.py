@@ -83,14 +83,14 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
     def auto_fill_desertion_place_fields():
         des_place_val = des_place.value
         des_cond = cond_area.value
-        if des_place_val == 'НЦ':
+        if des_place_val == EDU_CENTER:
             person.review_status = DEFAULT_REVIEW_STATUS_FOR_EDU_CENTER
             person.desertion_type = DEFAULT_DESERTION_TYPE_FOR_EDU_CENTER
             person.cc_article = ARTICLE_407_ABANDONEMENT
             desertion_type.update()
-            person.o_ass_num = 'НЦ'
+            person.o_ass_num = EDU_CENTER
             person.o_ass_date = desert_inp.value
-            person.kpp_num = 'НЦ'
+            person.kpp_num = EDU_CENTER
             person.kpp_date = desert_inp.value
         else:
             person.review_status = DEFAULT_REVIEW_STATUS
@@ -320,7 +320,8 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
                                 if person.id is not None:
                                     mil_unit_select.props('disable')
                                 else:
-                                    mil_unit_select.value = MIL_UNITS[0]
+                                    if person.mil_unit is None:
+                                        mil_unit_select.value = MIL_UNITS[0]
 
                                 name_input = ui.input(COLUMN_NAME, validation=req).bind_value(person, 'name').classes('col-span-12 sm:col-span-5')
 
