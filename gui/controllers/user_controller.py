@@ -9,6 +9,8 @@ import secrets
 import config
 from service.processing.MyWorkFlow import MyWorkFlow
 from werkzeug.security import check_password_hash
+
+from service.users.AuthService import AuthService
 from service.users.UserService import UserService
 
 class UserController:
@@ -17,6 +19,7 @@ class UserController:
         self.log_manager = workflow.log_manager
         self.logger = self.log_manager.get_logger()
         self.user_service = UserService(self.db, workflow.signalClient, workflow.emailClient)
+        self.auth_service = AuthService(self.db, self.user_service)
 
     def request_verification(self, ctx: RequestContext, contact_info: str, contact_type: str):
         """Етап 1: Працює в окремому потоці (через io_bound)"""
@@ -69,7 +72,7 @@ class UserController:
         # 3. ПЕРЕВІРКА КОДУ через хеш (constant-time порівняння)
         if not check_password_hash(pending['code_hash'], entered_code):
             # Реєструємо провал
-            attempts, lockout = self.user_service.auth_service.register_failed_attempt(ctx.user_id)
+            attempts, lockout = self.auth_service.register_failed_attempt(ctx.user_id)
 
             if lockout:
                 raise ValueError(f"Забагато спроб! Доступ заблоковано на {config.SECURITY_LOCKOUT_DURATION_MINS} хв.")
@@ -85,7 +88,7 @@ class UserController:
             self.user_service.update_user_phone(ctx.user_id, pending['contact'])
 
         # Скидаємо всі "гріхи" та очищуємо тимчасові дані
-        self.user_service.auth_service.reset_failed_attempts(ctx.user_id)
+        self.auth_service.reset_failed_attempts(ctx.user_id)
         self.user_service.clear_pending(ctx.user_id)
 
         return True

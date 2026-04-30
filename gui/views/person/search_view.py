@@ -218,7 +218,7 @@ def search_page(person_ctrl, auth_manager: AuthManager):
                             rnokpp="",
                             subunit="",
                             mil_unit=sheet_select.value,
-                            cc_article='407',
+                            cc_article=ARTICLE_407_ABANDONEMENT,
                             desertion_type='СЗЧ',
                             review_status=DEFAULT_REVIEW_STATUS
                         )

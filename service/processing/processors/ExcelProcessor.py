@@ -699,7 +699,7 @@ class ExcelProcessor:
                 match_402_article = True
                 if filter_obj.include_402 is not None and filter_obj.include_402 == False:
                     article = get_strint_fromfloat(row[article_idx])
-                    match_402_article = article != '402'
+                    match_402_article = article != ARTICLE_402_REBELLIOUS
 
                 match_des_region = True
                 if filter_obj.desertion_region:

@@ -82,9 +82,11 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
 
     def auto_fill_desertion_place_fields():
         des_place_val = des_place.value
+        des_cond = cond_area.value
         if des_place_val == 'НЦ':
             person.review_status = DEFAULT_REVIEW_STATUS_FOR_EDU_CENTER
             person.desertion_type = DEFAULT_DESERTION_TYPE_FOR_EDU_CENTER
+            person.cc_article = ARTICLE_407_ABANDONEMENT
             desertion_type.update()
             person.o_ass_num = 'НЦ'
             person.o_ass_date = desert_inp.value
@@ -92,7 +94,8 @@ def edit_person(person: Person, person_ctrl, auth_manager: AuthManager, on_close
             person.kpp_date = desert_inp.value
         else:
             person.review_status = DEFAULT_REVIEW_STATUS
-            person.desertion_type = DEFAULT_DESERTION_TYPE
+            person.desertion_type = extract_desertion_type(des_cond, des_place_val)
+            person.cc_article = extract_cc_article(person.desertion_type)
             desertion_type.update()
             person.kpp_num = None
             person.kpp_date = None

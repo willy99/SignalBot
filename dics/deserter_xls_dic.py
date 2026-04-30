@@ -479,8 +479,6 @@ REVIEW_STATUS_MAP: Final[Dict[str, List[str]]] = {
 
 }
 
-REPORT_SUBUNIT_EXCLUDE_ARTICLES = ['402']
-
 SUSPENDED_KEYWORD:Final[str] = 'призупинено В/С'
 DESERTION_TYPE_WEAPON_KEYWORD: Final[str] = 'СЗЧ зброя'
 
@@ -497,7 +495,13 @@ TASK_TYPES: Final[Dict[str, str]] = {
     'Звіти': 'menu_book'
 }
 
+ARTICLE_402_REBELLIOUS = '402' # непокора, відмова
+ARTICLE_407_ABANDONEMENT = '407' # Самовільне залишення військової частини або місця служби
+ARTICLE_408_DESERTION = '408' # Дезертирство
+ARTICLE_409_SELF_INJURY = '409' # Самокаліцтво
+ARTICLE_429_WEAPON = '429' # Самовільне залишення поля бою або відмова діяти зброєю
 
+REPORT_SUBUNIT_EXCLUDE_ARTICLES = [ARTICLE_402_REBELLIOUS]
 
 VOC_NAMES = {
     "100": "100 - Стрілецькі та спеціальні",

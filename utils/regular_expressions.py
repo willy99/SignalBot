@@ -498,10 +498,10 @@ def extract_desertion_place(text, file_name=None):
 
     return NA
 
-def extract_desertion_type(text, desertion_where):
+def extract_desertion_type(desertion_condition, desertion_where):
     des_type = DEFAULT_DESERTION_TYPE
     for pattern, short_name in PATTERN_DESERTION_TYPE_MAPPING.items():
-        if re.search(pattern, text, re.IGNORECASE):
+        if re.search(pattern, desertion_condition, re.IGNORECASE):
             return short_name
     if desertion_where == 'НЦ':
         des_type = DEFAULT_DESERTION_TYPE_FOR_EDU_CENTER

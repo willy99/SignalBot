@@ -42,7 +42,7 @@ def generate_test_records(count=20):
             COLUMN_DESERTION_PLACE: f"{random.choice(des_place)}",
             COLUMN_TITLE_2: f"солдат",
             COLUMN_REVIEW_STATUS: REVIEW_STATUS_NOT_ASSIGNED,
-            COLUMN_CC_ARTICLE: '407',
+            COLUMN_CC_ARTICLE: ARTICLE_407_ABANDONEMENT,
             "source_file": "test_batch.pdf"
         }
         records.append(record)
