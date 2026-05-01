@@ -1,12 +1,7 @@
 import regex as re
-from nicegui import ui, run
+from nicegui import ui
 from dics.deserter_xls_dic import PATTERN_NAME_WITH_CASE
 from gui.services.auth_manager import AuthManager
-
-
-# Переконайтеся, що імпортували ваші класи та константи:
-# from gui.services.request_context import RequestContext
-# from domain.filters import PersonSearchFilter
 
 def render_bulk_search_page(person_ctrl, auth_manager: AuthManager):
     ui.label('Масовий пошук осіб').classes('w-full text-center text-3xl font-bold mb-6')

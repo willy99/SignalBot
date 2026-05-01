@@ -59,10 +59,12 @@ class ErdrCacheManager:
                     if valid_files and progress_callback:
                         progress_callback(self.current_stats)
 
+
                     for filename in valid_files:
                         # =========================================================
                         # ЗАХИСТ ВІД ЗАБЛОКОВАНИХ ФАЙЛІВ ТА ВАЖКИХ ДОКУМЕНТІВ
                         # =========================================================
+                        full_path_win = f"{dirpath}\\{filename}"
                         try:
                             # Перевіряємо, чи файл доступний і чи не занадто великий (> 50 МБ)
                             if self.client.get_file_size(full_path_win) > 50 * 1024 * 1024:
@@ -73,7 +75,7 @@ class ErdrCacheManager:
                             continue
 
                         print(f'>> ERDR processing {filename} in {display_path}')
-                        full_path_win = f"{dirpath}\\{filename}"
+
                         extracted_names = []
                         temp_local_path = None
 
