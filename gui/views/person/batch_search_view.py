@@ -3,7 +3,7 @@ from nicegui import ui
 from datetime import datetime
 import config
 from config_examples.config_mac import EXCEL_DATE_FORMAT
-from dics.deserter_xls_dic import PATTERN_NAME_WITH_CASE, PATTERN_DATE, MIL_UNITS
+from dics.deserter_xls_dic import PATTERN_NAME_WITH_CASE, MIL_UNITS
 from gui.services.auth_manager import AuthManager
 from utils.regular_expressions import extract_desertion_date_from_erdr_cond
 from utils.utils import get_file_year_month, clean_text

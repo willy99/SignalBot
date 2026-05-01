@@ -192,7 +192,9 @@ class FileCacheManager:
 
     def search(self, query: str) -> List[Dict]:
         if not query or not self.cache_data:
+            self.log_manager.get_logger().error('# query = ' + str(query) + ' або порожній cache')
             return []
+        self.log_manager.get_logger().debug('# ПОШУК ' + str(query))
 
         query = query.strip()
         escaped_parts = [re.escape(part) for part in query.split('*')]
