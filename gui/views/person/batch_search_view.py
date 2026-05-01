@@ -43,6 +43,7 @@ def get_full_source_path(row_data, base_dir):
 
 
 def render_bulk_search_page(person_ctrl, file_cache_manager, auth_manager: AuthManager):
+    file_cache_manager.load_cache()
     ui.label('Масовий аналіз та пошук осіб').classes('w-full text-center text-3xl font-bold mb-6')
 
     with ui.card().classes('w-full max-w-5xl mx-auto p-6 shadow-md'):
