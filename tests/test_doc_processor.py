@@ -451,6 +451,10 @@ def test_name_lowercase_extraction(processor_factory, mock_logger):
     res = extract_name_lowercased(text)
     assert res == "Залужний Сергій Іванович"
 
+    text = "роти аеромобільного батальйону в/ч А0224 (79-та одшбр) рядовий ЗАЛУЖНИЙ СЕРГІЙ Іванович, 18.03.1971 р.н., Р"
+    res = extract_name_lowercased(text)
+    assert res == "ЗАЛУЖНИЙ СЕРГІЙ Іванович"
+
 
 def test_title_extraction(processor_factory, mock_logger):
     text = "ПУНДІК Олег Вікторович, старший солдат, військовослужбовець військової служби за призовом, "
@@ -814,6 +818,9 @@ def test_address_extraction(processor_factory, mock_logger):
     res = extract_address(text)
     assert res == 'Дніпропетровська область, м. Дніпро, вул. Новокримська 7 кв 9'
 
+    text = "411111177. Адреса проживання військовослужбовця: м. Вознесенськ, вул. Мирна, буд. 18. Номер мобільного телефону: (066) 511-11-22. Близькі родичі: відсутні."
+    res = extract_address(text)
+    assert res == 'м. Вознесенськ, вул. Мирна, буд. 18'
 
 def test_phone_extraction(processor_factory, mock_logger):
     text = "номер мобільного телефону (095) 64 73225. Адреса "

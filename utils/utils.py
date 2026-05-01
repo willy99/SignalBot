@@ -562,3 +562,36 @@ def get_build_info() -> str:
     except Exception:
         # Якщо git не встановлено, або немає папки .git (наприклад, зібрано в Docker)
         return "v.Dev (невідомо)"
+
+# витягує рік та місяць з імені файлу, патерн може бути різним, або з папки, де знаходився файл
+def get_file_year_month(path: str, filename: str):
+    """Витягує рік та місяць зі імені файлу або зі шляху."""
+
+    # --- 1. ШУКАЄМО В ІМЕНІ ФАЙЛУ ---
+    # Формат YYYY.MM.DD або YYYY_MM_DD (напр. 2025.05.26)
+    m = re.search(r'\b(\d{4})[\._](\d{2})[\._](\d{2})\b', filename)
+    if m: return int(m.group(1)), int(m.group(2))
+
+    # Формат DD.MM.YYYY або DD_MM_YYYY (напр. 11.05.2022 або 12_02_2025)
+    m = re.search(r'\b(\d{2})[\._](\d{2})[\._](\d{4})\b', filename)
+    if m: return int(m.group(3)), int(m.group(2))
+
+    # Формат DD.MM.YY або DD_MM_YY (напр. 04.01.26)
+    m = re.search(r'\b(\d{2})[\._](\d{2})[\._](\d{2})\b', filename)
+    if m:
+        yy = int(m.group(3))
+        year = 2000 + yy if yy < 50 else 1900 + yy
+        return year, int(m.group(2))
+
+    # --- 2. ЯКЩО В ІМЕНІ НЕМАЄ, ШУКАЄМО В ШЛЯХУ (ПАПКАХ) ---
+    m = re.search(r'\b(\d{2})\.(\d{2})\.(\d{4})\b', path)
+    if m: return int(m.group(3)), int(m.group(2))
+
+    m = re.search(r'\b(\d{2})\.(\d{4})\b', path)
+    if m: return int(m.group(2)), int(m.group(1))
+
+    m = re.search(r'\\(\d{4})\\(\d{2})\\', path)
+    if m: return int(m.group(1)), int(m.group(2))
+
+    return None, None
+

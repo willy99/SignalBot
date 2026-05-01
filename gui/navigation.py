@@ -103,9 +103,7 @@ def init_nicegui(workflow_obj):
     @require_access(auth_manager, MODULE_SEARCH, PERM_READ)
     def batch_search():
         app_menu.render(auth_manager)
-        batch_search_view.render_bulk_search_page(person_ctrl, auth_manager)
-
-
+        batch_search_view.render_bulk_search_page(person_ctrl, file_manager, auth_manager)
 
     @ui.page('/report_units')
     @require_access(auth_manager, MODULE_REPORT_UNITS, PERM_READ)

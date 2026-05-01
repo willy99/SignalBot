@@ -1,3 +1,4 @@
+from config_examples.config_mac import EXCEL_DATE_FORMAT
 from dics.deserter_xls_dic import *
 import regex as re
 from datetime import datetime
@@ -354,6 +355,54 @@ def extract_desertion_date(text):
         return format_to_excel_date(fallback.group(1))
 
     return NA
+
+# free text from erdr excels, search for desertion dates
+def extract_desertion_date_from_erdr_cond(text: str) -> str:
+    """
+    Розумний пошук дати СЗЧ з перевіркою на адекватність (щоб не сплутати з датою народження).
+    """
+
+    # Допоміжна функція для перевірки логічності дати
+    def is_valid_szch_date(date_str: str) -> bool:
+        try:
+            # Обробляємо формати як з 4 цифрами року, так і з 2 (ДД.ММ.РРРР / ДД.ММ.РР)
+            fmt = EXCEL_DATE_FORMAT if len(date_str.split('.')[-1]) == 4 else EXCEL_DATE_FORMAT
+            parsed_date = datetime.strptime(date_str, fmt)
+
+            current_year = datetime.now().year
+
+            # Відсікаємо дати народження.
+            # Якщо рік менше 2014 (або різниця з поточним роком неприродно велика) - це точно не СЗЧ.
+            if parsed_date.year < 2014 or parsed_date.year > current_year + 1:
+                return False
+
+            return True
+        except ValueError:
+            return False
+
+    # 1. Спроба знайти після прийменника "з "
+    match = re.search(fr"(?i)з\s+{PATTERN_DATE}\b", text)
+    if match:
+        candidate = match.group(1).replace(' ', '.')
+        if is_valid_szch_date(candidate):
+            return candidate
+
+    # 2. Спроба знайти перед фразою "в умовах"
+    match = re.search(fr"{PATTERN_DATE}\b\s*,?\s*в умовах", text)
+    if match:
+        candidate = match.group(1).replace(' ', '.')
+        if is_valid_szch_date(candidate):
+            return candidate
+
+    # 3. Фолбек: шукаємо всі дати і йдемо з кінця (від останньої до першої).
+    # Беремо першу з кінця, яка проходить перевірку на "адекватність".
+    all_dates = re.findall(PATTERN_DATE, text)
+    for date_str in reversed(all_dates):
+        candidate = date_str.replace(' ', '.')
+        if is_valid_szch_date(candidate):
+            return candidate
+
+    return "Не визначено"
 
 def extract_desert_conditions(text):
     paragraphs = [p.strip() for p in re.split(PATTERN_PARAGRAPH_SPLIT, text) if p.strip()]

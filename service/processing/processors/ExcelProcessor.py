@@ -1041,7 +1041,43 @@ class ExcelProcessor:
 
     @ensure_com
     def batch_search_names(self, names_list: List[str]) -> List[Dict[str, Any]]:
-        self.switch_to_sheet(config.DESERTER_TAB_NAME, silent=True)
+        # Отримуємо результати з обох вкладок
+        result_a0224 = self._batch_search_names(names_list, config.DESERTER_TAB_NAME)
+        result_a0718 = self._batch_search_names(names_list, config.DESERTER_RESERVE_TAB_NAME)
+
+        # Робимо мапи для швидкого доступу по імені
+        map_a0224 = {r['name']: r for r in result_a0224}
+        map_a0718 = {r['name']: r for r in result_a0718}
+
+        final_results = []
+
+        # Проходимося по оригінальному списку імен і формуємо фінальну відповідь
+        for name in names_list:
+            res_main = map_a0224.get(name)
+            res_resv = map_a0718.get(name)
+
+            if res_main and res_main['found']:
+                # Знайшли в основній частині
+                final_results.append(res_main)
+            elif res_resv and res_resv['found']:
+                # Знайшли в резерві
+                final_results.append(res_resv)
+            else:
+                # НЕ ЗНАЙШЛИ АНІ ТАМ, АНІ ТАМ
+                final_results.append({
+                    'name': name,
+                    'found': False,
+                    'mil_unit': 'Немає в БД',  # Відмічаємо, що його взагалі немає
+                    'rnokpp': None
+                })
+
+        # Сортуємо: щоб ті, кого не знайшли, були зверху (або знизу, як вам зручніше)
+        final_results.sort(key=lambda x: x['found'])
+
+        return final_results
+
+    def _batch_search_names(self, names_list: List[str], sheet_name) -> List[Dict[str, Any]]:
+        self.switch_to_sheet(sheet_name, silent=True)
 
         # 1. Отримуємо індекси колонок
         pib_idx = self.column_map.get(COLUMN_NAME.lower())
@@ -1049,15 +1085,10 @@ class ExcelProcessor:
 
         last_row = self.get_last_row()
         if last_row < 2:
-            return [{'name': n, 'found': False, 'rnokpp': None} for n in names_list]
+            return [{'name': n, 'found': False, 'mil_unit': sheet_name, 'rnokpp': None} for n in names_list]
 
-        # 2. Забираємо дані обох колонок одним запитом (діапазон від A до останньої потрібної)
-        # Щоб не гадати з буквами, візьмемо весь рядок даних з 2 по last_row
-        # Або точково, якщо колонки далеко:
         data_range = self.sheet.range((2, 1), (last_row, self.get_last_col())).value
 
-        # 3. Формуємо словник для швидкого пошуку: { "прізвище": "код" }
-        # Використовуємо словник, щоб дістати РНОКПП за ПІБ
         db_map = {}
         for row in data_range:
             name_val = row[pib_idx - 1]  # xlwings 1-based, list 0-based
@@ -1076,6 +1107,7 @@ class ExcelProcessor:
             results.append({
                 'name': orig_name,
                 'found': found,
+                'mil_unit': sheet_name,
                 'rnokpp': db_map.get(search_name) if found else None
             })
 
