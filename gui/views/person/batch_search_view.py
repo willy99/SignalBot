@@ -3,10 +3,11 @@ from nicegui import ui
 from datetime import datetime
 import config
 from config_examples.config_mac import EXCEL_DATE_FORMAT
-from dics.deserter_xls_dic import PATTERN_NAME_WITH_CASE, MIL_UNITS
+from dics.deserter_xls_dic import PATTERN_NAME_WITH_CASE, MIL_UNITS, PATTERN_TITLE_MAPPING
 from gui.services.auth_manager import AuthManager
 from utils.regular_expressions import extract_desertion_date_from_erdr_cond
 from utils.utils import get_file_year_month, clean_text
+import asyncio
 
 # --- РЕГУЛЯРКИ ---
 PATTERN_UNIT = r'[АAА-Яa-zA-Z]\s*\d{4}'
@@ -56,12 +57,19 @@ def render_bulk_search_page(person_ctrl, file_cache_manager, auth_manager: AuthM
 
     results_container = ui.column().classes('w-full mt-8 gap-2 px-2 sm:px-8')
 
+    def clean_words(text: str) -> str:
+        cleaned_text = text
+        for pattern in PATTERN_TITLE_MAPPING.keys():
+            cleaned_text = re.sub(pattern, ' ', cleaned_text)
+        return re.sub(r'\s+', ' ', cleaned_text).strip()
+
     def parse_text_blocks(raw_text: str):
         parsed_data = []
         blocks = [b.strip() for b in re.split(r'\n\s*\n|\n', raw_text) if b.strip()]
 
         for block in blocks:
             block = clean_text(block)
+            block = clean_words(block)
             units_found = re.findall(PATTERN_UNIT, block, flags=re.IGNORECASE)
             normalized_units = [u.replace(' ', '').upper().replace('A', 'А') for u in units_found]
 
@@ -140,6 +148,7 @@ def render_bulk_search_page(person_ctrl, file_cache_manager, auth_manager: AuthM
                 return
 
             names_to_search = [item['name'] for item in unique_items]
+            await asyncio.sleep(0.1)
 
             db_results = await auth_manager.execute(person_ctrl.batch_search_names, auth_manager.get_current_context(), names_to_search)
             db_map = {}
@@ -152,6 +161,7 @@ def render_bulk_search_page(person_ctrl, file_cache_manager, auth_manager: AuthM
             found_count = 0
 
             for item in unique_items:
+                await asyncio.sleep(0.01)
                 db_info = db_map.get(item['name'], {'found': False})
                 if db_info['found']:
                     found_count += 1
