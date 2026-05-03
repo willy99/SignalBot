@@ -161,8 +161,19 @@ class AuthManager:
                 self.auth_service.invalidate_session_token(user_id)
             except Exception as e:
                 self.logger.warning(f"Не вдалося інвалідувати токен для user_id={user_id}: {e}")
-        app.storage.user.clear()
 
+        try:
+            # Намагаємося видалити файл сесії (стандартна поведінка NiceGUI)
+            app.storage.user.clear()
+        except PermissionError:
+            # Якщо Windows заблокував файл (WinError 32), обходимо проблему:
+            # просто видаляємо всі ключі зі словника в пам'яті.
+            # Наступне збереження просто перезапише цей файл порожнім JSON-ом.
+            for key in list(app.storage.user.keys()):
+                app.storage.user.pop(key, None)
+        except Exception as e:
+            # На випадок інших непередбачуваних помилок, щоб сторінка не падала
+            print(f"Попередження: не вдалося очистити storage.user: {e}")
 
     def has_access(self, module_name: str, action: str = PERM_READ) -> bool:
         from nicegui import app
