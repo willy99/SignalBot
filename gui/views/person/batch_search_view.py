@@ -59,7 +59,9 @@ def render_bulk_search_page(person_ctrl, file_cache_manager, auth_manager: AuthM
 
     def clean_words(text: str) -> str:
         cleaned_text = text
-        for pattern in PATTERN_TITLE_MAPPING.keys():
+        sorted_patterns = sorted(PATTERN_TITLE_MAPPING.keys(), key=len, reverse=True)
+
+        for pattern in sorted_patterns:
             cleaned_text = re.sub(pattern, ' ', cleaned_text)
         return re.sub(r'\s+', ' ', cleaned_text).strip()
 
